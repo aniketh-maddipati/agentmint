@@ -18,6 +18,12 @@ pub enum Error {
     #[error("token already used (jti: {0})")]
     ReplayDetected(String),
 
+    #[error("validation error: {0}")]
+    Validation(String),
+
+    #[error("service unavailable: {0}")]
+    ServiceUnavailable(String),
+
     #[error("database error: {0}")]
     Database(#[from] rusqlite::Error),
 
@@ -31,6 +37,21 @@ pub enum Error {
     Signing(String),
 }
 
+fn client_message(err: &Error) -> String {
+    match err {
+        Error::TokenExpired => "token expired".into(),
+        Error::InvalidSignature => "invalid signature".into(),
+        Error::InvalidToken(_) => "invalid token".into(),
+        Error::ReplayDetected(_) => "token already used".into(),
+        Error::Validation(msg) => msg.clone(),
+        Error::ServiceUnavailable(_) => "service temporarily unavailable".into(),
+        Error::Database(_) => "internal error".into(),
+        Error::Serialization(_) => "invalid request body".into(),
+        Error::Base64(_) => "invalid encoding".into(),
+        Error::Signing(_) => "internal error".into(),
+    }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = match &self {
@@ -38,65 +59,46 @@ impl IntoResponse for Error {
                 StatusCode::UNAUTHORIZED
             }
             Error::ReplayDetected(_) => StatusCode::CONFLICT,
+            Error::Validation(_) | Error::Base64(_) => StatusCode::BAD_REQUEST,
+            Error::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Error::Database(_) | Error::Serialization(_) | Error::Signing(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
-            Error::Base64(_) => StatusCode::BAD_REQUEST,
         };
-        (status, self.to_string()).into_response()
+        tracing::warn!(error = %self, status = %status.as_u16(), "request failed");
+        (status, client_message(&self)).into_response()
     }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub fn lock_err<T>(msg: &str) -> impl FnOnce(std::sync::PoisonError<T>) -> Error + '_ {
+    move |_| Error::Signing(format!("{msg} lock poisoned"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn token_expired_returns_401() {
-        let response = Error::TokenExpired.into_response();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    fn assert_status(err: Error, expected: StatusCode) {
+        assert_eq!(err.into_response().status(), expected);
     }
 
     #[test]
-    fn invalid_signature_returns_401() {
-        let response = Error::InvalidSignature.into_response();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    fn status_code_mapping() {
+        assert_status(Error::TokenExpired, StatusCode::UNAUTHORIZED);
+        assert_status(Error::InvalidSignature, StatusCode::UNAUTHORIZED);
+        assert_status(Error::InvalidToken("x".into()), StatusCode::UNAUTHORIZED);
+        assert_status(Error::ReplayDetected("x".into()), StatusCode::CONFLICT);
+        assert_status(Error::Validation("x".into()), StatusCode::BAD_REQUEST);
+        assert_status(Error::Base64(base64::DecodeError::InvalidLength(3)), StatusCode::BAD_REQUEST);
+        assert_status(Error::ServiceUnavailable("x".into()), StatusCode::SERVICE_UNAVAILABLE);
+        assert_status(Error::Signing("x".into()), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     #[test]
-    fn invalid_token_returns_401() {
-        let response = Error::InvalidToken("bad".into()).into_response();
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
-
-    #[test]
-    fn replay_detected_returns_409() {
-        let response = Error::ReplayDetected("abc-123".into()).into_response();
-        assert_eq!(response.status(), StatusCode::CONFLICT);
-    }
-
-    #[test]
-    fn base64_error_returns_400() {
-        let err = base64::DecodeError::InvalidLength(3);
-        let response = Error::Base64(err).into_response();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[test]
-    fn signing_error_returns_500() {
-        let response = Error::Signing("key failure".into()).into_response();
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    #[test]
-    fn error_messages_are_descriptive() {
-        assert_eq!(Error::TokenExpired.to_string(), "token expired");
-        assert_eq!(Error::InvalidSignature.to_string(), "invalid signature");
-        assert_eq!(
-            Error::ReplayDetected("jti-1".into()).to_string(),
-            "token already used (jti: jti-1)"
-        );
+    fn internal_errors_do_not_leak_details() {
+        assert_eq!(client_message(&Error::Database(rusqlite::Error::QueryReturnedNoRows)), "internal error");
+        assert_eq!(client_message(&Error::Signing("secret".into())), "internal error");
     }
 }

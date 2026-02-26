@@ -7,7 +7,10 @@ use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::error::Result;
+use crate::error::{Result, lock_err};
+
+const MAX_SUB_LEN: usize = 256;
+const MAX_ACTION_LEN: usize = 64;
 
 pub struct AuditLog {
     conn: Mutex<Connection>,
@@ -21,6 +24,10 @@ pub struct AuditEntry {
     pub verified_at: String,
 }
 
+fn truncate(value: &str, max: usize) -> &str {
+    value.char_indices().nth(max).map_or(value, |(i, _)| &value[..i])
+}
+
 impl AuditLog {
     pub fn open(path: &str) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -30,7 +37,8 @@ impl AuditLog {
                 sub TEXT NOT NULL,
                 action TEXT NOT NULL,
                 verified_at TEXT NOT NULL
-            )",
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_verified_at ON audit_log(verified_at);",
         )?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -42,7 +50,9 @@ impl AuditLog {
     }
 
     pub fn log(&self, jti: &str, sub: &str, action: &str, verified_at: DateTime<Utc>) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| crate::error::Error::Signing(e.to_string()))?;
+        let sub = truncate(sub, MAX_SUB_LEN);
+        let action = truncate(action, MAX_ACTION_LEN);
+        let conn = self.conn.lock().map_err(lock_err("audit"))?;
         conn.execute(
             "INSERT INTO audit_log (jti, sub, action, verified_at) VALUES (?1, ?2, ?3, ?4)",
             (jti, sub, action, verified_at.to_rfc3339()),
@@ -51,7 +61,7 @@ impl AuditLog {
     }
 
     pub fn recent(&self, limit: usize) -> Result<Vec<AuditEntry>> {
-        let conn = self.conn.lock().map_err(|e| crate::error::Error::Signing(e.to_string()))?;
+        let conn = self.conn.lock().map_err(lock_err("audit"))?;
         let mut stmt = conn.prepare(
             "SELECT jti, sub, action, verified_at FROM audit_log ORDER BY rowid DESC LIMIT ?1",
         )?;
@@ -112,6 +122,26 @@ mod tests {
         audit.log("jti-1", "a", "x", Utc::now())?;
         let result = audit.log("jti-1", "a", "x", Utc::now());
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn long_sub_truncated() -> Result<()> {
+        let audit = AuditLog::open_in_memory()?;
+        let long_sub = "a".repeat(300);
+        audit.log("jti-1", &long_sub, "deploy", Utc::now())?;
+        let entries = audit.recent(1)?;
+        assert_eq!(entries[0].sub.len(), MAX_SUB_LEN);
+        Ok(())
+    }
+
+    #[test]
+    fn long_action_truncated() -> Result<()> {
+        let audit = AuditLog::open_in_memory()?;
+        let long_action = "b".repeat(100);
+        audit.log("jti-1", "agent", &long_action, Utc::now())?;
+        let entries = audit.recent(1)?;
+        assert_eq!(entries[0].action.len(), MAX_ACTION_LEN);
         Ok(())
     }
 }

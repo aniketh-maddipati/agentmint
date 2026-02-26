@@ -1,4 +1,4 @@
-//! Ed25519 token verification.
+//! Ed25519 token verification with size limits.
 //! Used by: handlers::proxy.
 
 use base64::Engine;
@@ -8,10 +8,26 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use crate::error::{Error, Result};
 use crate::token::claims::Claims;
 
+const MAX_TOKEN_BYTES: usize = 2048;
+
+fn validate_base64_url(input: &str) -> Result<()> {
+    if input.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'=') {
+        return Ok(());
+    }
+    Err(Error::InvalidToken("invalid base64url characters".into()))
+}
+
 pub fn verify_token(token: &str, key: &VerifyingKey) -> Result<Claims> {
+    if token.len() > MAX_TOKEN_BYTES {
+        return Err(Error::InvalidToken("token exceeds size limit".into()));
+    }
+
     let (payload_b64, sig_b64) = token
         .split_once('.')
         .ok_or_else(|| Error::InvalidToken("missing separator".into()))?;
+
+    validate_base64_url(payload_b64)?;
+    validate_base64_url(sig_b64)?;
 
     let sig_bytes = URL_SAFE_NO_PAD.decode(sig_b64)?;
     let signature = Signature::from_slice(&sig_bytes)
@@ -61,7 +77,8 @@ mod tests {
         let key = generate_keypair();
         let claims = Claims::new("agent-1".into(), "deploy".into(), 300);
         let token = sign_token(&claims, &key)?;
-        let tampered = format!("x{}", token);
+        let parts: Vec<&str> = token.split('.').collect();
+        let tampered = format!("{}x.{}", parts[0], parts[1]);
         let result = verify_token(&tampered, &key.verifying_key());
         assert!(matches!(result, Err(Error::InvalidSignature)));
         Ok(())
@@ -81,7 +98,22 @@ mod tests {
     #[test]
     fn missing_separator_rejected() {
         let key = generate_keypair();
-        let result = verify_token("no-dot-here", &key.verifying_key());
+        let result = verify_token("nodothere", &key.verifying_key());
+        assert!(matches!(result, Err(Error::InvalidToken(_))));
+    }
+
+    #[test]
+    fn oversized_token_rejected() {
+        let key = generate_keypair();
+        let huge = "A".repeat(MAX_TOKEN_BYTES + 1);
+        let result = verify_token(&huge, &key.verifying_key());
+        assert!(matches!(result, Err(Error::InvalidToken(_))));
+    }
+
+    #[test]
+    fn invalid_base64_chars_rejected() {
+        let key = generate_keypair();
+        let result = verify_token("pay load.sig!nature", &key.verifying_key());
         assert!(matches!(result, Err(Error::InvalidToken(_))));
     }
 }

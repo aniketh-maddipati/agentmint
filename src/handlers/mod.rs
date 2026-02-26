@@ -3,5 +3,6 @@
 
 pub mod audit;
 pub mod health;
+pub mod metrics;
 pub mod mint;
 pub mod proxy;
