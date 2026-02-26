@@ -1,6 +1,6 @@
 # 🔐 AgentMint
 
-**What it does:** Signs short-lived tokens proving a human approved a specific AI agent action. Verifies those tokens in <1ms. Logs everything.
+**What it does:** Signs short-lived tokens proving a human approved a specific AI agent action. Verifies those tokens in milliseconds. Logs everything.
 
 **Why it matters:** AI agents can call APIs, but nothing proves a human authorized a specific call. Session-level auth says "this agent can access Stripe." AgentMint says "Alice approved this $50 refund for order #123 at 10:03am."
 
@@ -17,7 +17,7 @@ cd agentmint
 cargo run
 ```
 
-Output:
+You'll see:
 ```
 ╔═══════════════════════════════════════════════════════════╗
 ║     🔐 AgentMint v0.1.0                                   ║
@@ -44,16 +44,21 @@ Open a new terminal:
 ```bash
 curl -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"alice@company.com","action":"refund_order_123","ttl_seconds":60}'
+  -d '{"sub":"alice@test.com","action":"refund:order:123","ttl_seconds":60}'
 ```
 
 Response:
 ```json
 {
   "token": "eyJqdGkiOi...",
-  "jti": "8680bbb6-c276-4507-ad34-13c9de1b5333",
-  "exp": "2026-02-26T13:45:01+00:00"
+  "jti": "f1268944-d428-4d55-b1a4-db3560650c03",
+  "exp": "2026-02-26T14:39:14+00:00"
 }
+```
+
+Console shows:
+```
+ MINT  sub: alice@test.com action: refund:order:123 jti:f1268944
 ```
 
 ### 2. Verify the token
@@ -67,10 +72,15 @@ curl -X POST http://localhost:3000/proxy \
 Response:
 ```json
 {
-  "sub": "alice@company.com",
-  "action": "refund_order_123",
-  "jti": "8680bbb6-c276-4507-ad34-13c9de1b5333"
+  "sub": "alice@test.com",
+  "action": "refund:order:123",
+  "jti": "f1268944-d428-4d55-b1a4-db3560650c03"
 }
+```
+
+Console shows:
+```
+ OK  jti:f1268944 3305μs ✓
 ```
 
 ### 3. Replay the token (blocked)
@@ -86,16 +96,41 @@ Response:
 token rejected
 ```
 
-### 4. View audit log
+Console shows:
+```
+ REPLAY  jti:f1268944 blocked
+```
+
+### 4. Check metrics
+
+```bash
+curl http://localhost:3000/metrics
+```
+
+```json
+{
+  "tokens_minted": 1,
+  "tokens_verified": 1,
+  "tokens_rejected": 0,
+  "replays_blocked": 1
+}
+```
+
+### 5. View audit log
 
 ```bash
 curl http://localhost:3000/audit
 ```
 
-### 5. View metrics
-
-```bash
-curl http://localhost:3000/metrics
+```json
+[
+  {
+    "jti": "f1268944-d428-4d55-b1a4-db3560650c03",
+    "sub": "alice@test.com",
+    "action": "refund:order:123",
+    "verified_at": "2026-02-26T14:38:14+00:00"
+  }
+]
 ```
 
 ## One-liner Test
@@ -103,8 +138,8 @@ curl http://localhost:3000/metrics
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"test","action":"test"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4) && \
-curl -X POST http://localhost:3000/proxy \
+  -d '{"sub":"test","action":"test","ttl_seconds":60}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4) && \
+curl -s -X POST http://localhost:3000/proxy \
   -H "Content-Type: application/json" \
   -d "{\"token\":\"$TOKEN\"}"
 ```
@@ -115,11 +150,11 @@ The action field is a freeform string. You define what it means.
 
 | Use Case | Example Action |
 |----------|----------------|
-| Refund | `refund_order_123_max_50` |
-| Deploy | `deploy_prod_api_v2` |
-| Data export | `export_users_csv` |
-| Email | `email_to_ceo` |
-| DB write | `db_delete_user_456` |
+| Refund | `refund:order:123:max:50` |
+| Deploy | `deploy:prod:api:v2.1.0` |
+| Data export | `export:users:csv` |
+| Email | `email:to:ceo@company.com` |
+| DB write | `db:delete:user:456` |
 
 AgentMint signs it, verifies it, logs it. Your app interprets it.
 
@@ -129,21 +164,21 @@ Refund:
 ```bash
 curl -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"support@co.com","action":"refund_ORD123_max99","ttl_seconds":120}'
+  -d '{"sub":"support@co.com","action":"refund:order:123:max:99","ttl_seconds":120}'
 ```
 
 Deploy:
 ```bash
 curl -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"deploy_bot","action":"deploy_prod_api_v2","ttl_seconds":300}'
+  -d '{"sub":"deploy-bot","action":"deploy:prod:api:v2","ttl_seconds":300}'
 ```
 
 GDPR deletion:
 ```bash
 curl -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"gdpr_proc","action":"delete_user_789_all_pii","ttl_seconds":60}'
+  -d '{"sub":"gdpr-proc","action":"delete:user:789","ttl_seconds":60}'
 ```
 
 ## Endpoints
@@ -162,9 +197,9 @@ curl -X POST http://localhost:3000/mint \
 {
   "jti": "unique-id",
   "sub": "who-approved",
-  "action": "what_they_approved",
-  "iat": "2026-02-26T13:44:01Z",
-  "exp": "2026-02-26T13:45:01Z"
+  "action": "what-they-approved",
+  "iat": "2026-02-26T14:38:14Z",
+  "exp": "2026-02-26T14:39:14Z"
 }
 ```
 
@@ -178,14 +213,20 @@ Signed with Ed25519. Format: `base64url(payload).base64url(signature)`
 - Input validation (sub ≤256, action ≤64)
 - Token size limit (2KB max)
 - Errors don't leak internals
+- Security headers (X-Frame-Options, X-Content-Type-Options, Cache-Control)
 
 ## Performance
 
+Measured on Apple M1:
+
 | Operation | Time |
 |-----------|------|
-| Verify signature | <100μs |
-| JTI check | <10μs |
-| Full request | <1ms |
+| Signature verify | ~1.6ms |
+| JTI check | ~15μs |
+| Audit log write | ~1.6ms |
+| **Total request** | **~3.3ms** |
+
+Check `X-Verify-Time-Us` response header for actual timing.
 
 ## Docker
 
@@ -211,7 +252,7 @@ def verify(token: str) -> dict:
         return r.json()
     raise Exception("Rejected")
 
-token = approve("alice@co.com", "refund_order_123")
+token = approve("alice@co.com", "refund:order:123")
 result = verify(token)
 print(f"Authorized by: {result['sub']}")
 ```
