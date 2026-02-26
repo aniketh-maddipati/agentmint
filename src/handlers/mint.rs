@@ -38,9 +38,9 @@ fn validate_request(req: &MintRequest) -> Result<()> {
     }
     if req.action.is_empty()
         || req.action.len() > 64
-        || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
     {
-        return Err(Error::InvalidToken("action must be 1-64 alphanumeric/underscore chars".into()));
+        return Err(Error::InvalidToken("action must be 1-64 chars (alphanumeric, underscore, colon, hyphen)".into()));
     }
     Ok(())
 }
@@ -96,6 +96,12 @@ mod tests {
     #[test]
     fn invalid_action_rejected() {
         assert!(validate_request(&req("a", "deploy!", 60)).is_err());
+    }
+
+    #[test]
+    fn action_allows_colons_and_hyphens() {
+        assert!(validate_request(&req("a", "refund:order:123", 60)).is_ok());
+        assert!(validate_request(&req("a", "deploy-prod", 60)).is_ok());
     }
 
     #[test]
