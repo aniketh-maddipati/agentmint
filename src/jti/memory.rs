@@ -4,14 +4,12 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use chrono::{DateTime, Utc};
-
 use crate::error::{Error, Result, lock_err};
 
 const DEFAULT_MAX_CAPACITY: usize = 100_000;
 
 pub struct JtiStore {
-    entries: Mutex<HashMap<String, DateTime<Utc>>>,
+    entries: Mutex<HashMap<String, i64>>,
     max_capacity: usize,
 }
 
@@ -27,7 +25,7 @@ impl JtiStore {
         }
     }
 
-    pub fn check_and_insert(&self, jti: &str, exp: DateTime<Utc>) -> Result<()> {
+    pub fn check_and_insert(&self, jti: &str, exp: i64) -> Result<()> {
         let mut entries = self.entries.lock().map_err(lock_err("jti"))?;
         Self::cleanup_expired_inner(&mut entries);
         if entries.len() >= self.max_capacity {
@@ -40,8 +38,8 @@ impl JtiStore {
         Ok(())
     }
 
-    fn cleanup_expired_inner(entries: &mut HashMap<String, DateTime<Utc>>) {
-        let now = Utc::now();
+    fn cleanup_expired_inner(entries: &mut HashMap<String, i64>) {
+        let now = chrono::Utc::now().timestamp();
         entries.retain(|_, exp| *exp > now);
     }
 
@@ -56,20 +54,22 @@ impl JtiStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
+
+    fn future_exp() -> i64 {
+        chrono::Utc::now().timestamp() + 300
+    }
 
     #[test]
     fn first_jti_succeeds() -> Result<()> {
         let store = JtiStore::new();
-        let exp = Utc::now() + Duration::seconds(300);
-        store.check_and_insert("jti-1", exp)?;
+        store.check_and_insert("jti-1", future_exp())?;
         Ok(())
     }
 
     #[test]
     fn duplicate_jti_rejected() -> Result<()> {
         let store = JtiStore::new();
-        let exp = Utc::now() + Duration::seconds(300);
+        let exp = future_exp();
         store.check_and_insert("jti-1", exp)?;
         let result = store.check_and_insert("jti-1", exp);
         assert!(matches!(result, Err(Error::ReplayDetected(_))));
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn different_jtis_both_succeed() -> Result<()> {
         let store = JtiStore::new();
-        let exp = Utc::now() + Duration::seconds(300);
+        let exp = future_exp();
         store.check_and_insert("jti-1", exp)?;
         store.check_and_insert("jti-2", exp)?;
         Ok(())
@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn capacity_limit_returns_503() -> Result<()> {
         let store = JtiStore::with_capacity(2);
-        let exp = Utc::now() + Duration::seconds(300);
+        let exp = future_exp();
         store.check_and_insert("jti-1", exp)?;
         store.check_and_insert("jti-2", exp)?;
         let result = store.check_and_insert("jti-3", exp);
@@ -99,10 +99,9 @@ mod tests {
     #[test]
     fn expired_entries_cleaned_up() -> Result<()> {
         let store = JtiStore::with_capacity(1);
-        let past = Utc::now() - Duration::seconds(1);
+        let past = chrono::Utc::now().timestamp() - 1;
         store.check_and_insert("jti-old", past)?;
-        let future = Utc::now() + Duration::seconds(300);
-        store.check_and_insert("jti-new", future)?;
+        store.check_and_insert("jti-new", future_exp())?;
         assert_eq!(store.len(), 1);
         Ok(())
     }

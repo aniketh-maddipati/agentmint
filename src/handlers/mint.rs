@@ -19,7 +19,7 @@ pub struct MintRequest {
 }
 
 fn default_ttl() -> i64 {
-    300
+    60
 }
 
 #[derive(Serialize)]
@@ -31,21 +31,22 @@ pub struct MintResponse {
 
 fn validate_request(req: &MintRequest) -> Result<()> {
     if req.sub.is_empty() || req.sub.len() > 256 {
-        return Err(Error::Validation("sub must be 1-256 characters".into()));
+        return Err(Error::InvalidToken("sub must be 1-256 characters".into()));
     }
     if req.sub.chars().any(|c| c.is_control()) {
-        return Err(Error::Validation("sub contains control characters".into()));
+        return Err(Error::InvalidToken("sub contains control characters".into()));
     }
     if req.action.is_empty()
         || req.action.len() > 64
         || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
     {
-        return Err(Error::Validation("action must be 1-64 alphanumeric/underscore chars".into()));
-    }
-    if !(1..=300).contains(&req.ttl_seconds) {
-        return Err(Error::Validation("ttl_seconds must be 1-300".into()));
+        return Err(Error::InvalidToken("action must be 1-64 alphanumeric/underscore chars".into()));
     }
     Ok(())
+}
+
+fn clamp_ttl(ttl: i64) -> i64 {
+    ttl.clamp(1, 300)
 }
 
 pub async fn mint(
@@ -53,11 +54,13 @@ pub async fn mint(
     Json(req): Json<MintRequest>,
 ) -> Result<Json<MintResponse>> {
     validate_request(&req)?;
-    let claims = Claims::new(req.sub, req.action, req.ttl_seconds);
+    let ttl = clamp_ttl(req.ttl_seconds);
+    let claims = Claims::new(req.sub, req.action, ttl);
     let jti = claims.jti.clone();
     let exp = claims.exp.to_rfc3339();
     let token = sign_token(&claims, &state.signing_key)?;
     tracing::info!(sub = %claims.sub, action = %claims.action, jti = %jti, "token minted");
+    crate::console::log_mint(&claims.sub, &claims.action, &jti);
     state.metrics.record_mint();
     Ok(Json(MintResponse { token, jti, exp }))
 }
@@ -101,10 +104,12 @@ mod tests {
     }
 
     #[test]
-    fn ttl_bounds_enforced() {
-        assert!(validate_request(&req("a", "x", 0)).is_err());
-        assert!(validate_request(&req("a", "x", 301)).is_err());
-        assert!(validate_request(&req("a", "x", 1)).is_ok());
-        assert!(validate_request(&req("a", "x", 300)).is_ok());
+    fn ttl_clamped_to_bounds() {
+        assert_eq!(clamp_ttl(0), 1);
+        assert_eq!(clamp_ttl(-5), 1);
+        assert_eq!(clamp_ttl(500), 300);
+        assert_eq!(clamp_ttl(60), 60);
+        assert_eq!(clamp_ttl(1), 1);
+        assert_eq!(clamp_ttl(300), 300);
     }
 }

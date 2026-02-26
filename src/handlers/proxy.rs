@@ -36,17 +36,19 @@ pub async fn proxy(
     let claims = match verify_token(&req.token, &state.verifying_key) {
         Ok(c) => c,
         Err(e) => {
-            state.metrics.record_rejection();
+            state.metrics.record_reject();
             tracing::warn!(reason = %e, "token rejected");
+            crate::console::log_reject(&e.to_string());
             return Err(e);
         }
     };
     let verify_us = verify_start.elapsed().as_micros();
 
     let jti_start = Instant::now();
-    if let Err(e) = state.jti_store.check_and_insert(&claims.jti, claims.exp) {
+    if let Err(e) = state.jti_store.check_and_insert(&claims.jti, claims.exp.timestamp()) {
         state.metrics.record_replay();
         tracing::warn!(jti = %claims.jti, "replay blocked");
+        crate::console::log_replay(&claims.jti);
         return Err(e);
     }
     let jti_us = jti_start.elapsed().as_micros();
@@ -56,7 +58,7 @@ pub async fn proxy(
     let audit_us = audit_start.elapsed().as_micros();
 
     let total_us = total_start.elapsed().as_micros();
-    state.metrics.record_verify(total_us as u64);
+    state.metrics.record_verify();
 
     tracing::info!(
         jti = %claims.jti,
@@ -64,6 +66,7 @@ pub async fn proxy(
         "verify: {}μs | jti: {}μs | audit: {}μs | total: {}μs",
         verify_us, jti_us, audit_us, total_us
     );
+    crate::console::log_verify(&claims.jti, total_us);
 
     let mut headers = HeaderMap::new();
     headers.insert(

@@ -42,7 +42,7 @@ fn client_message(err: &Error) -> String {
         Error::TokenExpired => "token expired".into(),
         Error::InvalidSignature => "invalid signature".into(),
         Error::InvalidToken(_) => "invalid token".into(),
-        Error::ReplayDetected(_) => "token already used".into(),
+        Error::ReplayDetected(_) => "token rejected".into(),
         Error::Validation(msg) => msg.clone(),
         Error::ServiceUnavailable(_) => "service temporarily unavailable".into(),
         Error::Database(_) => "internal error".into(),
