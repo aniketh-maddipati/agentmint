@@ -1,0 +1,4 @@
+{
+    "refund": { "max_amount": 50 },
+    "compute": { "max_amount": 200 }
+  }

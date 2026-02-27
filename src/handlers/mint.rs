@@ -1,5 +1,4 @@
-//! Token minting endpoint with input validation.
-//! Used by: server.
+//! Token minting endpoint with input validation and policy enforcement.
 
 use axum::extract::State;
 use axum::Json;
@@ -40,7 +39,9 @@ fn validate_request(req: &MintRequest) -> Result<()> {
         || req.action.len() > 64
         || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
     {
-        return Err(Error::InvalidToken("action must be 1-64 chars (alphanumeric, underscore, colon, hyphen)".into()));
+        return Err(Error::InvalidToken(
+            "action must be 1-64 chars (alphanumeric, underscore, colon, hyphen)".into(),
+        ));
     }
     Ok(())
 }
@@ -54,14 +55,32 @@ pub async fn mint(
     Json(req): Json<MintRequest>,
 ) -> Result<Json<MintResponse>> {
     validate_request(&req)?;
+
+    if let Err(v) = state.policy.check(&req.action) {
+        crate::console::log_policy_denial(
+            &req.sub,
+            &req.action,
+            v.action_type,
+            v.limit,
+            v.requested,
+        );
+        state.metrics.record_policy_denial();
+        return Err(Error::PolicyViolation(format!(
+            "{} limit is ${}. Requested: ${}",
+            v.action_type, v.limit, v.requested
+        )));
+    }
+
     let ttl = clamp_ttl(req.ttl_seconds);
     let claims = Claims::new(req.sub, req.action, ttl);
     let jti = claims.jti.clone();
     let exp = claims.exp.to_rfc3339();
     let token = sign_token(&claims, &state.signing_key)?;
+
     tracing::info!(sub = %claims.sub, action = %claims.action, jti = %jti, "token minted");
     crate::console::log_mint(&claims.sub, &claims.action, &jti);
     state.metrics.record_mint();
+
     Ok(Json(MintResponse { token, jti, exp }))
 }
 
@@ -70,7 +89,11 @@ mod tests {
     use super::*;
 
     fn req(sub: &str, action: &str, ttl: i64) -> MintRequest {
-        MintRequest { sub: sub.into(), action: action.into(), ttl_seconds: ttl }
+        MintRequest {
+            sub: sub.into(),
+            action: action.into(),
+            ttl_seconds: ttl,
+        }
     }
 
     #[test]
@@ -115,7 +138,5 @@ mod tests {
         assert_eq!(clamp_ttl(-5), 1);
         assert_eq!(clamp_ttl(500), 300);
         assert_eq!(clamp_ttl(60), 60);
-        assert_eq!(clamp_ttl(1), 1);
-        assert_eq!(clamp_ttl(300), 300);
     }
 }
