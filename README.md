@@ -264,3 +264,23 @@ MIT
 ## Author
 
 Aniketh Maddipati - https://github.com/aniketh-maddipati
+
+## Security Q&A Demo
+
+Interactive demo that answers common security questions with live API calls.
+
+**Run it:**
+```bash
+# Terminal 1: Start server
+cargo run
+
+# Terminal 2: Run demo (Node 18+)
+node security_qa.js
+```
+
+**Questions covered:**
+1. **Identity & Forgery** - How are users verified? Can tokens be forged?
+2. **Verification Flow** - Who verifies tokens? Is the agent just transport?
+3. **OAuth Comparison** - Why not just add claims to existing OAuth tokens?
+
+The demo includes honest admissions about room for improvement.
