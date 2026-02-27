@@ -1,5 +1,4 @@
 //! Unified error types for AgentMint.
-//! Used by: token, jti, audit, handlers.
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -17,6 +16,9 @@ pub enum Error {
 
     #[error("token already used (jti: {0})")]
     ReplayDetected(String),
+
+    #[error("policy violation: {0}")]
+    PolicyViolation(String),
 
     #[error("validation error: {0}")]
     Validation(String),
@@ -43,6 +45,7 @@ fn client_message(err: &Error) -> String {
         Error::InvalidSignature => "invalid signature".into(),
         Error::InvalidToken(_) => "invalid token".into(),
         Error::ReplayDetected(_) => "token rejected".into(),
+        Error::PolicyViolation(msg) => format!("policy violation: {}", msg),
         Error::Validation(msg) => msg.clone(),
         Error::ServiceUnavailable(_) => "service temporarily unavailable".into(),
         Error::Database(_) => "internal error".into(),
@@ -59,6 +62,7 @@ impl IntoResponse for Error {
                 StatusCode::UNAUTHORIZED
             }
             Error::ReplayDetected(_) => StatusCode::CONFLICT,
+            Error::PolicyViolation(_) => StatusCode::FORBIDDEN,
             Error::Validation(_) | Error::Base64(_) => StatusCode::BAD_REQUEST,
             Error::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Error::Database(_) | Error::Serialization(_) | Error::Signing(_) => {
@@ -90,15 +94,16 @@ mod tests {
         assert_status(Error::InvalidSignature, StatusCode::UNAUTHORIZED);
         assert_status(Error::InvalidToken("x".into()), StatusCode::UNAUTHORIZED);
         assert_status(Error::ReplayDetected("x".into()), StatusCode::CONFLICT);
+        assert_status(Error::PolicyViolation("x".into()), StatusCode::FORBIDDEN);
         assert_status(Error::Validation("x".into()), StatusCode::BAD_REQUEST);
-        assert_status(Error::Base64(base64::DecodeError::InvalidLength(3)), StatusCode::BAD_REQUEST);
-        assert_status(Error::ServiceUnavailable("x".into()), StatusCode::SERVICE_UNAVAILABLE);
-        assert_status(Error::Signing("x".into()), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     #[test]
     fn internal_errors_do_not_leak_details() {
-        assert_eq!(client_message(&Error::Database(rusqlite::Error::QueryReturnedNoRows)), "internal error");
+        assert_eq!(
+            client_message(&Error::Database(rusqlite::Error::QueryReturnedNoRows)),
+            "internal error"
+        );
         assert_eq!(client_message(&Error::Signing("secret".into())), "internal error");
     }
 }

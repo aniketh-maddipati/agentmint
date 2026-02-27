@@ -1,5 +1,4 @@
 //! Shared application state for Axum handlers.
-//! Used by: handlers, server, main.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -9,6 +8,7 @@ use ed25519_dalek::{SigningKey, VerifyingKey};
 use crate::audit::sqlite::AuditLog;
 use crate::error::Result;
 use crate::jti::memory::JtiStore;
+use crate::policy::PolicyEngine;
 use crate::telemetry::Metrics;
 use crate::token::sign::generate_keypair;
 
@@ -18,6 +18,7 @@ pub struct AppStateInner {
     pub jti_store: JtiStore,
     pub audit_log: AuditLog,
     pub metrics: Metrics,
+    pub policy: PolicyEngine,
     pub request_count: AtomicU64,
 }
 
@@ -32,7 +33,7 @@ impl AppStateInner {
     }
 }
 
-fn build_inner(audit_log: AuditLog) -> AppState {
+fn build_inner(audit_log: AuditLog, policy: PolicyEngine) -> AppState {
     let signing_key = generate_keypair();
     let verifying_key = signing_key.verifying_key();
     Arc::new(AppStateInner {
@@ -41,14 +42,16 @@ fn build_inner(audit_log: AuditLog) -> AppState {
         jti_store: JtiStore::new(),
         audit_log,
         metrics: Metrics::new(),
+        policy,
         request_count: AtomicU64::new(0),
     })
 }
 
 pub fn build_state(db_path: &str) -> Result<AppState> {
-    Ok(build_inner(AuditLog::open(db_path)?))
+    let policy = PolicyEngine::from_default_file();
+    Ok(build_inner(AuditLog::open(db_path)?, policy))
 }
 
 pub fn build_test_state() -> Result<AppState> {
-    Ok(build_inner(AuditLog::open_in_memory()?))
+    Ok(build_inner(AuditLog::open_in_memory()?, PolicyEngine::default()))
 }

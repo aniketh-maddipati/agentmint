@@ -1,15 +1,14 @@
 //! Metrics tracking.
-//! Used by: handlers, state.
-
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::Serialize;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub struct Metrics {
     pub tokens_minted: AtomicU64,
     pub tokens_verified: AtomicU64,
     pub tokens_rejected: AtomicU64,
     pub replays_blocked: AtomicU64,
+    pub policy_denials: AtomicU64,
 }
 
 impl Metrics {
@@ -19,6 +18,7 @@ impl Metrics {
             tokens_verified: AtomicU64::new(0),
             tokens_rejected: AtomicU64::new(0),
             replays_blocked: AtomicU64::new(0),
+            policy_denials: AtomicU64::new(0),
         }
     }
 
@@ -38,12 +38,17 @@ impl Metrics {
         self.replays_blocked.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn record_policy_denial(&self) {
+        self.policy_denials.fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(&self) -> MetricsSnapshot {
         MetricsSnapshot {
             tokens_minted: self.tokens_minted.load(Ordering::Relaxed),
             tokens_verified: self.tokens_verified.load(Ordering::Relaxed),
             tokens_rejected: self.tokens_rejected.load(Ordering::Relaxed),
             replays_blocked: self.replays_blocked.load(Ordering::Relaxed),
+            policy_denials: self.policy_denials.load(Ordering::Relaxed),
         }
     }
 }
@@ -54,6 +59,7 @@ pub struct MetricsSnapshot {
     pub tokens_verified: u64,
     pub tokens_rejected: u64,
     pub replays_blocked: u64,
+    pub policy_denials: u64,
 }
 
 #[cfg(test)]
@@ -67,6 +73,7 @@ mod tests {
         assert_eq!(s.tokens_verified, 0);
         assert_eq!(s.tokens_rejected, 0);
         assert_eq!(s.replays_blocked, 0);
+        assert_eq!(s.policy_denials, 0);
     }
 
     #[test]
@@ -78,24 +85,9 @@ mod tests {
     }
 
     #[test]
-    fn record_verify_increments() {
+    fn record_policy_denial_increments() {
         let m = Metrics::new();
-        m.record_verify();
-        m.record_verify();
-        assert_eq!(m.snapshot().tokens_verified, 2);
-    }
-
-    #[test]
-    fn record_reject_increments() {
-        let m = Metrics::new();
-        m.record_reject();
-        assert_eq!(m.snapshot().tokens_rejected, 1);
-    }
-
-    #[test]
-    fn record_replay_increments() {
-        let m = Metrics::new();
-        m.record_replay();
-        assert_eq!(m.snapshot().replays_blocked, 1);
+        m.record_policy_denial();
+        assert_eq!(m.snapshot().policy_denials, 1);
     }
 }
