@@ -1,4 +1,4 @@
-//! Token minting endpoint with input validation and policy enforcement.
+//! Token minting endpoint with input validation, policy enforcement, and OIDC verification.
 
 use axum::extract::State;
 use axum::Json;
@@ -15,6 +15,7 @@ pub struct MintRequest {
     pub action: String,
     #[serde(default = "default_ttl")]
     pub ttl_seconds: i64,
+    pub id_token: Option<String>,
 }
 
 fn default_ttl() -> i64 {
@@ -56,6 +57,39 @@ pub async fn mint(
 ) -> Result<Json<MintResponse>> {
     validate_request(&req)?;
 
+    // OIDC verification
+    if let Some(ref oidc) = state.oidc {
+        match &req.id_token {
+            Some(token) => {
+                let claims = oidc.verify(token).await.map_err(|e| {
+                    crate::console::log_oidc_failure(&req.sub, &e.to_string());
+                    state.metrics.record_oidc_failure();
+                    Error::Unauthorized(format!("OIDC verification failed: {}", e))
+                })?;
+
+                // Verify sub matches
+                let oidc_sub = claims.email.as_ref().unwrap_or(&claims.sub);
+                if oidc_sub != &req.sub {
+                    crate::console::log_oidc_mismatch(&req.sub, oidc_sub);
+                    state.metrics.record_oidc_failure();
+                    return Err(Error::Unauthorized(format!(
+                        "sub mismatch: requested {} but id_token is for {}",
+                        req.sub, oidc_sub
+                    )));
+                }
+
+                crate::console::log_oidc_success(&req.sub);
+            }
+            None if state.require_oidc => {
+                crate::console::log_oidc_required(&req.sub);
+                state.metrics.record_oidc_failure();
+                return Err(Error::Unauthorized("id_token required".into()));
+            }
+            None => {}
+        }
+    }
+
+    // Policy check
     if let Err(v) = state.policy.check(&req.action) {
         crate::console::log_policy_denial(
             &req.sub,
@@ -93,6 +127,7 @@ mod tests {
             sub: sub.into(),
             action: action.into(),
             ttl_seconds: ttl,
+            id_token: None,
         }
     }
 

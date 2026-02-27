@@ -20,6 +20,9 @@ pub enum Error {
     #[error("policy violation: {0}")]
     PolicyViolation(String),
 
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("validation error: {0}")]
     Validation(String),
 
@@ -46,6 +49,7 @@ fn client_message(err: &Error) -> String {
         Error::InvalidToken(_) => "invalid token".into(),
         Error::ReplayDetected(_) => "token rejected".into(),
         Error::PolicyViolation(msg) => format!("policy violation: {}", msg),
+        Error::Unauthorized(msg) => format!("unauthorized: {}", msg),
         Error::Validation(msg) => msg.clone(),
         Error::ServiceUnavailable(_) => "service temporarily unavailable".into(),
         Error::Database(_) => "internal error".into(),
@@ -63,6 +67,7 @@ impl IntoResponse for Error {
             }
             Error::ReplayDetected(_) => StatusCode::CONFLICT,
             Error::PolicyViolation(_) => StatusCode::FORBIDDEN,
+            Error::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Error::Validation(_) | Error::Base64(_) => StatusCode::BAD_REQUEST,
             Error::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Error::Database(_) | Error::Serialization(_) | Error::Signing(_) => {
@@ -95,6 +100,7 @@ mod tests {
         assert_status(Error::InvalidToken("x".into()), StatusCode::UNAUTHORIZED);
         assert_status(Error::ReplayDetected("x".into()), StatusCode::CONFLICT);
         assert_status(Error::PolicyViolation("x".into()), StatusCode::FORBIDDEN);
+        assert_status(Error::Unauthorized("x".into()), StatusCode::UNAUTHORIZED);
         assert_status(Error::Validation("x".into()), StatusCode::BAD_REQUEST);
     }
 

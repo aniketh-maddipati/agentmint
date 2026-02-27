@@ -32,8 +32,12 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 pub async fn run(state: AppState, addr: &str) -> std::io::Result<()> {
-    let router = build_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!("listening on {}", addr);
+    run_with_listener(state, listener).await
+}
+
+pub async fn run_with_listener(state: AppState, listener: tokio::net::TcpListener) -> std::io::Result<()> {
+    let router = build_router(state);
+    tracing::info!("listening on {:?}", listener.local_addr());
     axum::serve(listener, router).await
 }

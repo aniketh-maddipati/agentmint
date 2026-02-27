@@ -64,7 +64,7 @@ pub fn log_replay(jti: &str) {
     );
 }
 
-pub fn log_policy_denial(sub: &str, action: &str, action_type: &str, limit: u64, requested: u64) {
+pub fn log_policy_denial(sub: &str, action: &str, _action_type: &str, limit: u64, requested: u64) {
     println!(
         "{} {} {} {} {} {} {} {}",
         " POLICY ".black().on_red().bold(),
@@ -75,5 +75,48 @@ pub fn log_policy_denial(sub: &str, action: &str, action_type: &str, limit: u64,
         format!("limit=${}", limit).dimmed(),
         format!("requested=${}", requested).red(),
         "DENIED".red().bold()
+    );
+}
+
+pub fn log_oidc_success(sub: &str) {
+    println!(
+        "{} {} {} {}",
+        " OIDC ".black().on_green().bold(),
+        "sub:".dimmed(),
+        sub.white(),
+        "verified".green()
+    );
+}
+
+pub fn log_oidc_failure(sub: &str, reason: &str) {
+    println!(
+        "{} {} {} {} {}",
+        " OIDC ".black().on_red().bold(),
+        "sub:".dimmed(),
+        sub.yellow(),
+        "failed:".dimmed(),
+        reason.red()
+    );
+}
+
+pub fn log_oidc_mismatch(requested: &str, actual: &str) {
+    println!(
+        "{} {} {} {} {} {}",
+        " OIDC ".black().on_red().bold(),
+        "mismatch:".dimmed(),
+        "requested".dimmed(),
+        requested.yellow(),
+        "but token is for".dimmed(),
+        actual.red()
+    );
+}
+
+pub fn log_oidc_required(sub: &str) {
+    println!(
+        "{} {} {} {}",
+        " OIDC ".black().on_yellow().bold(),
+        "sub:".dimmed(),
+        sub.yellow(),
+        "id_token required but not provided".yellow()
     );
 }

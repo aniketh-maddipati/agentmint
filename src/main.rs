@@ -5,6 +5,7 @@ pub mod console;
 pub mod error;
 pub mod handlers;
 pub mod jti;
+pub mod oidc;
 pub mod policy;
 pub mod server;
 pub mod state;
@@ -19,7 +20,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".into());
     let state = state::build_state("agentmint.db")?;
     tracing::info!(bind = %addr, jti_capacity = 100000, max_ttl = 300, "config");
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
     console::print_startup(&addr);
-    server::run(state, &addr).await?;
+    server::run_with_listener(state, listener).await?;
     Ok(())
 }
