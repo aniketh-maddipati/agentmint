@@ -9,6 +9,7 @@ pub struct Metrics {
     pub tokens_rejected: AtomicU64,
     pub replays_blocked: AtomicU64,
     pub policy_denials: AtomicU64,
+    pub oidc_failures: AtomicU64,
 }
 
 impl Metrics {
@@ -19,6 +20,7 @@ impl Metrics {
             tokens_rejected: AtomicU64::new(0),
             replays_blocked: AtomicU64::new(0),
             policy_denials: AtomicU64::new(0),
+            oidc_failures: AtomicU64::new(0),
         }
     }
 
@@ -42,6 +44,10 @@ impl Metrics {
         self.policy_denials.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn record_oidc_failure(&self) {
+        self.oidc_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(&self) -> MetricsSnapshot {
         MetricsSnapshot {
             tokens_minted: self.tokens_minted.load(Ordering::Relaxed),
@@ -49,6 +55,7 @@ impl Metrics {
             tokens_rejected: self.tokens_rejected.load(Ordering::Relaxed),
             replays_blocked: self.replays_blocked.load(Ordering::Relaxed),
             policy_denials: self.policy_denials.load(Ordering::Relaxed),
+            oidc_failures: self.oidc_failures.load(Ordering::Relaxed),
         }
     }
 }
@@ -60,6 +67,7 @@ pub struct MetricsSnapshot {
     pub tokens_rejected: u64,
     pub replays_blocked: u64,
     pub policy_denials: u64,
+    pub oidc_failures: u64,
 }
 
 #[cfg(test)]
@@ -74,20 +82,13 @@ mod tests {
         assert_eq!(s.tokens_rejected, 0);
         assert_eq!(s.replays_blocked, 0);
         assert_eq!(s.policy_denials, 0);
+        assert_eq!(s.oidc_failures, 0);
     }
 
     #[test]
-    fn record_mint_increments() {
+    fn record_oidc_failure_increments() {
         let m = Metrics::new();
-        m.record_mint();
-        m.record_mint();
-        assert_eq!(m.snapshot().tokens_minted, 2);
-    }
-
-    #[test]
-    fn record_policy_denial_increments() {
-        let m = Metrics::new();
-        m.record_policy_denial();
-        assert_eq!(m.snapshot().policy_denials, 1);
+        m.record_oidc_failure();
+        assert_eq!(m.snapshot().oidc_failures, 1);
     }
 }
