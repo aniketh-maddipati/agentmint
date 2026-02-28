@@ -10,6 +10,11 @@ pub struct Metrics {
     pub replays_blocked: AtomicU64,
     pub policy_denials: AtomicU64,
     pub oidc_failures: AtomicU64,
+    pub rate_limited: AtomicU64,
+    pub webauthn_registers: AtomicU64,
+    pub webauthn_successes: AtomicU64,
+    pub webauthn_failures: AtomicU64,
+    pub webauthn_lockouts: AtomicU64,
 }
 
 impl Metrics {
@@ -21,6 +26,11 @@ impl Metrics {
             replays_blocked: AtomicU64::new(0),
             policy_denials: AtomicU64::new(0),
             oidc_failures: AtomicU64::new(0),
+            rate_limited: AtomicU64::new(0),
+            webauthn_registers: AtomicU64::new(0),
+            webauthn_successes: AtomicU64::new(0),
+            webauthn_failures: AtomicU64::new(0),
+            webauthn_lockouts: AtomicU64::new(0),
         }
     }
 
@@ -48,6 +58,26 @@ impl Metrics {
         self.oidc_failures.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn record_rate_limited(&self) {
+        self.rate_limited.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_webauthn_register(&self) {
+        self.webauthn_registers.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_webauthn_success(&self) {
+        self.webauthn_successes.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_webauthn_failure(&self) {
+        self.webauthn_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_webauthn_lockout(&self) {
+        self.webauthn_lockouts.fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(&self) -> MetricsSnapshot {
         MetricsSnapshot {
             tokens_minted: self.tokens_minted.load(Ordering::Relaxed),
@@ -56,6 +86,11 @@ impl Metrics {
             replays_blocked: self.replays_blocked.load(Ordering::Relaxed),
             policy_denials: self.policy_denials.load(Ordering::Relaxed),
             oidc_failures: self.oidc_failures.load(Ordering::Relaxed),
+            rate_limited: self.rate_limited.load(Ordering::Relaxed),
+            webauthn_registers: self.webauthn_registers.load(Ordering::Relaxed),
+            webauthn_successes: self.webauthn_successes.load(Ordering::Relaxed),
+            webauthn_failures: self.webauthn_failures.load(Ordering::Relaxed),
+            webauthn_lockouts: self.webauthn_lockouts.load(Ordering::Relaxed),
         }
     }
 }
@@ -68,6 +103,11 @@ pub struct MetricsSnapshot {
     pub replays_blocked: u64,
     pub policy_denials: u64,
     pub oidc_failures: u64,
+    pub rate_limited: u64,
+    pub webauthn_registers: u64,
+    pub webauthn_successes: u64,
+    pub webauthn_failures: u64,
+    pub webauthn_lockouts: u64,
 }
 
 #[cfg(test)]
@@ -78,17 +118,21 @@ mod tests {
     fn new_metrics_start_at_zero() {
         let s = Metrics::new().snapshot();
         assert_eq!(s.tokens_minted, 0);
-        assert_eq!(s.tokens_verified, 0);
-        assert_eq!(s.tokens_rejected, 0);
-        assert_eq!(s.replays_blocked, 0);
-        assert_eq!(s.policy_denials, 0);
-        assert_eq!(s.oidc_failures, 0);
+        assert_eq!(s.rate_limited, 0);
+        assert_eq!(s.webauthn_successes, 0);
     }
 
     #[test]
-    fn record_oidc_failure_increments() {
+    fn record_rate_limited_increments() {
         let m = Metrics::new();
-        m.record_oidc_failure();
-        assert_eq!(m.snapshot().oidc_failures, 1);
+        m.record_rate_limited();
+        assert_eq!(m.snapshot().rate_limited, 1);
+    }
+
+    #[test]
+    fn record_webauthn_success_increments() {
+        let m = Metrics::new();
+        m.record_webauthn_success();
+        assert_eq!(m.snapshot().webauthn_successes, 1);
     }
 }

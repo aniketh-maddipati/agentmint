@@ -1,7 +1,7 @@
-//! Shared application state for Axum handlers.
+//! Shared application state.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 use ed25519_dalek::{SigningKey, VerifyingKey};
 
@@ -10,8 +10,10 @@ use crate::error::Result;
 use crate::jti::memory::JtiStore;
 use crate::oidc::OidcVerifier;
 use crate::policy::PolicyEngine;
+use crate::ratelimit::{RateLimiter, RateLimitConfig};
 use crate::telemetry::Metrics;
 use crate::token::sign::generate_keypair;
+use crate::webauthn::WebAuthnState;
 
 pub struct AppStateInner {
     pub signing_key: SigningKey,
@@ -21,6 +23,8 @@ pub struct AppStateInner {
     pub metrics: Metrics,
     pub policy: PolicyEngine,
     pub oidc: Option<OidcVerifier>,
+    pub webauthn: Option<WebAuthnState>,
+    pub rate_limiter: RateLimiter,
     pub require_oidc: bool,
     pub request_count: AtomicU64,
 }
@@ -29,41 +33,60 @@ pub type AppState = Arc<AppStateInner>;
 
 impl AppStateInner {
     pub fn increment_requests(&self) {
-        let count = self.request_count.fetch_add(1, Ordering::Relaxed) + 1;
-        if count % 1000 == 0 {
-            tracing::warn!(count, "high request volume");
+        let n = self.request_count.fetch_add(1, Relaxed) + 1;
+        if n % 1000 == 0 {
+            tracing::warn!(count = n, "high request volume");
         }
     }
 }
 
-fn build_inner(audit_log: AuditLog, policy: PolicyEngine, oidc: Option<OidcVerifier>) -> AppState {
-    let signing_key = generate_keypair();
-    let verifying_key = signing_key.verifying_key();
-    let require_oidc = std::env::var("REQUIRE_OIDC").map(|v| v == "true").unwrap_or(false);
-    
-    if require_oidc && oidc.is_none() {
-        tracing::warn!("REQUIRE_OIDC=true but no OIDC config provided");
+struct StateBuilder {
+    audit: AuditLog,
+    policy: PolicyEngine,
+    oidc: Option<OidcVerifier>,
+    webauthn: Option<WebAuthnState>,
+}
+
+impl StateBuilder {
+    fn build(self) -> AppState {
+        let signing_key = generate_keypair();
+        let verifying_key = signing_key.verifying_key();
+        let require_oidc = std::env::var("REQUIRE_OIDC").map(|v| v == "true").unwrap_or(false);
+
+        if require_oidc && self.oidc.is_none() {
+            tracing::warn!("REQUIRE_OIDC=true but no OIDC configured");
+        }
+
+        Arc::new(AppStateInner {
+            signing_key,
+            verifying_key,
+            jti_store: JtiStore::new(),
+            audit_log: self.audit,
+            metrics: Metrics::new(),
+            policy: self.policy,
+            oidc: self.oidc,
+            webauthn: self.webauthn,
+            rate_limiter: RateLimiter::new(RateLimitConfig::default()),
+            require_oidc,
+            request_count: AtomicU64::new(0),
+        })
     }
-    
-    Arc::new(AppStateInner {
-        signing_key,
-        verifying_key,
-        jti_store: JtiStore::new(),
-        audit_log,
-        metrics: Metrics::new(),
-        policy,
-        oidc,
-        require_oidc,
-        request_count: AtomicU64::new(0),
-    })
 }
 
 pub fn build_state(db_path: &str) -> Result<AppState> {
-    let policy = PolicyEngine::from_default_file();
-    let oidc = OidcVerifier::from_env();
-    Ok(build_inner(AuditLog::open(db_path)?, policy, oidc))
+    Ok(StateBuilder {
+        audit: AuditLog::open(db_path)?,
+        policy: PolicyEngine::from_default_file(),
+        oidc: OidcVerifier::from_env(),
+        webauthn: WebAuthnState::from_env(),
+    }.build())
 }
 
 pub fn build_test_state() -> Result<AppState> {
-    Ok(build_inner(AuditLog::open_in_memory()?, PolicyEngine::default(), None))
+    Ok(StateBuilder {
+        audit: AuditLog::open_in_memory()?,
+        policy: PolicyEngine::default(),
+        oidc: None,
+        webauthn: None,
+    }.build())
 }
