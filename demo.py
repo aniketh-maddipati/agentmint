@@ -278,7 +278,7 @@ def main():
     print(f"  {DIM}Every receipt is single-use (JTI tracked), time-limited (TTL),{RESET}")
     print(f"  {DIM}and chains back to the original human approval.{RESET}")
     print()
-    print(f"  {DIM}Code: https://github.com/your-username/agentmint{RESET}")
+    print(f"  {DIM}Code: https://github.com/aniketh-maddipati/agentmint{RESET}")
     print()
 
 
