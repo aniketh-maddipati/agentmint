@@ -22,6 +22,7 @@ pub fn print_startup(addr: &str) {
     println!("{}", "Endpoints:".white().bold());
     println!("  {} {}  {}", "POST".yellow(), "/mint".white(), "Issue signed token".dimmed());
     println!("  {} {}  {}", "POST".yellow(), "/proxy".white(), "Verify & consume token".dimmed());
+    println!("  {} {} {}", "POST".yellow(), "/delegate".white(), "Delegate scoped authorization".dimmed());
     println!("  {} {}  {}", "GET ".green(), "/audit".white(), "View audit log".dimmed());
     println!("  {} {} {}", "GET ".green(), "/metrics".white(), "Telemetry".dimmed());
     println!("  {} {} {}", "GET ".green(), "/health".white(), "Health check".dimmed());
@@ -181,5 +182,39 @@ pub fn log_webauthn_lockout(user_id: &str) {
         badge("LOCKOUT", colored::Color::White, colored::Color::Red),
         "user:".dimmed(), user_id.yellow(),
         "🔒 account locked".red()
+    );
+}
+
+// === Delegation ===
+
+pub fn log_delegation_approved(agent: &str, action: &str, jti: &str) {
+    println!(
+        "{} {} {} {} {} {}",
+        badge("DELEGATE", colored::Color::Black, colored::Color::Green),
+        "agent:".dimmed(), agent.white(),
+        format!("action:{}", action).cyan(),
+        format!("jti:{}", short_jti(jti)).dimmed(),
+        "✓".green().bold()
+    );
+}
+
+pub fn log_delegation_denied(agent: &str, action: &str, reason: &str) {
+    println!(
+        "{} {} {} {} {}",
+        badge("DELEGATE", colored::Color::White, colored::Color::Red),
+        format!("agent:{}", agent).yellow(),
+        format!("action:{}", action).white(),
+        format!("reason:{}", reason).red(),
+        "✗".red().bold()
+    );
+}
+
+pub fn log_checkpoint_required(agent: &str, action: &str) {
+    println!(
+        "{} {} {} {}",
+        badge("CHECKPOINT", colored::Color::Black, colored::Color::Yellow),
+        format!("agent:{}", agent).yellow(),
+        format!("action:{}", action).white(),
+        "⚠ requires human approval".yellow().bold()
     );
 }

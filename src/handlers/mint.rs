@@ -16,10 +16,20 @@ pub struct MintRequest {
     #[serde(default = "default_ttl")]
     pub ttl_seconds: i64,
     pub id_token: Option<String>,
+    // Orchestration fields (optional)
+    pub scope: Option<Vec<String>>,
+    pub delegates_to: Option<Vec<String>>,
+    pub requires_checkpoint: Option<Vec<String>>,
+    #[serde(default = "default_max_depth")]
+    pub max_delegation_depth: Option<u32>,
 }
 
 fn default_ttl() -> i64 {
     60
+}
+
+fn default_max_depth() -> Option<u32> {
+    None
 }
 
 #[derive(Serialize)]
@@ -27,6 +37,8 @@ pub struct MintResponse {
     pub token: String,
     pub jti: String,
     pub exp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_type: Option<String>,
 }
 
 fn validate_request(req: &MintRequest) -> Result<()> {
@@ -106,16 +118,33 @@ pub async fn mint(
     }
 
     let ttl = clamp_ttl(req.ttl_seconds);
-    let claims = Claims::new(req.sub, req.action, ttl);
+
+    // Build claims: plan receipt if orchestration fields present, basic receipt otherwise
+    let is_plan = req.scope.is_some() || req.delegates_to.is_some();
+    let claims = if is_plan {
+        Claims::new_plan(
+            req.sub,
+            req.action,
+            ttl,
+            req.scope.unwrap_or_default(),
+            req.delegates_to.unwrap_or_default(),
+            req.requires_checkpoint.unwrap_or_default(),
+            req.max_delegation_depth.unwrap_or(2),
+        )
+    } else {
+        Claims::new(req.sub, req.action, ttl)
+    };
+
     let jti = claims.jti.clone();
     let exp = claims.exp.to_rfc3339();
+    let receipt_type = claims.receipt_type.clone();
     let token = sign_token(&claims, &state.signing_key)?;
 
-    tracing::info!(sub = %claims.sub, action = %claims.action, jti = %jti, "token minted");
+    tracing::info!(sub = %claims.sub, action = %claims.action, jti = %jti, receipt_type = ?receipt_type, "token minted");
     crate::console::log_mint(&claims.sub, &claims.action, &jti);
     state.metrics.record_mint();
 
-    Ok(Json(MintResponse { token, jti, exp }))
+    Ok(Json(MintResponse { token, jti, exp, receipt_type }))
 }
 
 #[cfg(test)]
@@ -128,6 +157,10 @@ mod tests {
             action: action.into(),
             ttl_seconds: ttl,
             id_token: None,
+            scope: None,
+            delegates_to: None,
+            requires_checkpoint: None,
+            max_delegation_depth: None,
         }
     }
 
