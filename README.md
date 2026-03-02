@@ -6,6 +6,20 @@ Ed25519 signed receipts. Single-use. Time-limited. Extended for multi-agent dele
 
 ~1200 lines of Rust. MIT licensed.
 
+**[Live Site](https://agent-mint.dev)** | **[GitHub](https://github.com/aniketh-maddipati/agentmint)**
+
+---
+
+## Demo
+
+### Sculptor agent blocked — no valid receipt (20 sec)
+
+https://github.com/user-attachments/assets/7d260af7-2dc5-4bee-854f-93bebd13d031
+
+### Full terminal walkthrough (2 min)
+
+[![asciicast](https://asciinema.org/a/tW9WeD9WwEog94uV.svg)](https://asciinema.org/a/tW9WeD9WwEog94uV)
+
 ---
 
 ## The Problem
@@ -322,4 +336,4 @@ MIT
 
 Building agents that take real actions? I'd love your feedback.
 
-[Open an issue](https://github.com/aniketh-maddipati/agentmint/issues) · [LinkedIn](https://linkedin.com/in/aniketh-maddipati) · [X](https://x.com/aniketh745)
+[Open an issue](https://github.com/aniketh-maddipati/agentmint/issues) · [LinkedIn](https://linkedin.com/in/anikethmaddipati) · [X](https://x.com/aniketh745)
