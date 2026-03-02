@@ -24,6 +24,7 @@ pub fn build_router(state: AppState) -> Router {
         // Core endpoints
         .route("/health", get(handlers::health::health))
         .route("/mint", post(handlers::mint::mint))
+        .route("/delegate", post(handlers::delegate::delegate))
         .route("/proxy", post(handlers::proxy::proxy))
         .route("/audit", get(handlers::audit::recent))
         .route("/metrics", get(handlers::metrics::metrics))
