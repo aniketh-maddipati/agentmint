@@ -1,134 +1,196 @@
 # 🔐 AgentMint
 
-**Prove a human approved a specific agent action.**
+**Cryptographic proof that a human approved an AI agent action.**
 
-Session auth says "this agent can access Stripe."
-AgentMint says "Alice approved this $50 refund for order #123 at 10:03am."
+Ed25519 signed receipts. Single-use. Time-limited. Extended for multi-agent delegation chains with checkpoint escalation.
+
+~1200 lines of Rust. MIT licensed.
 
 ---
 
 ## The Problem
 
-AI agents can call APIs. Nothing proves a human authorized a specific call.
+One agent is easy. You approve, it acts.
 
-- No audit trail of who approved what
-- No replay protection
-- No per-action scoping
+Three agents working in parallel on the same codebase? Who approved what? Can Agent 3 deploy to production while you're reviewing Agent 1? If something breaks, can you prove which human authorized which action through which chain of delegation?
+
+Existing solutions don't solve this. Session auth says "this agent can access Stripe." Logging says "something happened." Neither proves a human authorized a specific action at a specific time through a specific delegation chain.
+
+---
 
 ## The Solution
 
-1. Human approves action → AgentMint signs a token (60s expiry, single-use)
-2. Agent passes token to resource provider → Provider verifies before executing
-3. Full audit trail of who approved what, when
+AgentMint issues cryptographic receipts that prove human authorization for AI agent actions.
+
+**Basic flow:** Human approves action → AgentMint signs a receipt (Ed25519, single-use, 60s default TTL) → Agent presents receipt → Provider verifies before executing.
+
+**Orchestration flow:** Human approves a plan with scoped authorization → Sub-agents receive delegated receipts within the approved scope → Actions outside scope trigger checkpoint escalation → Every receipt chains back to the original human approval.
 
 ---
 
 ## Quick Start
+
 ```bash
 git clone https://github.com/aniketh-maddipati/agentmint
 cd agentmint
 cargo run
 ```
+
 ```
-╔═══════════════════════════════════════════════════════════╗
-║     🔐 AgentMint v0.1.0                                   ║
-║     Cryptographic proof of human authorization            ║
-╚═══════════════════════════════════════════════════════════╝
+🔐 AgentMint v0.1.0
+Cryptographic proof of human authorization
 
 ✓ Server ready → http://0.0.0.0:3000
 ```
 
+### Run the orchestration demo
+
+```bash
+pip3 install requests
+python3 demo.py
+```
+
+The demo walks through the full flow: plan approval, scoped delegation, checkpoint escalation, rogue agent denial, and audit trail.
+
 ---
 
-## Demo
+## Orchestration: Delegation Chains
 
-### 1. Mint a token
+This is what makes AgentMint different. Not just signed tokens — verifiable delegation chains across multiple agents.
+
+### 1. Human approves a plan
+
 ```bash
 curl -X POST http://localhost:3000/mint \
   -H "Content-Type: application/json" \
-  -d '{"sub":"alice@company.com","action":"refund:order:123:amount:50","ttl_seconds":60}'
+  -d '{
+    "sub": "aniketh@company.com",
+    "action": "deploy:api-v2",
+    "ttl_seconds": 300,
+    "scope": ["build:*", "test:*", "deploy:staging"],
+    "delegates_to": ["build-agent", "test-agent", "deploy-agent"],
+    "requires_checkpoint": ["deploy:production"],
+    "max_delegation_depth": 2
+  }'
 ```
 
-### 2. Verify the token
+The plan receipt carries the rules: which agents, which actions, which actions need re-approval.
+
+### 2. Agents request scoped delegation
+
 ```bash
-curl -X POST http://localhost:3000/proxy \
+curl -X POST http://localhost:3000/delegate \
   -H "Content-Type: application/json" \
-  -d '{"token":"<token from step 1>"}'
+  -d '{
+    "parent_token": "<plan receipt>",
+    "agent_id": "build-agent",
+    "action": "build:docker"
+  }'
 ```
 
-### 3. Replay blocked
-```bash
-# Same token again
-curl -X POST http://localhost:3000/proxy \
-  -H "Content-Type: application/json" \
-  -d '{"token":"<same token>"}'
-
-# → "token already used"
-```
-
-### 4. Audit trail
-```bash
-curl http://localhost:3000/audit
-```
 ```json
-[
-  {
-    "jti": "f1268944-...",
-    "sub": "alice@company.com",
-    "action": "refund:order:123:amount:50",
-    "verified_at": "2026-02-26T14:38:14Z"
-  }
-]
+{
+  "status": "ok",
+  "jti": "9fbd8b71-...",
+  "chain": ["87971956-...", "9fbd8b71-..."]
+}
 ```
+
+The chain links every delegated receipt back to the original plan.
+
+### 3. Dangerous actions trigger checkpoints
+
+```bash
+curl -X POST http://localhost:3000/delegate \
+  -d '{"parent_token": "<plan>", "agent_id": "deploy-agent", "action": "deploy:production"}'
+```
+
+```json
+{
+  "status": "checkpoint_required",
+  "reason": "action 'deploy:production' requires explicit human approval"
+}
+```
+
+The agent cannot proceed. A human must approve a new receipt specifically for this action.
+
+### 4. Unauthorized agents are denied
+
+```json
+{
+  "status": "denied",
+  "reason": "agent_not_authorized"
+}
+```
+
+---
+
+## Threat Model
+
+| Threat | Protection |
+|--------|------------|
+| **Substitution** — approve one payload, execute another | Receipt signature covers the exact action string |
+| **Replay** — reuse an old approval | Single-use JTI tracking; each receipt consumed on first use |
+| **Enforcement bypass** — execute without authorization | Fail-closed validation; any check failure = denial |
+| **Scope creep** — agent acts beyond approved scope | Wildcard pattern matching on scope field |
+| **Delegation abuse** — unbounded agent-to-agent delegation | Depth limits + named agent authorization |
 
 ---
 
 ## How It Works
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Human     │ ──── │  AgentMint  │ ──── │  Resource   │
-│  approves   │  1   │  mints      │  2   │  Provider   │
-│  action     │      │  token      │      │  verifies   │
-└─────────────┘      └─────────────┘      └─────────────┘
-                            │
-                            ▼
-                     ┌─────────────┐
-                     │   Agent     │
-                     │  (transport)│
-                     └─────────────┘
-```
 
-1. Human approves action in your UI
-2. Your backend calls AgentMint `/mint` → gets signed token
-3. Agent carries token to resource provider (Stripe, your API)
-4. Resource provider calls `/proxy` to verify → executes if valid
-5. Token can't be reused, forged, or used after expiry
+```
+Human approves plan
+    │
+    ▼
+┌──────────────────────────────────────────────┐
+│  AgentMint mints plan receipt                │
+│  scope: [build:*, test:*, deploy:staging]    │
+│  delegates_to: [build-agent, test-agent]     │
+│  requires_checkpoint: [deploy:production]    │
+└──────────┬───────────────┬───────────────────┘
+           │               │
+           ▼               ▼
+     ┌───────────┐   ┌───────────┐
+     │ build-agent│   │ test-agent│
+     │ build:*   ✓│   │ test:*   ✓│
+     └───────────┘   └───────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │ deploy-agent│
+                    │ staging   ✓ │
+                    │ production ⚠│ ← CHECKPOINT
+                    └─────────────┘
+                           │
+                    human re-approves
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │ production ✓│
+                    └─────────────┘
+```
 
 ---
 
-## Why Not OAuth?
+## AIUC-1 Control Mapping
 
-| OAuth | AgentMint |
-|-------|-----------|
-| Tokens last hours/days | 60 seconds default |
-| Reusable | Single-use (JTI tracking) |
-| Scope = "can access Stripe" | Scope = "refund $50 for order #123" |
-| Requires IdP coordination | Drop-in sidecar |
+AgentMint satisfies several mandatory controls from the AIUC-1 AI certification standard:
 
----
+**D003 — Restrict unsafe tool calls (mandatory)**
+The `scope` field on plan receipts defines exactly which actions agents can perform. Wildcard patterns (`build:*`) allow flexibility within boundaries. Actions outside scope are denied. The `/delegate` endpoint enforces this on every request.
 
-## Security
+**E004 — Document approvals with evidence (mandatory)**
+Every approval is an Ed25519 signed receipt with: who approved it (`sub`), what was approved (`action`), when (`iat`, `exp`), and a unique identifier (`jti`). The SQLite audit log provides a tamper-evident record. This is not a log entry — it's a cryptographic artifact.
 
-| Feature | Implementation |
-|---------|----------------|
-| Signatures | Ed25519 (constant-time) |
-| Replay protection | JTI tracking, single-use |
-| Expiry | 1-300 seconds (default 60) |
-| Input validation | sub ≤256 chars, action ≤64 chars |
-| Token size | 2KB max |
-| Error handling | No internal details leaked |
+**B006 — Limit agent scope (mandatory)**
+The `scope` field directly implements agent scope limiting. `["build:*", "test:*", "deploy:staging"]` means the agent can build and test anything but can only deploy to staging. Production requires a checkpoint.
 
-**Performance:** ~3.3ms total verify time (Apple M1)
+**B007 — Enforce user access (mandatory)**
+The `delegates_to` field names which agents can receive delegation. Combined with `original_approver` tracking through the chain, every action traces back to a verified human identity.
+
+**C007 — Flag high-risk actions for review (optional)**
+The `requires_checkpoint` field flags specific action patterns for mandatory human re-approval. When triggered, the system returns `checkpoint_required` and the agent cannot proceed.
 
 ---
 
@@ -136,90 +198,109 @@ curl http://localhost:3000/audit
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/mint` | POST | Issue signed token |
-| `/proxy` | POST | Verify token |
-| `/audit` | GET | Recent verified tokens |
+| `/mint` | POST | Issue signed receipt (basic or plan) |
+| `/delegate` | POST | Request scoped delegation from a parent receipt |
+| `/proxy` | POST | Verify and consume a receipt |
+| `/audit` | GET | View audit trail |
 | `/metrics` | GET | Telemetry counters |
 | `/health` | GET | Health check |
 
+### Mint request (with orchestration)
+
+```json
+{
+  "sub": "alice@company.com",
+  "action": "deploy:api-v2",
+  "ttl_seconds": 300,
+  "scope": ["build:*", "test:*"],
+  "delegates_to": ["build-agent", "test-agent"],
+  "requires_checkpoint": ["deploy:production"],
+  "max_delegation_depth": 2
+}
+```
+
+All orchestration fields are optional. Without them, mint behaves as a basic single-action receipt.
+
+### Delegate request
+
+```json
+{
+  "parent_token": "<signed plan receipt>",
+  "agent_id": "build-agent",
+  "action": "build:docker"
+}
+```
+
+### Delegate response
+
+```json
+{
+  "status": "ok",
+  "token": "<signed delegated receipt>",
+  "jti": "9fbd8b71-...",
+  "chain": ["87971956-...", "9fbd8b71-..."]
+}
+```
+
+Status is one of: `ok`, `denied`, `checkpoint_required`.
+
 ---
 
-## Use Cases
+## Security
 
-| Scenario | Action string |
-|----------|---------------|
-| Refund | `refund:order:123:amount:50` |
-| Deploy | `deploy:prod:api:v2.1.0` |
-| Data export | `export:users:csv` |
-| GDPR deletion | `delete:user:789` |
-| Compute purchase | `compute:aws:instances:10` |
-
-Action is freeform. You define the schema. AgentMint signs, verifies, logs.
+| Property | Implementation |
+|----------|----------------|
+| Signatures | Ed25519 (constant-time, via ed25519-dalek) |
+| Replay protection | Single-use JTI tracking |
+| Expiry | 1–300 seconds (default 60) |
+| Delegation depth | Configurable max, default 2 |
+| Enforcement | Fail-closed on any validation error |
+| Input validation | sub ≤256 chars, action ≤64 chars, 2KB token limit |
+| Audit | SQLite with JTI primary key (duplicates rejected) |
 
 ---
 
 ## WebAuthn (Optional)
 
 Hardware key authentication for high-security environments:
+
 ```bash
 WEBAUTHN_RP_ID=localhost WEBAUTHN_RP_ORIGIN=http://localhost:3000 cargo run
 ```
 
-| Endpoint | Description |
-|----------|-------------|
-| `/webauthn/register/start` | Begin passkey registration |
-| `/webauthn/register/finish` | Complete registration |
-| `/webauthn/auth/start` | Begin authentication |
-| `/webauthn/auth/finish` | Complete authentication |
-
-- Lockout after 5 failed attempts (15 min)
-- Challenge TTL: 5 minutes
-- Rate limiting per user
-
----
-
-## FAQ
-
-**How are users verified?**
-
-AgentMint trusts the caller (your backend). It sits behind your existing auth. The protection is the Ed25519 signature—you can't forge a token without the private key.
-
-**Who verifies the token?**
-
-The resource provider. Agent is just transport.
-
-**What's missing?**
-
-- No built-in IdP verification (trusts caller)
-- No resource provider integrations yet
-- Open question: should this become an OAuth extension?
-
-See: [IETF AAuth Draft](https://www.ietf.org/archive/id/draft-patwhite-aauth-00.html)
-
 ---
 
 ## Integration (Python)
+
 ```python
 import requests
 
-def mint(user: str, action: str) -> str:
-    r = requests.post("http://localhost:3000/mint", json={
-        "sub": user, "action": action, "ttl_seconds": 60
-    })
-    return r.json()["token"]
+BASE = "http://localhost:3000"
 
-def verify(token: str) -> dict:
-    r = requests.post("http://localhost:3000/proxy", json={"token": token})
-    return r.json() if r.ok else None
+# Mint a plan receipt
+plan = requests.post(f"{BASE}/mint", json={
+    "sub": "alice@company.com",
+    "action": "deploy:api-v2",
+    "scope": ["build:*", "test:*"],
+    "delegates_to": ["build-agent"],
+    "requires_checkpoint": ["deploy:production"],
+}).json()
 
-token = mint("alice@company.com", "refund:order:123:amount:50")
-result = verify(token)
-print(f"Approved by: {result['sub']}")
+# Delegate to an agent
+result = requests.post(f"{BASE}/delegate", json={
+    "parent_token": plan["token"],
+    "agent_id": "build-agent",
+    "action": "build:docker",
+}).json()
+
+print(f"Status: {result['status']}")
+print(f"Chain: {result['chain']}")
 ```
 
 ---
 
 ## Docker
+
 ```bash
 docker build -t agentmint .
 docker run -p 3000:3000 agentmint
@@ -237,8 +318,8 @@ MIT
 
 ---
 
-## Looking for design partners
+## Design Partners
 
-Building agents that take real actions? I'd love your feedback on whether this solves a real problem.
+Building agents that take real actions? I'd love your feedback.
 
-[Open an issue](https://github.com/aniketh-maddipati/agentmint/issues) or DM me on [LinkedIn](https://linkedin.com/in/aniketh-maddipati) / [X](https://x.com/aniketh_m).
+[Open an issue](https://github.com/aniketh-maddipati/agentmint/issues) · [LinkedIn](https://linkedin.com/in/aniketh-maddipati) · [X](https://x.com/aniketh745)
