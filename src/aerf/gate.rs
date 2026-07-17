@@ -650,10 +650,10 @@ fn decide(
             .cross_ref_values
             .get(&cross_ref_key(&rule.prior_tool, &rule.prior_field));
         let matches_prior = prior_values.is_some_and(|values| values.contains(value));
-        let related_write = call.tool == "write_file"
+        let grounded_write = call.tool == "write_file"
             && rule.field == "path"
-            && prior_values.is_some_and(|values| has_related_prior_read(values, value));
-        if related_write {
+            && prior_values.is_some_and(|values| has_grounding_prior_read(values, value));
+        if grounded_write {
             continue;
         }
         if !matches_prior {
@@ -811,28 +811,22 @@ fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
     value.get(field)?.as_str()
 }
 
-fn has_related_prior_read(prior_paths: &HashSet<String>, candidate: &str) -> bool {
-    prior_paths.iter().any(|prior_path| paths_are_related(prior_path, candidate))
+fn has_grounding_prior_read(prior_paths: &HashSet<String>, candidate: &str) -> bool {
+    let Some((candidate_dir, _)) = split_path(candidate) else {
+        return false;
+    };
+    prior_paths.iter().any(|prior_path| {
+        split_path(prior_path).is_some_and(|(prior_dir, _)| dir_covers(prior_dir, candidate_dir))
+    })
 }
 
-fn paths_are_related(prior_path: &str, candidate: &str) -> bool {
-    let Some((prior_dir, prior_file)) = split_path(prior_path) else {
-        return false;
-    };
-    let Some((candidate_dir, candidate_file)) = split_path(candidate) else {
-        return false;
-    };
-    if prior_dir != candidate_dir {
-        return false;
-    }
-
-    let prior_stem = file_stem(prior_file);
-    let candidate_stem = file_stem(candidate_file);
-    if prior_stem == candidate_stem {
+fn dir_covers(explored_dir: &str, target_dir: &str) -> bool {
+    if explored_dir == target_dir {
         return true;
     }
-
-    prior_stem.starts_with(candidate_stem) || candidate_stem.starts_with(prior_stem)
+    target_dir
+        .strip_prefix(explored_dir)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 fn split_path(path: &str) -> Option<(&str, &str)> {
@@ -841,13 +835,6 @@ fn split_path(path: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((dir, file))
-}
-
-fn file_stem(file_name: &str) -> &str {
-    file_name
-        .split_once('.')
-        .map(|(stem, _)| stem)
-        .unwrap_or(file_name)
 }
 
 fn matches_pattern(pattern: &str, value: &str) -> bool {
@@ -999,16 +986,28 @@ mod tests {
     }
 
     #[test]
-    fn blocks_unrelated_sibling_write_after_read() -> AerfResult<()> {
-        let session = engine().open_session("unrelated-sibling");
+    fn allows_grounded_sibling_write_in_explored_dir() -> AerfResult<()> {
+        let session = engine().open_session("grounded-sibling");
         let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
         let outcome = session.evaluate(ToolCall::new(
             "write_file",
             json!({ "path": "src/totally_unrelated.ts" }),
         ))?;
 
-        assert_eq!(outcome.decision, GateDecision::Block);
-        assert!(outcome.reason.contains("failed cross_ref"));
+        assert_eq!(outcome.decision, GateDecision::Pass);
+        Ok(())
+    }
+
+    #[test]
+    fn allows_new_file_in_new_subdirectory_of_explored_parent() -> AerfResult<()> {
+        let session = engine().open_session("new-subdir");
+        let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/aerf/gate.rs" })))?;
+        let outcome = session.evaluate(ToolCall::new(
+            "write_file",
+            json!({ "path": "src/aerf/adapters/mod.rs" }),
+        ))?;
+
+        assert_eq!(outcome.decision, GateDecision::Pass);
         Ok(())
     }
 
@@ -1037,11 +1036,11 @@ mod tests {
     }
 
     #[test]
-    fn blocks_cross_ref_mismatch() -> AerfResult<()> {
-        let session = engine().open_session("cross-ref");
+    fn blocks_write_into_unexplored_directory() -> AerfResult<()> {
+        let session = engine().open_session("unexplored-dir");
         let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
         let outcome =
-            session.evaluate(ToolCall::new("write_file", json!({ "path": "src/other.ts" })))?;
+            session.evaluate(ToolCall::new("write_file", json!({ "path": "config/secrets.rs" })))?;
 
         assert_eq!(outcome.decision, GateDecision::Block);
         assert!(outcome.reason.contains("failed cross_ref"));
