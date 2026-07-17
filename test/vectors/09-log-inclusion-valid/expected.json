@@ -1,0 +1,6 @@
+{
+  "outcome": "PASS",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "Valid RFC 9162-aligned inclusion proof against signed STH."
+}

@@ -1,0 +1,6 @@
+{
+  "outcome": "FAIL",
+  "reason_code": "parent_signature",
+  "stderr_substring": "parent_signature absent",
+  "notes": "HIGH-IMPACT receipt missing required parent counter-signature."
+}

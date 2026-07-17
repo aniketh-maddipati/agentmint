@@ -1,0 +1,6 @@
+{
+  "outcome": "FAIL",
+  "reason_code": "pdp_signature",
+  "stderr_substring": "pdp signature verification FAILED",
+  "notes": "PDP signed verdict for context A; receipt claims context B."
+}

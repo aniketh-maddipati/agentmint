@@ -1,0 +1,21 @@
+{
+  "id": "bc3b3c26-ae23-4203-8c51-ee054904a1ad",
+  "type": "notarised_evidence",
+  "plan_id": "5f0e856b-68fe-4519-8529-36288d4a0ee1",
+  "agent": "claims-agent",
+  "action": "submit:claim:CLM-0002",
+  "in_policy": true,
+  "policy_reason": "matched scope submit:claim:*",
+  "evidence": {
+    "tool": "submit-claim",
+    "claim_id": "CLM-9920",
+    "amount": "1250.00",
+    "patient_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "step": "2"
+  },
+  "evidence_hash_sha512": "fe77d482d9cfbcb1aeaa1732e00cb3be940db2228dbff427acd9684dbe75f3674488482bdb043bf318d5fc7b526c767506983f7935ef1a2139912006f956042a",
+  "observed_at": "2026-05-11T12:02:00+00:00",
+  "key_id": "2ff7c1c638d85244",
+  "previous_receipt_hash": "e7d34ee23a55ea7bffb6acd80049121449d9454ac7fe0466749da62d15e334a0",
+  "signature": "28e39024d13e3cdbfc7d4f4045cd0db87baa0d4c0c73df6fe33b0162cc59e6823c464102e89bedd6b125992c6650c53a2cbfcd7327ab4bb19c3031f6df25c600"
+}

@@ -1,0 +1,6 @@
+{
+  "outcome": "KNOWN_LIMIT",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "Tag stripping at the receipt layer: an attacker controlling the agent can strip impact_tags and bypass the sync counter-sign requirement. The verifier cannot detect this; defense is upstream PEP tag pinning (SPEC.md \u00a712.7)."
+}

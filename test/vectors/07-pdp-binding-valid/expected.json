@@ -1,0 +1,6 @@
+{
+  "outcome": "PASS",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "PDP signature over canonical {context_hash, in_policy, policy_hash} verifies."
+}

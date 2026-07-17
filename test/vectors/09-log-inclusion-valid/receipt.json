@@ -1,0 +1,35 @@
+{
+  "id": "9a4ff789-adc4-411f-874a-98c75f653a39",
+  "type": "notarised_evidence",
+  "plan_id": "a409e564-0fe3-4f65-8b77-154a29665461",
+  "agent": "claims-agent",
+  "action": "submit:claim:CLM-9001",
+  "in_policy": true,
+  "policy_reason": "matched scope submit:claim:*",
+  "evidence": {
+    "tool": "submit-claim",
+    "claim_id": "CLM-9920",
+    "amount": "1250.00",
+    "patient_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "evidence_hash_sha512": "f90aa27a8bec780e14286ebefa26efe8a0e2b8e62565c48c14db08563dce3c4202482a33fa82b97e5aebf49e4288b8d58f18ffd8745daea56f59a71d3dd0e41b",
+  "observed_at": "2026-05-11T12:00:00+00:00",
+  "key_id": "2ff7c1c638d85244",
+  "signature": "4682419cd278b52abe0a3532f43359bac4ac2c3ac9edfe817c42a8fbbbaa869b75b9ad4456e08a064608702c7d39e0b65a5507e85464c74e8ed936ac40a61d09",
+  "log_inclusion_proof": {
+    "log_id": "vectors-log-001",
+    "leaf_hash": "ce0f209bdb6e3ff4dd9b2a32845e84bd9ae72f5f753436e701bb429d2dd3bf55",
+    "leaf_index": 0,
+    "tree_size": 4,
+    "audit_path": [
+      "e2ddb298b4d076bea3a3b3afccbdfde30d791551d0fffe74486851046a73d0ab",
+      "a6f60095eb4996f10300a68d8aec9ea2a7a14aa7a68f50a000c6ba99b7cf0122"
+    ],
+    "sth": {
+      "tree_size": 4,
+      "root_hash": "fa523726e1a46e7e8f7e6211b7009e477744430507c50c6b181885110ac25aab",
+      "timestamp": "2026-05-11T12:00:00+00:00"
+    },
+    "sth_signature": "0a8d6ac7bf45493399528e5ab3ec1c553a7a36f0e350f225a61b7868806e901c6d22c96af1a322c95c9554f1952443e9ed28b8d71b57238c93b15ddfb78f9e0b"
+  }
+}
