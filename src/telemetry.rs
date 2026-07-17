@@ -17,6 +17,12 @@ pub struct Metrics {
     pub webauthn_lockouts: AtomicU64,
 }
 
+impl Default for Metrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Metrics {
     pub fn new() -> Self {
         Self {

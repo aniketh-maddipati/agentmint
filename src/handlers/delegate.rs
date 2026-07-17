@@ -34,8 +34,7 @@ fn action_matches_pattern(action: &str, pattern: &str) -> bool {
     if pattern == "*" {
         return true;
     }
-    if pattern.ends_with(":*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    if let Some(prefix) = pattern.strip_suffix(":*") {
         return action == prefix || action.starts_with(&format!("{}:", prefix));
     }
     action == pattern
