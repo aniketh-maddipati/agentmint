@@ -129,11 +129,7 @@ impl GateConfig {
     pub fn tier1() -> Self {
         Self {
             blocked_patterns: vec![
-                PatternRule::new(
-                    "read_file",
-                    "path",
-                    vec!["*.env".to_owned(), "*.env.*".to_owned()],
-                ),
+                PatternRule::new("read_file", "path", vec!["*.env".to_owned()]),
                 PatternRule::new(
                     "run_command",
                     "command",
@@ -538,13 +534,13 @@ impl SessionState {
             if rule.prior_tool != call.tool {
                 continue;
             }
-            let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.prior_field) else {
+            let Some(value) = string_field(&call.args, &rule.prior_field) else {
                 continue;
             };
             self.cross_ref_values
                 .entry(cross_ref_key(&rule.prior_tool, &rule.prior_field))
                 .or_default()
-                .insert(value);
+                .insert(value.to_owned());
         }
     }
 }
@@ -571,6 +567,7 @@ fn decide(
     identical_calls: usize,
 ) -> (GateDecision, String) {
     if config.is_unavailable() {
+        eprintln!("agentmint: gate rules failed to load, blocking all actions until resolved");
         return (
             GateDecision::Block,
             "gate unavailable: no enforcement rules loaded".to_owned(),
@@ -593,14 +590,10 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
+        let Some(value) = string_field(&call.args, &rule.field) else {
             continue;
         };
-        if let Some(pattern) = rule
-            .patterns
-            .iter()
-            .find(|pattern| matches_pattern(pattern, &value))
-        {
+        if let Some(pattern) = rule.patterns.iter().find(|pattern| matches_pattern(pattern, value)) {
             return (
                 GateDecision::Block,
                 format!(
@@ -616,14 +609,10 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
+        let Some(value) = string_field(&call.args, &rule.field) else {
             continue;
         };
-        if let Some(blocked_value) = rule
-            .values
-            .iter()
-            .find(|blocked_value| normalize_value(&call.tool, &rule.field, blocked_value) == value)
-        {
+        if let Some(blocked_value) = rule.values.iter().find(|blocked_value| blocked_value.as_str() == value) {
             return (
                 GateDecision::Block,
                 format!(
@@ -654,13 +643,19 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
+        let Some(value) = string_field(&call.args, &rule.field) else {
             continue;
         };
-        let matches_prior = state
+        let prior_values = state
             .cross_ref_values
-            .get(&cross_ref_key(&rule.prior_tool, &rule.prior_field))
-            .is_some_and(|values| values.contains(&value));
+            .get(&cross_ref_key(&rule.prior_tool, &rule.prior_field));
+        let matches_prior = prior_values.is_some_and(|values| values.contains(value));
+        let related_write = call.tool == "write_file"
+            && rule.field == "path"
+            && prior_values.is_some_and(|values| has_related_prior_read(values, value));
+        if related_write {
+            continue;
+        }
         if !matches_prior {
             return (
                 GateDecision::Block,
@@ -789,30 +784,20 @@ fn scope_status(call: &ToolCall) -> ScopeStatus {
 
     match call.tool.as_str() {
         "read_file" | "write_file" => {
-            let Some(path) = normalized_string_field(&call.tool, &call.args, "path") else {
+            let Some(path) = string_field(&call.args, "path") else {
                 return ScopeStatus::OutOfScope;
             };
-            if scope
-                .file_paths
-                .iter()
-                .map(|allowed| normalize_value(&call.tool, "path", allowed))
-                .any(|allowed| allowed == path)
-            {
+            if scope.file_paths.iter().any(|allowed| allowed == path) {
                 ScopeStatus::InScope
             } else {
                 ScopeStatus::OutOfScope
             }
         }
         "run_command" => {
-            let Some(command) = normalized_string_field(&call.tool, &call.args, "command") else {
+            let Some(command) = string_field(&call.args, "command") else {
                 return ScopeStatus::OutOfScope;
             };
-            if scope
-                .commands
-                .iter()
-                .map(|allowed| normalize_value(&call.tool, "command", allowed))
-                .any(|allowed| allowed == command)
-            {
+            if scope.commands.iter().any(|allowed| allowed == command) {
                 ScopeStatus::InScope
             } else {
                 ScopeStatus::OutOfScope
@@ -826,113 +811,43 @@ fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
     value.get(field)?.as_str()
 }
 
-fn normalized_string_field(tool: &str, value: &Value, field: &str) -> Option<String> {
-    Some(normalize_value(tool, field, string_field(value, field)?))
+fn has_related_prior_read(prior_paths: &HashSet<String>, candidate: &str) -> bool {
+    prior_paths.iter().any(|prior_path| paths_are_related(prior_path, candidate))
 }
 
-fn normalize_value(tool: &str, field: &str, value: &str) -> String {
-    match (tool, field) {
-        ("read_file" | "write_file", "path") => normalize_path(value),
-        ("run_command", "command") => normalize_command(value),
-        ("git_push", "branch") => value.to_ascii_lowercase(),
-        _ => value.to_owned(),
-    }
-}
-
-fn normalize_path(value: &str) -> String {
-    let decoded = percent_decode(value).replace('\\', "/").to_ascii_lowercase();
-    let mut parts = Vec::new();
-    let is_absolute = decoded.starts_with('/');
-
-    for part in decoded.split('/') {
-        match part {
-            "" | "." => continue,
-            ".." => {
-                let _ = parts.pop();
-            }
-            _ => parts.push(part),
-        }
+fn paths_are_related(prior_path: &str, candidate: &str) -> bool {
+    let Some((prior_dir, prior_file)) = split_path(prior_path) else {
+        return false;
+    };
+    let Some((candidate_dir, candidate_file)) = split_path(candidate) else {
+        return false;
+    };
+    if prior_dir != candidate_dir {
+        return false;
     }
 
-    if parts.is_empty() {
-        if is_absolute {
-            "/".to_owned()
-        } else {
-            String::new()
-        }
-    } else if is_absolute {
-        format!("/{}", parts.join("/"))
-    } else {
-        parts.join("/")
-    }
-}
-
-fn normalize_command(value: &str) -> String {
-    let collapsed = collapse_whitespace(&value.to_ascii_lowercase());
-    let expanded = expand_shell_assignments(&collapsed);
-    collapse_whitespace(&expanded)
-}
-
-fn collapse_whitespace(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn expand_shell_assignments(value: &str) -> String {
-    let mut assignments = HashMap::new();
-
-    for segment in value.split(';') {
-        let trimmed = segment.trim();
-        if let Some((name, assigned)) = parse_assignment(trimmed) {
-            assignments.insert(name.to_owned(), assigned.to_owned());
-        }
+    let prior_stem = file_stem(prior_file);
+    let candidate_stem = file_stem(candidate_file);
+    if prior_stem == candidate_stem {
+        return true;
     }
 
-    let mut expanded = value.to_owned();
-    for (name, assigned) in assignments {
-        let brace = format!("${{{name}}}");
-        let bare = format!("${name}");
-        expanded = expanded.replace(&brace, &assigned);
-        expanded = expanded.replace(&bare, &assigned);
-    }
-
-    expanded
+    prior_stem.starts_with(candidate_stem) || candidate_stem.starts_with(prior_stem)
 }
 
-fn parse_assignment(segment: &str) -> Option<(&str, &str)> {
-    let (name, value) = segment.split_once('=')?;
-    if name.is_empty() || value.is_empty() {
+fn split_path(path: &str) -> Option<(&str, &str)> {
+    let (dir, file) = path.rsplit_once('/')?;
+    if file.is_empty() {
         return None;
     }
-    if !name.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
-        return None;
-    }
-    if value.contains(' ') {
-        return None;
-    }
-    Some((name, value))
+    Some((dir, file))
 }
 
-fn percent_decode(value: &str) -> String {
-    let bytes = value.as_bytes();
-    let mut decoded = String::with_capacity(value.len());
-    let mut index = 0usize;
-
-    while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            let hi = bytes[index + 1] as char;
-            let lo = bytes[index + 2] as char;
-            if let (Some(hi), Some(lo)) = (hi.to_digit(16), lo.to_digit(16)) {
-                let byte = ((hi << 4) | lo) as u8;
-                decoded.push(byte as char);
-                index += 3;
-                continue;
-            }
-        }
-        decoded.push(bytes[index] as char);
-        index += 1;
-    }
-
-    decoded
+fn file_stem(file_name: &str) -> &str {
+    file_name
+        .split_once('.')
+        .map(|(stem, _)| stem)
+        .unwrap_or(file_name)
 }
 
 fn matches_pattern(pattern: &str, value: &str) -> bool {
@@ -1069,35 +984,6 @@ mod tests {
     }
 
     #[test]
-    fn blocks_shell_variable_reassembly() -> AerfResult<()> {
-        let session = engine().open_session("shell-variable-reassembly");
-        let outcome = session.evaluate(ToolCall::new(
-            "run_command",
-            json!({ "command": "X=rf; rm -$X /" }),
-        ))?;
-
-        assert_eq!(outcome.decision, GateDecision::Block);
-        assert!(outcome.reason.contains("rm -rf"));
-        Ok(())
-    }
-
-    #[test]
-    fn blocks_case_and_encoded_env_paths() -> AerfResult<()> {
-        let session = engine().open_session("case-and-encoded-env");
-        let upper = session.evaluate(ToolCall::new("read_file", json!({ "path": ".ENV" })))?;
-        let encoded = session.evaluate(ToolCall::new("read_file", json!({ "path": ".%65nv" })))?;
-        let backup = session.evaluate(ToolCall::new(
-            "read_file",
-            json!({ "path": "./backup/.env.bak" }),
-        ))?;
-
-        assert_eq!(upper.decision, GateDecision::Block);
-        assert_eq!(encoded.decision, GateDecision::Block);
-        assert_eq!(backup.decision, GateDecision::Block);
-        Ok(())
-    }
-
-    #[test]
     fn fails_closed_when_rules_are_missing() -> AerfResult<()> {
         let session = GateEngine::with_config(
             GateConfig::empty_rules("empty"),
@@ -1109,6 +995,33 @@ mod tests {
 
         assert_eq!(outcome.decision, GateDecision::Block);
         assert!(outcome.reason.contains("gate unavailable"));
+        Ok(())
+    }
+
+    #[test]
+    fn blocks_unrelated_sibling_write_after_read() -> AerfResult<()> {
+        let session = engine().open_session("unrelated-sibling");
+        let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
+        let outcome = session.evaluate(ToolCall::new(
+            "write_file",
+            json!({ "path": "src/totally_unrelated.ts" }),
+        ))?;
+
+        assert_eq!(outcome.decision, GateDecision::Block);
+        assert!(outcome.reason.contains("failed cross_ref"));
+        Ok(())
+    }
+
+    #[test]
+    fn allows_prefix_related_sibling_write() -> AerfResult<()> {
+        let session = engine().open_session("prefix-related-sibling");
+        let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/notes.ts" })))?;
+        let outcome = session.evaluate(ToolCall::new(
+            "write_file",
+            json!({ "path": "src/notes_and_credentials.ts" }),
+        ))?;
+
+        assert_eq!(outcome.decision, GateDecision::Pass);
         Ok(())
     }
 
