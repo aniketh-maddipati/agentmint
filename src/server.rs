@@ -49,3 +49,74 @@ pub async fn run_with_listener(state: AppState, listener: tokio::net::TcpListene
     tracing::info!("listening on {:?}", listener.local_addr());
     axum::serve(listener, router).await
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::state::build_test_state;
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    async fn spawn_server() -> Result<(String, reqwest::Client), Box<dyn std::error::Error>> {
+        let state = build_test_state()?;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
+        tokio::spawn(super::run_with_listener(state, listener));
+        let client = reqwest::Client::builder().no_proxy().build()?;
+        Ok((format!("http://{addr}"), client))
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn health_route_returns_ok_with_security_headers() -> TestResult {
+        let (base, client) = spawn_server().await?;
+
+        let response = client.get(format!("{base}/health")).send().await?;
+
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("x-content-type-options").and_then(|value| value.to_str().ok()),
+            Some("nosniff")
+        );
+        assert_eq!(
+            response.headers().get("x-frame-options").and_then(|value| value.to_str().ok()),
+            Some("DENY")
+        );
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn metrics_route_returns_json() -> TestResult {
+        let (base, client) = spawn_server().await?;
+
+        let response = client.get(format!("{base}/metrics")).send().await?;
+
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let body: serde_json::Value = response.json().await?;
+        assert!(body.is_object());
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn mint_rejects_malformed_body_via_extractor() -> TestResult {
+        let (base, client) = spawn_server().await?;
+
+        let response = client
+            .post(format!("{base}/mint"))
+            .header("content-type", "application/json")
+            .body("{ not json")
+            .send()
+            .await?;
+
+        assert!(response.status().is_client_error());
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unknown_route_returns_not_found() -> TestResult {
+        let (base, client) = spawn_server().await?;
+
+        let response = client.get(format!("{base}/does-not-exist")).send().await?;
+
+        assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+        Ok(())
+    }
+}

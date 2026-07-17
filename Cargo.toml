@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-axum = "0.7"
+axum = "0.8"
 ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
 rand = "0.8"
 base64 = "0.22"
