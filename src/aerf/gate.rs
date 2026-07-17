@@ -129,7 +129,11 @@ impl GateConfig {
     pub fn tier1() -> Self {
         Self {
             blocked_patterns: vec![
-                PatternRule::new("read_file", "path", vec!["*.env".to_owned()]),
+                PatternRule::new(
+                    "read_file",
+                    "path",
+                    vec!["*.env".to_owned(), "*.env.*".to_owned()],
+                ),
                 PatternRule::new(
                     "run_command",
                     "command",
@@ -156,6 +160,24 @@ impl GateConfig {
             max_identical_calls: 3,
             policy_hash: "tier1-gate-policy-v1".to_owned(),
         }
+    }
+
+    pub fn empty_rules(policy_hash: &str) -> Self {
+        Self {
+            blocked_patterns: Vec::new(),
+            blocked_values: Vec::new(),
+            requires: Vec::new(),
+            cross_refs: Vec::new(),
+            max_identical_calls: 1_000_000,
+            policy_hash: policy_hash.to_owned(),
+        }
+    }
+
+    fn is_unavailable(&self) -> bool {
+        self.blocked_patterns.is_empty()
+            && self.blocked_values.is_empty()
+            && self.requires.is_empty()
+            && self.cross_refs.is_empty()
     }
 }
 
@@ -274,13 +296,25 @@ pub struct GateEngine {
 
 impl GateEngine {
     pub fn tier1() -> Arc<Self> {
+        Self::new(
+            GateConfig::tier1(),
+            "tier1-gate",
+            "tier1-correctness-suite",
+        )
+    }
+
+    pub fn with_config(config: GateConfig, agent: &str, plan_id: &str) -> Arc<Self> {
+        Self::new(config, agent, plan_id)
+    }
+
+    fn new(config: GateConfig, agent: &str, plan_id: &str) -> Arc<Self> {
         let signing_key = SigningKey::from_bytes(&[23; 32]);
         Arc::new(Self {
-            config: GateConfig::tier1(),
+            config,
             verifying_key: signing_key.verifying_key(),
             signing_key,
-            agent: "tier1-gate".to_owned(),
-            plan_id: "tier1-correctness-suite".to_owned(),
+            agent: agent.to_owned(),
+            plan_id: plan_id.to_owned(),
         })
     }
 
@@ -504,13 +538,13 @@ impl SessionState {
             if rule.prior_tool != call.tool {
                 continue;
             }
-            let Some(value) = string_field(&call.args, &rule.prior_field) else {
+            let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.prior_field) else {
                 continue;
             };
             self.cross_ref_values
                 .entry(cross_ref_key(&rule.prior_tool, &rule.prior_field))
                 .or_default()
-                .insert(value.to_owned());
+                .insert(value);
         }
     }
 }
@@ -536,6 +570,13 @@ fn decide(
     call: &ToolCall,
     identical_calls: usize,
 ) -> (GateDecision, String) {
+    if config.is_unavailable() {
+        return (
+            GateDecision::Block,
+            "gate unavailable: no enforcement rules loaded".to_owned(),
+        );
+    }
+
     if identical_calls >= config.max_identical_calls {
         return (
             GateDecision::Block,
@@ -552,10 +593,14 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = string_field(&call.args, &rule.field) else {
+        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
             continue;
         };
-        if let Some(pattern) = rule.patterns.iter().find(|pattern| matches_pattern(pattern, value)) {
+        if let Some(pattern) = rule
+            .patterns
+            .iter()
+            .find(|pattern| matches_pattern(pattern, &value))
+        {
             return (
                 GateDecision::Block,
                 format!(
@@ -571,10 +616,14 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = string_field(&call.args, &rule.field) else {
+        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
             continue;
         };
-        if let Some(blocked_value) = rule.values.iter().find(|blocked_value| blocked_value.as_str() == value) {
+        if let Some(blocked_value) = rule
+            .values
+            .iter()
+            .find(|blocked_value| normalize_value(&call.tool, &rule.field, blocked_value) == value)
+        {
             return (
                 GateDecision::Block,
                 format!(
@@ -605,13 +654,13 @@ fn decide(
         if rule.tool != call.tool {
             continue;
         }
-        let Some(value) = string_field(&call.args, &rule.field) else {
+        let Some(value) = normalized_string_field(&call.tool, &call.args, &rule.field) else {
             continue;
         };
         let matches_prior = state
             .cross_ref_values
             .get(&cross_ref_key(&rule.prior_tool, &rule.prior_field))
-            .is_some_and(|values| values.contains(value));
+            .is_some_and(|values| values.contains(&value));
         if !matches_prior {
             return (
                 GateDecision::Block,
@@ -740,20 +789,30 @@ fn scope_status(call: &ToolCall) -> ScopeStatus {
 
     match call.tool.as_str() {
         "read_file" | "write_file" => {
-            let Some(path) = string_field(&call.args, "path") else {
+            let Some(path) = normalized_string_field(&call.tool, &call.args, "path") else {
                 return ScopeStatus::OutOfScope;
             };
-            if scope.file_paths.iter().any(|allowed| allowed == path) {
+            if scope
+                .file_paths
+                .iter()
+                .map(|allowed| normalize_value(&call.tool, "path", allowed))
+                .any(|allowed| allowed == path)
+            {
                 ScopeStatus::InScope
             } else {
                 ScopeStatus::OutOfScope
             }
         }
         "run_command" => {
-            let Some(command) = string_field(&call.args, "command") else {
+            let Some(command) = normalized_string_field(&call.tool, &call.args, "command") else {
                 return ScopeStatus::OutOfScope;
             };
-            if scope.commands.iter().any(|allowed| allowed == command) {
+            if scope
+                .commands
+                .iter()
+                .map(|allowed| normalize_value(&call.tool, "command", allowed))
+                .any(|allowed| allowed == command)
+            {
                 ScopeStatus::InScope
             } else {
                 ScopeStatus::OutOfScope
@@ -765,6 +824,115 @@ fn scope_status(call: &ToolCall) -> ScopeStatus {
 
 fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
     value.get(field)?.as_str()
+}
+
+fn normalized_string_field(tool: &str, value: &Value, field: &str) -> Option<String> {
+    Some(normalize_value(tool, field, string_field(value, field)?))
+}
+
+fn normalize_value(tool: &str, field: &str, value: &str) -> String {
+    match (tool, field) {
+        ("read_file" | "write_file", "path") => normalize_path(value),
+        ("run_command", "command") => normalize_command(value),
+        ("git_push", "branch") => value.to_ascii_lowercase(),
+        _ => value.to_owned(),
+    }
+}
+
+fn normalize_path(value: &str) -> String {
+    let decoded = percent_decode(value).replace('\\', "/").to_ascii_lowercase();
+    let mut parts = Vec::new();
+    let is_absolute = decoded.starts_with('/');
+
+    for part in decoded.split('/') {
+        match part {
+            "" | "." => continue,
+            ".." => {
+                let _ = parts.pop();
+            }
+            _ => parts.push(part),
+        }
+    }
+
+    if parts.is_empty() {
+        if is_absolute {
+            "/".to_owned()
+        } else {
+            String::new()
+        }
+    } else if is_absolute {
+        format!("/{}", parts.join("/"))
+    } else {
+        parts.join("/")
+    }
+}
+
+fn normalize_command(value: &str) -> String {
+    let collapsed = collapse_whitespace(&value.to_ascii_lowercase());
+    let expanded = expand_shell_assignments(&collapsed);
+    collapse_whitespace(&expanded)
+}
+
+fn collapse_whitespace(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn expand_shell_assignments(value: &str) -> String {
+    let mut assignments = HashMap::new();
+
+    for segment in value.split(';') {
+        let trimmed = segment.trim();
+        if let Some((name, assigned)) = parse_assignment(trimmed) {
+            assignments.insert(name.to_owned(), assigned.to_owned());
+        }
+    }
+
+    let mut expanded = value.to_owned();
+    for (name, assigned) in assignments {
+        let brace = format!("${{{name}}}");
+        let bare = format!("${name}");
+        expanded = expanded.replace(&brace, &assigned);
+        expanded = expanded.replace(&bare, &assigned);
+    }
+
+    expanded
+}
+
+fn parse_assignment(segment: &str) -> Option<(&str, &str)> {
+    let (name, value) = segment.split_once('=')?;
+    if name.is_empty() || value.is_empty() {
+        return None;
+    }
+    if !name.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+        return None;
+    }
+    if value.contains(' ') {
+        return None;
+    }
+    Some((name, value))
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = String::with_capacity(value.len());
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let hi = bytes[index + 1] as char;
+            let lo = bytes[index + 2] as char;
+            if let (Some(hi), Some(lo)) = (hi.to_digit(16), lo.to_digit(16)) {
+                let byte = ((hi << 4) | lo) as u8;
+                decoded.push(byte as char);
+                index += 3;
+                continue;
+            }
+        }
+        decoded.push(bytes[index] as char);
+        index += 1;
+    }
+
+    decoded
 }
 
 fn matches_pattern(pattern: &str, value: &str) -> bool {
@@ -897,6 +1065,50 @@ mod tests {
 
         assert_eq!(outcome.decision, GateDecision::Block);
         assert!(outcome.reason.contains("rm -rf"));
+        Ok(())
+    }
+
+    #[test]
+    fn blocks_shell_variable_reassembly() -> AerfResult<()> {
+        let session = engine().open_session("shell-variable-reassembly");
+        let outcome = session.evaluate(ToolCall::new(
+            "run_command",
+            json!({ "command": "X=rf; rm -$X /" }),
+        ))?;
+
+        assert_eq!(outcome.decision, GateDecision::Block);
+        assert!(outcome.reason.contains("rm -rf"));
+        Ok(())
+    }
+
+    #[test]
+    fn blocks_case_and_encoded_env_paths() -> AerfResult<()> {
+        let session = engine().open_session("case-and-encoded-env");
+        let upper = session.evaluate(ToolCall::new("read_file", json!({ "path": ".ENV" })))?;
+        let encoded = session.evaluate(ToolCall::new("read_file", json!({ "path": ".%65nv" })))?;
+        let backup = session.evaluate(ToolCall::new(
+            "read_file",
+            json!({ "path": "./backup/.env.bak" }),
+        ))?;
+
+        assert_eq!(upper.decision, GateDecision::Block);
+        assert_eq!(encoded.decision, GateDecision::Block);
+        assert_eq!(backup.decision, GateDecision::Block);
+        Ok(())
+    }
+
+    #[test]
+    fn fails_closed_when_rules_are_missing() -> AerfResult<()> {
+        let session = GateEngine::with_config(
+            GateConfig::empty_rules("empty"),
+            "gate-unavailable",
+            "gate-unavailable",
+        )
+        .open_session("gate-unavailable");
+        let outcome = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
+
+        assert_eq!(outcome.decision, GateDecision::Block);
+        assert!(outcome.reason.contains("gate unavailable"));
         Ok(())
     }
 
