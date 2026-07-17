@@ -1,0 +1,6 @@
+{
+  "outcome": "PASS",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "Three chained receipts; verifier checks each signature in turn."
+}

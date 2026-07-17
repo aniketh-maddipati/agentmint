@@ -1,0 +1,6 @@
+{
+  "outcome": "PASS",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "v0.1 canonical example preserved verbatim under v0.2 to lock regression."
+}

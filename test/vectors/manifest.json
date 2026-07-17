@@ -1,0 +1,86 @@
+[
+  {
+    "dir": "01-genesis-happy-path",
+    "outcome": "PASS",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "v0.1 canonical example preserved verbatim under v0.2 to lock regression."
+  },
+  {
+    "dir": "02-chain-happy-path",
+    "outcome": "PASS",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "Three chained receipts; verifier checks each signature in turn."
+  },
+  {
+    "dir": "03-tamper-evidence",
+    "outcome": "FAIL",
+    "reason_code": "issuer_signature",
+    "stderr_substring": "signature verification FAILED",
+    "notes": "Mutated action field after signing; signature no longer matches."
+  },
+  {
+    "dir": "04-tamper-chain",
+    "outcome": "FAIL",
+    "reason_code": "issuer_signature",
+    "stderr_substring": "signature verification FAILED",
+    "notes": "Middle receipt's evidence mutated after signing; verifier rejects it."
+  },
+  {
+    "dir": "05-impact-no-parent-sig",
+    "outcome": "FAIL",
+    "reason_code": "parent_signature",
+    "stderr_substring": "parent_signature absent",
+    "notes": "HIGH-IMPACT receipt missing required parent counter-signature."
+  },
+  {
+    "dir": "06-impact-with-parent-sig",
+    "outcome": "PASS",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "HIGH-IMPACT receipt with valid parent + PDP signatures."
+  },
+  {
+    "dir": "07-pdp-binding-valid",
+    "outcome": "PASS",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "PDP signature over canonical {context_hash, in_policy, policy_hash} verifies."
+  },
+  {
+    "dir": "08-pdp-binding-split-context",
+    "outcome": "FAIL",
+    "reason_code": "pdp_signature",
+    "stderr_substring": "pdp signature verification FAILED",
+    "notes": "PDP signed verdict for context A; receipt claims context B."
+  },
+  {
+    "dir": "09-log-inclusion-valid",
+    "outcome": "PASS",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "Valid RFC 9162-aligned inclusion proof against signed STH."
+  },
+  {
+    "dir": "10-log-inclusion-invalid",
+    "outcome": "FAIL",
+    "reason_code": "log_inclusion",
+    "stderr_substring": "audit_path does not lead to STH root_hash",
+    "notes": "Audit path tampered; root does not match the signed STH."
+  },
+  {
+    "dir": "11-tag-stripped-known-limit",
+    "outcome": "KNOWN_LIMIT",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "Tag stripping at the receipt layer: an attacker controlling the agent can strip impact_tags and bypass the sync counter-sign requirement. The verifier cannot detect this; defense is upstream PEP tag pinning (SPEC.md \u00a712.7)."
+  },
+  {
+    "dir": "12-common-mode-known-limit",
+    "outcome": "KNOWN_LIMIT",
+    "reason_code": "",
+    "stderr_substring": "",
+    "notes": "Common-mode failure on poisoned upstream context. All three layers (issuer, parent, PDP) saw the same poisoned input and signed honestly. AERF records what was, not what should have been (SPEC.md \u00a712.6)."
+  }
+]

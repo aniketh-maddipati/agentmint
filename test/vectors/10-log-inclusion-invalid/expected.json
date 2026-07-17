@@ -1,0 +1,6 @@
+{
+  "outcome": "FAIL",
+  "reason_code": "log_inclusion",
+  "stderr_substring": "audit_path does not lead to STH root_hash",
+  "notes": "Audit path tampered; root does not match the signed STH."
+}

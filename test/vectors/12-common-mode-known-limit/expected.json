@@ -1,0 +1,6 @@
+{
+  "outcome": "KNOWN_LIMIT",
+  "reason_code": "",
+  "stderr_substring": "",
+  "notes": "Common-mode failure on poisoned upstream context. All three layers (issuer, parent, PDP) saw the same poisoned input and signed honestly. AERF records what was, not what should have been (SPEC.md \u00a712.6)."
+}

@@ -1,0 +1,6 @@
+{
+  "outcome": "FAIL",
+  "break_type": "hash_link_mismatch",
+  "break_at_index": 1,
+  "notes": "LOCAL ONLY: the full 3-receipt chain verifies cleanly, but removing receipt-01 and verifying [receipt-00, receipt-02] fails at the current hash-link-first ordering."
+}

@@ -1,0 +1,6 @@
+{
+  "outcome": "FAIL",
+  "reason_code": "issuer_signature",
+  "stderr_substring": "signature verification FAILED",
+  "notes": "Middle receipt's evidence mutated after signing; verifier rejects it."
+}
