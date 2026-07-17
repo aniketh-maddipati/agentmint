@@ -1,6 +1,7 @@
 //! AERF crypto-core primitives and verifiers.
 //! Used by: conformance tests and future verifier integration.
 
+pub mod adapters;
 pub mod canonical;
 pub mod chain;
 pub mod gate;
