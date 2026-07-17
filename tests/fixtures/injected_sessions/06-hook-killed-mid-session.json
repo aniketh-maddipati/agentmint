@@ -1,0 +1,44 @@
+{
+  "name": "hook-killed-mid-session",
+  "classification": "DESIGN",
+  "citation": null,
+  "relevance": "FOUNDER-RELEVANT",
+  "off_scope_action_fired": false,
+  "failure_reason": "signing key unavailable",
+  "pre_failure_steps": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "src/app.ts"
+      }
+    },
+    {
+      "tool": "write_file",
+      "args": {
+        "path": "src/app.ts"
+      }
+    },
+    {
+      "tool": "run_tests",
+      "args": {},
+      "planned_result": {
+        "passed": 3,
+        "failed": 0
+      }
+    }
+  ],
+  "post_failure_steps": [
+    {
+      "tool": "git_commit",
+      "args": {
+        "message": "hotfix after recorder failure"
+      }
+    },
+    {
+      "tool": "git_push",
+      "args": {
+        "branch": "feature/hotfix-after-gap"
+      }
+    }
+  ]
+}

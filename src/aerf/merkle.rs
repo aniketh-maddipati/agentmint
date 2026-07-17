@@ -46,10 +46,10 @@ pub fn walk_audit_path(
             return None;
         }
 
-        let next = if fn_index % 2 == 1 || fn_index == sn_index {
+        let next = if !fn_index.is_multiple_of(2) || fn_index == sn_index {
             let hashed = hash_internal(sibling, &root).ok()?;
-            if fn_index % 2 == 0 {
-                while fn_index % 2 == 0 && fn_index != 0 {
+            if fn_index.is_multiple_of(2) {
+                while fn_index.is_multiple_of(2) && fn_index != 0 {
                     fn_index /= 2;
                     sn_index /= 2;
                 }

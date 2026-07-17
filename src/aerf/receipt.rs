@@ -233,7 +233,7 @@ fn check_parent_signature(receipt: &Receipt, options: &VerifyOptions<'_>) -> Che
         .as_ref()
         .is_some_and(|signature| !signature.is_empty());
 
-    if receipt.impact_tags.len() > 0 && !has_signature {
+    if !receipt.impact_tags.is_empty() && !has_signature {
         return missing("impact_tags non-empty but parent_signature absent");
     }
 
@@ -270,7 +270,7 @@ fn check_pdp_signature(receipt: &Receipt, options: &VerifyOptions<'_>) -> CheckR
         .as_ref()
         .is_some_and(|signature| !signature.is_empty());
 
-    if receipt.impact_tags.len() > 0 && !has_signature {
+    if !receipt.impact_tags.is_empty() && !has_signature {
         return missing("impact_tags non-empty but pdp_signature absent");
     }
 
@@ -344,7 +344,7 @@ fn verify_log_inclusion_proof(
         return Ok(Some("leaf_hash malformed".to_owned()));
     }
 
-    let sth_value = raw_sth_value(receipt).ok_or_else(|| AerfError::InvalidHex { field: "sth" })?;
+    let sth_value = raw_sth_value(receipt).ok_or(AerfError::InvalidHex { field: "sth" })?;
     let sth_payload = canonicalize_verbatim_or_strict(sth_value)?.into_bytes();
     if !verify_signature_bytes(
         &sth_payload,

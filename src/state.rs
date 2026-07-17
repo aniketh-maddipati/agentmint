@@ -34,7 +34,7 @@ pub type AppState = Arc<AppStateInner>;
 impl AppStateInner {
     pub fn increment_requests(&self) {
         let n = self.request_count.fetch_add(1, Relaxed) + 1;
-        if n % 1000 == 0 {
+        if n.is_multiple_of(1000) {
             tracing::warn!(count = n, "high request volume");
         }
     }

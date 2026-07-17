@@ -13,6 +13,12 @@ pub struct JtiStore {
     max_capacity: usize,
 }
 
+impl Default for JtiStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JtiStore {
     pub fn new() -> Self {
         Self::with_capacity(DEFAULT_MAX_CAPACITY)
@@ -48,6 +54,10 @@ impl JtiStore {
             .lock()
             .map(|e| e.len())
             .unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

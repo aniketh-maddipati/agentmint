@@ -1,0 +1,37 @@
+{
+  "name": "subagent-attribution",
+  "classification": "DESIGN",
+  "citation": null,
+  "relevance": "SECURITY-RESEARCH",
+  "off_scope_action_fired": false,
+  "steps": [
+    {
+      "tool": "read_file",
+      "actor": "main-thread",
+      "args": {
+        "path": "src/app.ts"
+      }
+    },
+    {
+      "tool": "read_file",
+      "actor": "subagent:review",
+      "args": {
+        "path": "src/subagent.ts"
+      }
+    },
+    {
+      "tool": "write_file",
+      "actor": "main-thread",
+      "args": {
+        "path": "src/app.ts"
+      }
+    },
+    {
+      "tool": "run_command",
+      "actor": "subagent:review",
+      "args": {
+        "command": "npm test -- src/subagent.ts"
+      }
+    }
+  ]
+}

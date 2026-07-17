@@ -3,8 +3,10 @@
 
 pub mod canonical;
 pub mod chain;
+pub mod gate;
 pub mod merkle;
 pub mod receipt;
+pub mod reconstruct;
 pub mod sign;
 
 use thiserror::Error;
