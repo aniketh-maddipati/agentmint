@@ -23,6 +23,13 @@ struct ExpectedOutcome {
     reason_code: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct LocalExpectedOutcome {
+    outcome: String,
+    break_type: String,
+    break_at_index: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ActualOutcome {
     outcome: String,
@@ -62,10 +69,61 @@ fn aerf_conformance_vectors_match_manifest() {
         ));
     }
 
-    println!("AERF conformance 12/12");
+    let local_summary = verify_local_seq_gap_fixture();
+    summary.push(local_summary);
+
+    println!("AERF conformance 12/12 official + 1 local");
     for line in summary {
         println!("{line}");
     }
+}
+
+fn verify_local_seq_gap_fixture() -> String {
+    let vector_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("test/vectors/13-seq-gap-local");
+    let expected: LocalExpectedOutcome =
+        serde_json::from_slice(&fs::read(vector_dir.join("expected.json")).expect("expected"))
+            .expect("expected json");
+    let issuer_public_key = load_required_key(&vector_dir.join("public_key.pem"));
+    let receipts = load_receipts(&vector_dir);
+
+    let full_chain = verify_aerf_chain(
+        &receipts,
+        VerifyChainOptions {
+            issuer_public_key: Some(&issuer_public_key),
+        },
+    );
+    assert!(
+        full_chain.valid,
+        "13-seq-gap-local full chain should be valid"
+    );
+
+    let deleted_middle = vec![receipts[0].clone(), receipts[2].clone()];
+    let subset_chain = verify_aerf_chain(
+        &deleted_middle,
+        VerifyChainOptions {
+            issuer_public_key: Some(&issuer_public_key),
+        },
+    );
+
+    assert!(!subset_chain.valid, "13-seq-gap-local subset should fail");
+    assert_eq!(expected.outcome, "FAIL");
+    assert_eq!(
+        subset_chain.break_at_index,
+        Some(expected.break_at_index),
+        "13-seq-gap-local break index"
+    );
+    assert_eq!(
+        chain_break_type_name(subset_chain.break_type),
+        expected.break_type,
+        "13-seq-gap-local break type"
+    );
+
+    format!(
+        "13-seq-gap-local [LOCAL, not official] | expected={} | actual={} | reason={}",
+        expected.outcome,
+        "FAIL",
+        chain_break_type_name(subset_chain.break_type)
+    )
 }
 
 fn verify_vector(vector_dir: &Path, expected_outcome: &str) -> ActualOutcome {
@@ -168,4 +226,14 @@ fn load_optional_key(path: &Path) -> Option<VerifyingKey> {
 
     let pem = fs::read_to_string(path).expect("pem");
     Some(VerifyingKey::from_public_key_pem(&pem).expect("public key pem"))
+}
+
+fn chain_break_type_name(break_type: Option<ChainBreakType>) -> String {
+    match break_type {
+        Some(ChainBreakType::SignatureInvalid) => "signature_invalid".to_owned(),
+        Some(ChainBreakType::HashLinkMismatch) => "hash_link_mismatch".to_owned(),
+        Some(ChainBreakType::SeqGap) => "seq_gap".to_owned(),
+        Some(ChainBreakType::GenesisViolation) => "genesis_violation".to_owned(),
+        None => String::new(),
+    }
 }
