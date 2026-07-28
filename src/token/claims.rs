@@ -90,7 +90,11 @@ impl Claims {
     }
 
     pub fn is_expired(&self) -> bool {
-        Utc::now() > self.exp
+        self.is_expired_at(Utc::now())
+    }
+
+    pub fn is_expired_at(&self, now: DateTime<Utc>) -> bool {
+        now >= self.exp
     }
 }
 
@@ -111,7 +115,19 @@ mod tests {
     #[test]
     fn claims_with_zero_ttl_are_expired() {
         let claims = Claims::new("agent-1".into(), "deploy".into(), 0);
-        assert!(claims.is_expired());
+        assert!(claims.is_expired_at(claims.exp));
+    }
+
+    #[test]
+    fn claims_expire_at_exp_boundary() {
+        let claims = Claims::new("agent-1".into(), "deploy".into(), 300);
+        assert!(claims.is_expired_at(claims.exp));
+    }
+
+    #[test]
+    fn claims_before_exp_boundary_are_valid() {
+        let claims = Claims::new("agent-1".into(), "deploy".into(), 300);
+        assert!(!claims.is_expired_at(claims.exp - chrono::Duration::nanoseconds(1)));
     }
 
     #[test]

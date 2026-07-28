@@ -5,6 +5,7 @@ pub mod adapters;
 pub mod canonical;
 pub mod chain;
 pub mod gate;
+pub mod intervention;
 pub mod merkle;
 pub mod receipt;
 pub mod reconstruct;

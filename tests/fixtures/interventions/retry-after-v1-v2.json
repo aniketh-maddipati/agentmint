@@ -1,0 +1,511 @@
+{
+  "run_id": "run-retry-after-v1-v2",
+  "session_id": "session-retry-after-v1-v2",
+  "provider": "openai",
+  "model": "gpt-4.1",
+  "request": {
+    "input": [
+      {
+        "type": "message",
+        "role": "system",
+        "content": "Preserve deterministic retries across API versions."
+      },
+      {
+        "type": "message",
+        "role": "user",
+        "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+      }
+    ],
+    "cached_input": [
+      {
+        "type": "message",
+        "role": "system",
+        "content": "Preserve deterministic retries across API versions."
+      }
+    ]
+  },
+  "raw_events": [
+    {
+      "event_id": "inspect-api-1",
+      "recorded_at": "2026-07-28T12:00:00Z",
+      "source": "recorder",
+      "endpoint": "/repo/docs",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "read_file",
+      "file_path": "docs/api/v1/responses.md",
+      "summary": "Inspect the /v1 Responses API contract.",
+      "body": {
+        "path": "docs/api/v1/responses.md"
+      }
+    },
+    {
+      "event_id": "inspect-api-2",
+      "recorded_at": "2026-07-28T12:00:01Z",
+      "source": "recorder",
+      "endpoint": "/repo/docs",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "read_file",
+      "file_path": "docs/api/v1/responses.md",
+      "summary": "Re-check the /v1 retry_after behavior.",
+      "body": {
+        "path": "docs/api/v1/responses.md"
+      }
+    },
+    {
+      "event_id": "inspect-api-3",
+      "recorded_at": "2026-07-28T12:00:02Z",
+      "source": "recorder",
+      "endpoint": "/repo/docs",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "read_file",
+      "file_path": "docs/api/v2/responses.md",
+      "summary": "Inspect the /v2 Responses API contract.",
+      "body": {
+        "path": "docs/api/v2/responses.md"
+      }
+    },
+    {
+      "event_id": "edit-schema-1",
+      "recorded_at": "2026-07-28T12:00:03Z",
+      "source": "recorder",
+      "endpoint": "/local/workspace",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "write_file",
+      "file_path": "src/aerf/intervention.rs",
+      "summary": "Add deterministic episode-builder support to the schema."
+    },
+    {
+      "event_id": "update-client-1",
+      "recorded_at": "2026-07-28T12:00:04Z",
+      "source": "recorder",
+      "endpoint": "/local/workspace",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "write_file",
+      "file_path": "src/client/intervention_client.rs",
+      "summary": "Update the client to consume the normalized episode output."
+    },
+    {
+      "event_id": "failed-test-1",
+      "recorded_at": "2026-07-28T12:00:05Z",
+      "source": "recorder",
+      "endpoint": "/local/tests",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "run_tests",
+      "summary": "The intervention parsing golden test failed before the fixture was revised.",
+      "outcome": "failed",
+      "status_code": 500,
+      "body": {
+        "test": "intervention_parsing",
+        "status": "failed"
+      }
+    },
+    {
+      "event_id": "revise-fixture-1",
+      "recorded_at": "2026-07-28T12:00:06Z",
+      "source": "recorder",
+      "endpoint": "/local/workspace",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "write_file",
+      "file_path": "tests/fixtures/interventions/retry-after-v1-v2.json",
+      "summary": "Revise the fixture to carry six semantic episodes."
+    },
+    {
+      "event_id": "passing-test-1",
+      "recorded_at": "2026-07-28T12:00:07Z",
+      "source": "recorder",
+      "endpoint": "/local/tests",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "tool_name": "run_tests",
+      "summary": "The intervention parsing golden test passed after the fixture revision.",
+      "outcome": "succeeded",
+      "status_code": 200,
+      "body": {
+        "test": "intervention_parsing",
+        "status": "passed"
+      }
+    }
+  ],
+  "episodes": [
+    {
+      "episode_id": "episode-inspect-api",
+      "title": "inspect API",
+      "raw_event_ids": [
+        "inspect-api-1",
+        "inspect-api-2",
+        "inspect-api-3"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-inspect-api-observed",
+          "summary": "Collapsed 3 API inspection events while preserving their raw-event IDs.",
+          "source_event_id": "inspect-api-1"
+        }
+      ],
+      "checkpoints": []
+    },
+    {
+      "episode_id": "episode-edit-schema",
+      "title": "edit schema",
+      "raw_event_ids": [
+        "edit-schema-1"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-edit-schema-observed",
+          "summary": "Updated the schema shape for deterministic episodes.",
+          "source_event_id": "edit-schema-1"
+        }
+      ],
+      "checkpoints": []
+    },
+    {
+      "episode_id": "episode-update-client",
+      "title": "update client",
+      "raw_event_ids": [
+        "update-client-1"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-update-client-observed",
+          "summary": "Adjusted the client flow to match the revised schema.",
+          "source_event_id": "update-client-1"
+        }
+      ],
+      "checkpoints": []
+    },
+    {
+      "episode_id": "episode-failed-test",
+      "title": "failed test",
+      "raw_event_ids": [
+        "failed-test-1"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-failed-test-observed",
+          "summary": "Recorded a failing test result before revising the fixture.",
+          "source_event_id": "failed-test-1"
+        }
+      ],
+      "checkpoints": []
+    },
+    {
+      "episode_id": "episode-revise-fixture",
+      "title": "revise fixture",
+      "raw_event_ids": [
+        "revise-fixture-1"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-revise-fixture-observed",
+          "summary": "Revised the recorded fixture after the failing test.",
+          "source_event_id": "revise-fixture-1"
+        }
+      ],
+      "checkpoints": []
+    },
+    {
+      "episode_id": "episode-passing-test",
+      "title": "passing test",
+      "raw_event_ids": [
+        "passing-test-1"
+      ],
+      "evidence": [
+        {
+          "kind": "observed_fact",
+          "evidence_id": "episode-passing-test-observed",
+          "summary": "Recorded the passing test result after the fixture revision.",
+          "source_event_id": "passing-test-1"
+        }
+      ],
+      "checkpoints": []
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "intervention-switch-endpoint",
+      "kind": "switch_endpoint",
+      "summary": "The recovery attempt should proceed on /v2 with the same normalized input.",
+      "checkpoint_ids": [],
+      "correction_packet_ids": [
+        "packet-v2-retry"
+      ]
+    }
+  ],
+  "correction_packets": [
+    {
+      "packet_id": "packet-v2-retry",
+      "issued_at": "2026-07-28T12:00:02Z",
+      "summary": "Retry on /v2 while preserving only cached input that already appeared in the original input.",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "supporting_evidence_ids": [
+        "episode-inspect-api-observed",
+        "episode-revise-fixture-observed"
+      ]
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": "attempt-v1",
+      "endpoint": "/v1/responses",
+      "started_at": "2026-07-28T12:00:01Z",
+      "outcome": "rate_limited",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "status_code": 429,
+      "retry_after_ms": 2000
+    },
+    {
+      "attempt_id": "attempt-v2",
+      "endpoint": "/v2/responses",
+      "started_at": "2026-07-28T12:00:03Z",
+      "outcome": "succeeded",
+      "request": {
+        "input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": "Explain why /v1 rate limits should not corrupt /v2 recovery."
+          }
+        ],
+        "cached_input": [
+          {
+            "type": "message",
+            "role": "system",
+            "content": "Preserve deterministic retries across API versions."
+          }
+        ]
+      },
+      "status_code": 200
+    }
+  ],
+  "verification": {
+    "verified_at": "2026-07-28T12:00:08Z",
+    "verdict": "confirmed",
+    "observed_fact_ids": [
+      "episode-inspect-api-observed",
+      "episode-edit-schema-observed",
+      "episode-update-client-observed",
+      "episode-failed-test-observed",
+      "episode-revise-fixture-observed",
+      "episode-passing-test-observed"
+    ],
+    "agent_statement_ids": [],
+    "derived_inference_ids": [],
+    "human_context_ids": []
+  },
+  "token_usage": {
+    "input_tokens": 120,
+    "cached_input_tokens": 48,
+    "output_tokens": 36,
+    "total_tokens": 204
+  }
+}

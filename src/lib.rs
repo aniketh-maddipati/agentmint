@@ -2,3 +2,6 @@
 //! Used by: integration tests and external callers.
 
 pub mod aerf;
+pub mod checkpoint;
+pub mod fork_from_here;
+pub mod intervene;

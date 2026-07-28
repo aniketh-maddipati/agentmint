@@ -2,6 +2,7 @@
 //! {tool, args} event into an approximate native shape and back.
 //! Used by: tests/cross_agent_portability.rs.
 
+pub mod codex_app_server;
 pub mod copilot;
 pub mod cursor;
 pub mod generic;
