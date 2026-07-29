@@ -163,7 +163,10 @@ fn p2_multi_hop_cross_ref(engine: &Arc<GateEngine>) -> Result<RobustnessRow, Box
     let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "a.ts" })))?;
     let _ = session.evaluate(ToolCall::new("write_file", json!({ "path": "a.ts" })))?;
     let _ = session.evaluate(ToolCall::new("run_tests", json!({})))?;
-    let _ = session.evaluate(ToolCall::new("git_commit", json!({ "message": "checkpoint" })))?;
+    let _ = session.evaluate(ToolCall::new(
+        "git_commit",
+        json!({ "message": "checkpoint" }),
+    ))?;
     let outcome = session.evaluate(ToolCall::new("write_file", json!({ "path": "b.ts" })))?;
 
     Ok(build_row(
@@ -211,8 +214,14 @@ fn p4_normal_bugfix(engine: &Arc<GateEngine>) -> Result<RobustnessRow, Box<dyn E
 fn p4_clean_investigation(engine: &Arc<GateEngine>) -> Result<RobustnessRow, Box<dyn Error>> {
     let session = engine.open_session("p4-clean-investigation");
     let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
-    let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/other.ts" })))?;
-    let outcome = session.evaluate(ToolCall::new("read_file", json!({ "path": "package.json" })))?;
+    let _ = session.evaluate(ToolCall::new(
+        "read_file",
+        json!({ "path": "src/other.ts" }),
+    ))?;
+    let outcome = session.evaluate(ToolCall::new(
+        "read_file",
+        json!({ "path": "package.json" }),
+    ))?;
 
     Ok(build_row(
         "7",

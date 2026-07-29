@@ -10,16 +10,18 @@ use chrono::Utc;
 use serde_json::json;
 
 use crate::aerf::adapters::codex_app_server::{
-    installed_codex_version, CodexAppServerAdapter, CodexInitializeHandshake, CodexInstalledVersion,
-    CodexRpcCall, CodexTranscript, LifecyclePhase, NormalizedCodexEvent, StdioJsonlTransport,
+    installed_codex_version, CodexAppServerAdapter, CodexInitializeHandshake,
+    CodexInstalledVersion, CodexRpcCall, CodexTranscript, LifecyclePhase, NormalizedCodexEvent,
+    StdioJsonlTransport,
 };
 use crate::aerf::intervention::{
     apply_recorded_demo_correction, generate_live_correction_preview,
     generate_recorded_demo_correction_preview, recorded_verification_command, Attempt,
-    AttemptOutcome, CorrectionComparison, CorrectionExecution, CorrectionExecutionMode, CorrectionFork,
-    CorrectionPacket, Episode, Evidence, InputEnvelope, RawEvent, RawEventOutcome, RawEventParseState,
-    RawEventSource, Run, TerminalHandoff, TokenUsage, TokenUsageComparison, Verification,
-    VerificationComparison, VerificationCounts, VerificationVerdict, RECORDED_DEMO_SCHEMA_EPISODE_ID,
+    AttemptOutcome, CorrectionComparison, CorrectionExecution, CorrectionExecutionMode,
+    CorrectionFork, CorrectionPacket, Episode, Evidence, InputEnvelope, RawEvent, RawEventOutcome,
+    RawEventParseState, RawEventSource, Run, TerminalHandoff, TokenUsage, TokenUsageComparison,
+    Verification, VerificationComparison, VerificationCounts, VerificationVerdict,
+    RECORDED_DEMO_SCHEMA_EPISODE_ID,
 };
 use crate::aerf::{AerfError, AerfResult};
 use crate::checkpoint::{
@@ -28,7 +30,11 @@ use crate::checkpoint::{
 };
 
 pub trait CorrectionExecutor {
-    fn preview(&self, run: &Run, episode_id: &str) -> Option<crate::aerf::intervention::CorrectionPreview>;
+    fn preview(
+        &self,
+        run: &Run,
+        episode_id: &str,
+    ) -> Option<crate::aerf::intervention::CorrectionPreview>;
     fn confirm(&self, run: &Run, episode_id: &str) -> ForkFromHereResult<CorrectionFork>;
 }
 
@@ -59,7 +65,11 @@ pub enum ForkFromHereError {
 pub struct OfflineFixtureExecutor;
 
 impl CorrectionExecutor for OfflineFixtureExecutor {
-    fn preview(&self, run: &Run, episode_id: &str) -> Option<crate::aerf::intervention::CorrectionPreview> {
+    fn preview(
+        &self,
+        run: &Run,
+        episode_id: &str,
+    ) -> Option<crate::aerf::intervention::CorrectionPreview> {
         generate_recorded_demo_correction_preview(run, episode_id)
     }
 
@@ -117,8 +127,14 @@ impl CodexAttemptStreamer for CodexAppServerStreamer {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
-        let stdout = child.stdout.take().ok_or(ForkFromHereError::MissingStdoutPipe)?;
-        let stdin = child.stdin.take().ok_or(ForkFromHereError::MissingStdinPipe)?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or(ForkFromHereError::MissingStdoutPipe)?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or(ForkFromHereError::MissingStdinPipe)?;
         let transport = StdioJsonlTransport::new(BufReader::new(stdout), stdin);
         let mut adapter = CodexAppServerAdapter::new(transport, self.installed_version.clone());
         let handshake = adapter.initialize()?;
@@ -145,7 +161,11 @@ impl CodexAttemptStreamer for CodexAppServerStreamer {
                 "packet": packet,
             }),
         )?;
-        let transcript = transcript_from_calls(&handshake, &self.installed_version.version, &[thread_call, turn_call]);
+        let transcript = transcript_from_calls(
+            &handshake,
+            &self.installed_version.version,
+            &[thread_call, turn_call],
+        );
         let _ = child.kill();
         let _ = child.wait();
 
@@ -175,7 +195,10 @@ impl ProcessRunner for SystemProcessRunner {
         let Some(program) = command.first() else {
             return Err(ForkFromHereError::EmptyVerificationCommand);
         };
-        let output = Command::new(program).args(&command[1..]).current_dir(cwd).output()?;
+        let output = Command::new(program)
+            .args(&command[1..])
+            .current_dir(cwd)
+            .output()?;
         Ok(ProcessOutput {
             exit_code: output.status.code().unwrap_or(1),
             stdout: String::from_utf8_lossy(&output.stdout).trim().to_owned(),
@@ -244,7 +267,11 @@ impl LiveCodexExecutor {
 }
 
 impl CorrectionExecutor for LiveCodexExecutor {
-    fn preview(&self, run: &Run, episode_id: &str) -> Option<crate::aerf::intervention::CorrectionPreview> {
+    fn preview(
+        &self,
+        run: &Run,
+        episode_id: &str,
+    ) -> Option<crate::aerf::intervention::CorrectionPreview> {
         generate_live_correction_preview(run, episode_id)
     }
 
@@ -255,7 +282,9 @@ impl CorrectionExecutor for LiveCodexExecutor {
 
         let preview = generate_live_correction_preview(run, episode_id)
             .ok_or_else(|| ForkFromHereError::UnsupportedEpisode(episode_id.to_owned()))?;
-        let checkpoint = self.checkpoint_service.capture_checkpoint(&self.repo_root)?;
+        let checkpoint = self
+            .checkpoint_service
+            .capture_checkpoint(&self.repo_root)?;
         let materialized = self
             .checkpoint_service
             .materialize_checkpoint(&self.repo_root, &checkpoint)?;
@@ -267,8 +296,7 @@ impl CorrectionExecutor for LiveCodexExecutor {
         )?;
         let branch_name = format!(
             "{}/{}",
-            self.branch_prefix,
-            preview.comparison.corrected_attempt.attempt_id
+            self.branch_prefix, preview.comparison.corrected_attempt.attempt_id
         );
         let switch_args = ["switch", "-c", branch_name.as_str()];
         self.git_runner
@@ -286,8 +314,8 @@ impl CorrectionExecutor for LiveCodexExecutor {
             &materialized.worktree_path,
             &["diff", "--name-only", "-z", "HEAD", "--", "."],
         )?);
-        let captured_token_usage =
-            captured_token_usage(&codex_stream.transcript.events).ok_or(ForkFromHereError::MissingTokenUsage)?;
+        let captured_token_usage = captured_token_usage(&codex_stream.transcript.events)
+            .ok_or(ForkFromHereError::MissingTokenUsage)?;
         let now = self.clock.now_rfc3339();
         let corrected_attempt = build_actual_attempt(
             run,
@@ -454,8 +482,10 @@ fn build_live_episode(
     materialized: &MaterializedCheckpoint,
     codex_stream: &CodexAttemptStream,
 ) -> Episode {
-    let agent_summary = last_agent_statement(&codex_stream.transcript.events)
-        .unwrap_or_else(|| "Codex streamed a corrected attempt in the isolated worktree.".to_owned());
+    let agent_summary =
+        last_agent_statement(&codex_stream.transcript.events).unwrap_or_else(|| {
+            "Codex streamed a corrected attempt in the isolated worktree.".to_owned()
+        });
     let observed_id = "episode-codex-corrected-attempt-observed".to_owned();
     let agent_id = "episode-codex-corrected-attempt-agent".to_owned();
     let inference_id = "episode-codex-corrected-attempt-inference".to_owned();
@@ -514,7 +544,9 @@ fn build_live_raw_event(
         request: packet.request.clone(),
         tool_name: Some("fork_correction_live".to_owned()),
         file_path: execution.actual_changed_paths.first().cloned(),
-        summary: Some("Live Codex corrected attempt completed in an isolated AgentMint worktree.".to_owned()),
+        summary: Some(
+            "Live Codex corrected attempt completed in an isolated AgentMint worktree.".to_owned(),
+        ),
         outcome: Some(if verification_output.exit_code == 0 {
             RawEventOutcome::Succeeded
         } else {
@@ -609,7 +641,11 @@ fn extract_thread_id(call: &CodexRpcCall) -> ForkFromHereResult<&str> {
     call.response
         .pointer("/result/threadId")
         .and_then(serde_json::Value::as_str)
-        .or_else(|| call.response.pointer("/result/thread/id").and_then(serde_json::Value::as_str))
+        .or_else(|| {
+            call.response
+                .pointer("/result/thread/id")
+                .and_then(serde_json::Value::as_str)
+        })
         .ok_or(ForkFromHereError::MissingThreadId)
 }
 
@@ -695,21 +731,29 @@ fn live_demo_limitations() -> Vec<String> {
 }
 
 fn nul_split(bytes: Vec<u8>) -> Vec<String> {
-    bytes.split(|byte| *byte == 0)
+    bytes
+        .split(|byte| *byte == 0)
         .filter(|entry| !entry.is_empty())
         .map(|entry| String::from_utf8_lossy(entry).to_string())
         .collect()
 }
 
-pub fn default_executor_for_run_path(run_path: &Path, repo_root: &Path) -> AerfResult<Arc<dyn CorrectionExecutor + Send + Sync>> {
+pub fn default_executor_for_run_path(
+    run_path: &Path,
+    repo_root: &Path,
+) -> AerfResult<Arc<dyn CorrectionExecutor + Send + Sync>> {
     if is_fixture_path(run_path) {
         return Ok(Arc::new(OfflineFixtureExecutor));
     }
-    Ok(Arc::new(LiveCodexExecutor::system(repo_root.to_path_buf())?))
+    Ok(Arc::new(LiveCodexExecutor::system(
+        repo_root.to_path_buf(),
+    )?))
 }
 
 fn is_fixture_path(path: &Path) -> bool {
-    path.ends_with(Path::new("tests/fixtures/interventions/retry-after-v1-v2.json"))
+    path.ends_with(Path::new(
+        "tests/fixtures/interventions/retry-after-v1-v2.json",
+    ))
 }
 
 #[cfg(test)]
@@ -740,7 +784,10 @@ mod tests {
     }
 
     impl CheckpointService for MockCheckpointService {
-        fn capture_checkpoint(&self, _repo_root: &Path) -> Result<CheckpointCapture, crate::checkpoint::CheckpointError> {
+        fn capture_checkpoint(
+            &self,
+            _repo_root: &Path,
+        ) -> Result<CheckpointCapture, crate::checkpoint::CheckpointError> {
             Ok(self.capture.clone())
         }
 
@@ -775,16 +822,28 @@ mod tests {
     }
 
     impl GitRunner for MockGitRunner {
-        fn run(&self, _repo_root: &Path, args: &[&str]) -> Result<String, crate::checkpoint::CheckpointError> {
+        fn run(
+            &self,
+            _repo_root: &Path,
+            args: &[&str],
+        ) -> Result<String, crate::checkpoint::CheckpointError> {
             self.commands.lock().expect("commands").push(args.join(" "));
             let key = args.join(" ");
             let bytes = self.outputs.get(&key).cloned().unwrap_or_default();
             Ok(String::from_utf8_lossy(&bytes).trim().to_owned())
         }
 
-        fn run_bytes(&self, _repo_root: &Path, args: &[&str]) -> Result<Vec<u8>, crate::checkpoint::CheckpointError> {
+        fn run_bytes(
+            &self,
+            _repo_root: &Path,
+            args: &[&str],
+        ) -> Result<Vec<u8>, crate::checkpoint::CheckpointError> {
             self.commands.lock().expect("commands").push(args.join(" "));
-            Ok(self.outputs.get(&args.join(" ")).cloned().unwrap_or_default())
+            Ok(self
+                .outputs
+                .get(&args.join(" "))
+                .cloned()
+                .unwrap_or_default())
         }
 
         fn run_optional(
@@ -795,7 +854,11 @@ mod tests {
             Ok(None)
         }
 
-        fn run_no_output(&self, _repo_root: &Path, args: &[&str]) -> Result<(), crate::checkpoint::CheckpointError> {
+        fn run_no_output(
+            &self,
+            _repo_root: &Path,
+            args: &[&str],
+        ) -> Result<(), crate::checkpoint::CheckpointError> {
             self.commands.lock().expect("commands").push(args.join(" "));
             Ok(())
         }
@@ -930,12 +993,21 @@ mod tests {
         );
 
         let fork = executor
-            .confirm(&run, crate::aerf::intervention::RECORDED_DEMO_SCHEMA_EPISODE_ID)
+            .confirm(
+                &run,
+                crate::aerf::intervention::RECORDED_DEMO_SCHEMA_EPISODE_ID,
+            )
             .expect("live fork");
 
         let execution = fork.execution.expect("execution");
-        assert_eq!(execution.mode, crate::aerf::intervention::CorrectionExecutionMode::LiveCodex);
-        assert_eq!(execution.branch_name, "agentmint/attempt-codex-corrected-from-schema");
+        assert_eq!(
+            execution.mode,
+            crate::aerf::intervention::CorrectionExecutionMode::LiveCodex
+        );
+        assert_eq!(
+            execution.branch_name,
+            "agentmint/attempt-codex-corrected-from-schema"
+        );
         assert_eq!(execution.thread_id.as_deref(), Some("thread-1"));
         assert_eq!(
             execution.verification_command,
@@ -957,8 +1029,12 @@ mod tests {
     fn default_executor_keeps_fixture_in_offline_mode() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/interventions/retry-after-v1-v2.json");
-        let executor = default_executor_for_run_path(&fixture, Path::new("/repo")).expect("executor");
-        let preview = executor.preview(&recorded_demo_run(), crate::aerf::intervention::RECORDED_DEMO_SCHEMA_EPISODE_ID);
+        let executor =
+            default_executor_for_run_path(&fixture, Path::new("/repo")).expect("executor");
+        let preview = executor.preview(
+            &recorded_demo_run(),
+            crate::aerf::intervention::RECORDED_DEMO_SCHEMA_EPISODE_ID,
+        );
         assert_eq!(
             preview.expect("preview").packet.packet_id,
             "packet-fixture-correction-from-schema"
@@ -968,7 +1044,8 @@ mod tests {
     #[test]
     fn relative_fixture_path_stays_in_offline_mode() {
         let fixture = Path::new("tests/fixtures/interventions/retry-after-v1-v2.json");
-        let executor = default_executor_for_run_path(fixture, Path::new("/repo")).expect("executor");
+        let executor =
+            default_executor_for_run_path(fixture, Path::new("/repo")).expect("executor");
         let preview = executor.preview(
             &recorded_demo_run(),
             crate::aerf::intervention::RECORDED_DEMO_SCHEMA_EPISODE_ID,
@@ -1012,7 +1089,10 @@ mod tests {
         ];
 
         assert_eq!(last_agent_statement(&events).as_deref(), Some("second"));
-        assert_eq!(captured_token_usage(&events).expect("usage").total_tokens, 5);
+        assert_eq!(
+            captured_token_usage(&events).expect("usage").total_tokens,
+            5
+        );
     }
 
     fn recorded_demo_run() -> Run {

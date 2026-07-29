@@ -45,7 +45,10 @@ pub async fn proxy(
     let verify_us = verify_start.elapsed().as_micros();
 
     let jti_start = Instant::now();
-    if let Err(e) = state.jti_store.check_and_insert(&claims.jti, claims.exp.timestamp()) {
+    if let Err(e) = state
+        .jti_store
+        .check_and_insert(&claims.jti, claims.exp.timestamp())
+    {
         state.metrics.record_replay();
         tracing::warn!(jti = %claims.jti, "replay blocked");
         crate::console::log_replay(&claims.jti);
@@ -54,7 +57,9 @@ pub async fn proxy(
     let jti_us = jti_start.elapsed().as_micros();
 
     let audit_start = Instant::now();
-    state.audit_log.log(&claims.jti, &claims.sub, &claims.action, Utc::now())?;
+    state
+        .audit_log
+        .log(&claims.jti, &claims.sub, &claims.action, Utc::now())?;
     let audit_us = audit_start.elapsed().as_micros();
 
     let total_us = total_start.elapsed().as_micros();
@@ -74,9 +79,12 @@ pub async fn proxy(
         HeaderValue::from_str(&total_us.to_string()).map_err(|e| Error::Signing(e.to_string()))?,
     );
 
-    Ok((headers, Json(ProxyResponse {
-        sub: claims.sub,
-        action: claims.action,
-        jti: claims.jti,
-    })))
+    Ok((
+        headers,
+        Json(ProxyResponse {
+            sub: claims.sub,
+            action: claims.action,
+            jti: claims.jti,
+        }),
+    ))
 }

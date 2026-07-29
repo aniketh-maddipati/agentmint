@@ -109,14 +109,17 @@ fn normal_bugfix(engine: &Arc<GateEngine>) -> Result<(ScenarioRow, SessionCheck)
     let session = engine.open_session("normal-bugfix");
     let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
     let _ = session.evaluate(ToolCall::new("write_file", json!({ "path": "src/app.ts" })))?;
-    let _ = session.evaluate(
-        ToolCall::new("run_tests", json!({})).with_planned_result(PlannedResult::RunTests {
+    let _ = session.evaluate(ToolCall::new("run_tests", json!({})).with_planned_result(
+        PlannedResult::RunTests {
             passed: 24,
             failed: 0,
-        }),
-    )?;
+        },
+    ))?;
     let _ = session.evaluate(ToolCall::new("git_commit", json!({ "message": "fix bug" })))?;
-    let _ = session.evaluate(ToolCall::new("git_push", json!({ "branch": "feature/fix" })))?;
+    let _ = session.evaluate(ToolCall::new(
+        "git_push",
+        json!({ "branch": "feature/fix" }),
+    ))?;
     let check = inspect_session(&session, engine)?;
 
     Ok((
@@ -159,8 +162,10 @@ fn destructive_command(
     engine: &Arc<GateEngine>,
 ) -> Result<(ScenarioRow, SessionCheck), Box<dyn Error>> {
     let session = engine.open_session("destructive-command");
-    let outcome =
-        session.evaluate(ToolCall::new("run_command", json!({ "command": "rm -rf /" })))?;
+    let outcome = session.evaluate(ToolCall::new(
+        "run_command",
+        json!({ "command": "rm -rf /" }),
+    ))?;
     assert_eq!(outcome.decision, GateDecision::Block);
     let check = inspect_session(&session, engine)?;
 
@@ -198,12 +203,13 @@ fn push_to_main(engine: &Arc<GateEngine>) -> Result<(ScenarioRow, SessionCheck),
     ))
 }
 
-fn collateral_edit(
-    engine: &Arc<GateEngine>,
-) -> Result<(ScenarioRow, String), Box<dyn Error>> {
+fn collateral_edit(engine: &Arc<GateEngine>) -> Result<(ScenarioRow, String), Box<dyn Error>> {
     let session = engine.open_session("collateral-edit");
     let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
-    let outcome = session.evaluate(ToolCall::new("write_file", json!({ "path": "src/other.ts" })))?;
+    let outcome = session.evaluate(ToolCall::new(
+        "write_file",
+        json!({ "path": "src/other.ts" }),
+    ))?;
     let check = inspect_session(&session, engine)?;
 
     let actual = if matches!(outcome.decision, GateDecision::Block) {
@@ -245,12 +251,12 @@ fn test_retry_loop(
         )?;
         assert_eq!(outcome.decision, GateDecision::Pass);
     }
-    let blocked = session.evaluate(
-        ToolCall::new("run_tests", json!({})).with_planned_result(PlannedResult::RunTests {
+    let blocked = session.evaluate(ToolCall::new("run_tests", json!({})).with_planned_result(
+        PlannedResult::RunTests {
             passed: 12,
             failed: 1,
-        }),
-    )?;
+        },
+    ))?;
     assert_eq!(blocked.decision, GateDecision::Block);
     let check = inspect_session(&session, engine)?;
 
@@ -295,8 +301,14 @@ fn clean_investigation(
 ) -> Result<(ScenarioRow, SessionCheck), Box<dyn Error>> {
     let session = engine.open_session("clean-investigation");
     let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
-    let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/other.ts" })))?;
-    let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "package.json" })))?;
+    let _ = session.evaluate(ToolCall::new(
+        "read_file",
+        json!({ "path": "src/other.ts" }),
+    ))?;
+    let _ = session.evaluate(ToolCall::new(
+        "read_file",
+        json!({ "path": "package.json" }),
+    ))?;
     let check = inspect_session(&session, engine)?;
 
     Ok((
@@ -336,9 +348,7 @@ fn padded_bypass_attempt(
     ))
 }
 
-fn benign_scope_creep(
-    engine: &Arc<GateEngine>,
-) -> Result<(ScenarioRow, String), Box<dyn Error>> {
+fn benign_scope_creep(engine: &Arc<GateEngine>) -> Result<(ScenarioRow, String), Box<dyn Error>> {
     let scope = TaskScope {
         summary: "fix the failing test in src/app.ts".to_owned(),
         file_paths: vec!["src/app.ts".to_owned()],
@@ -372,7 +382,10 @@ fn benign_scope_creep(
     assert_eq!(outside_scope.len(), 2);
     for decision in outside_scope {
         assert!(decision.policy_reason.contains("scope=outside_task"));
-        assert!(decision.compliance_tags.iter().any(|tag| tag == "scope:outside_task"));
+        assert!(decision
+            .compliance_tags
+            .iter()
+            .any(|tag| tag == "scope:outside_task"));
     }
     assert_eq!(cleanup.decision, GateDecision::Pass);
 
@@ -405,9 +418,7 @@ fn benign_scope_creep(
     ))
 }
 
-fn cost_loop_runaway(
-    engine: &Arc<GateEngine>,
-) -> Result<(ScenarioRow, String), Box<dyn Error>> {
+fn cost_loop_runaway(engine: &Arc<GateEngine>) -> Result<(ScenarioRow, String), Box<dyn Error>> {
     let session = engine.open_session("cost-loop-runaway");
     for _ in 0..3 {
         let outcome = session.evaluate(
@@ -516,7 +527,10 @@ fn concurrent_batch_writes(
     ))
 }
 
-fn inspect_session(session: &GateSession, engine: &Arc<GateEngine>) -> Result<SessionCheck, Box<dyn Error>> {
+fn inspect_session(
+    session: &GateSession,
+    engine: &Arc<GateEngine>,
+) -> Result<SessionCheck, Box<dyn Error>> {
     let receipts = session.receipts()?;
     let decisions = session.decisions()?;
     let chain = verify_aerf_chain(
@@ -528,7 +542,10 @@ fn inspect_session(session: &GateSession, engine: &Arc<GateEngine>) -> Result<Se
     assert!(chain.valid);
     assert!(all_verified(&receipts, engine));
 
-    Ok(SessionCheck { receipts, decisions })
+    Ok(SessionCheck {
+        receipts,
+        decisions,
+    })
 }
 
 fn all_signed(receipts: &[Receipt]) -> bool {
@@ -537,7 +554,11 @@ fn all_signed(receipts: &[Receipt]) -> bool {
 
 fn all_verified(receipts: &[Receipt], engine: &Arc<GateEngine>) -> bool {
     agentmint::aerf::gate::verify_receipt_set(receipts, engine.verifying_key())
-        .map(|results| results.iter().all(|item| item.receipt_signed && item.receipt_verifies))
+        .map(|results| {
+            results
+                .iter()
+                .all(|item| item.receipt_signed && item.receipt_verifies)
+        })
         .unwrap_or(false)
 }
 

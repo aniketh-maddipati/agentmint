@@ -1,4 +1,4 @@
-use jsonwebtoken::{decode, decode_header, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -15,7 +15,6 @@ pub struct IdTokenClaims {
     pub exp: u64,
     pub iat: u64,
 }
-
 
 pub struct OidcVerifier {
     issuer: String,
@@ -57,25 +56,25 @@ impl OidcVerifier {
         let issuer = std::env::var("OIDC_ISSUER").ok()?;
         let audience = std::env::var("OIDC_AUDIENCE").ok()?;
         let jwks_uri = std::env::var("OIDC_JWKS_URI").ok()?;
-        
+
         tracing::info!(issuer = %issuer, "OIDC enabled");
         Some(Self::new(&issuer, &audience, &jwks_uri))
     }
 
     pub async fn verify(&self, token: &str) -> Result<IdTokenClaims, Error> {
         let header = decode_header(token).map_err(|_| Error::InvalidToken)?;
-        
+
         let kid = header.kid.ok_or(Error::MissingKid)?;
-        
+
         let key = self.get_key(&kid).await?;
-        
+
         let mut validation = Validation::new(Algorithm::RS256);
         validation.set_issuer(&[&self.issuer]);
         validation.set_audience(&[&self.audience]);
-        
+
         let data = decode::<IdTokenClaims>(token, &key, &validation)
             .map_err(|e| Error::ValidationFailed(e.to_string()))?;
-        
+
         Ok(data.claims)
     }
 
@@ -130,7 +129,6 @@ impl OidcVerifier {
     }
 }
 
-
 #[derive(Debug)]
 pub enum Error {
     InvalidToken,
@@ -164,7 +162,7 @@ mod tests {
         std::env::remove_var("OIDC_ISSUER");
         std::env::remove_var("OIDC_AUDIENCE");
         std::env::remove_var("OIDC_JWKS_URI");
-        
+
         assert!(OidcVerifier::from_env().is_none());
     }
 }

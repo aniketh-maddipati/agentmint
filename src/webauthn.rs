@@ -93,7 +93,9 @@ impl WebAuthnState {
 
     fn check_capacity<T>(map: &HashMap<Box<str>, ChallengeEntry<T>>) -> Result<()> {
         if map.len() >= MAX_CHALLENGES {
-            return Err(Error::ServiceUnavailable("challenge store at capacity".into()));
+            return Err(Error::ServiceUnavailable(
+                "challenge store at capacity".into(),
+            ));
         }
         Ok(())
     }
@@ -148,12 +150,15 @@ pub async fn register_start(
     let wa = WebAuthnState::require(state.webauthn.as_ref())?;
 
     // Rate limit per user
-    state.rate_limiter.check_user(&req.user_id)
+    state
+        .rate_limiter
+        .check_user(&req.user_id)
         .map_err(|e| Error::RateLimited(e.to_string()))?;
 
     let user_id = Uuid::parse_str(&req.user_id).unwrap_or_else(|_| Uuid::new_v4());
 
-    let (challenge, reg_state) = wa.core
+    let (challenge, reg_state) = wa
+        .core
         .start_passkey_registration(user_id, &req.user_name, &req.user_name, None)
         .map_err(|e| Error::Unauthorized(format!("{:?}", e)))?;
 
@@ -161,10 +166,13 @@ pub async fn register_start(
         let mut challenges = wa.reg_challenges.write().unwrap();
         WebAuthnState::cleanup_expired(&mut challenges);
         WebAuthnState::check_capacity(&challenges)?;
-        challenges.insert(req.user_id.into_boxed_str(), ChallengeEntry {
-            data: reg_state,
-            created: Instant::now(),
-        });
+        challenges.insert(
+            req.user_id.into_boxed_str(),
+            ChallengeEntry {
+                data: reg_state,
+                created: Instant::now(),
+            },
+        );
     }
 
     Ok(Json(RegStartRes { challenge }))
@@ -176,7 +184,8 @@ pub async fn register_finish(
 ) -> Result<Json<SuccessRes>> {
     let wa = WebAuthnState::require(state.webauthn.as_ref())?;
 
-    let entry = wa.reg_challenges
+    let entry = wa
+        .reg_challenges
         .write()
         .unwrap()
         .remove(req.user_id.as_str())
@@ -187,7 +196,8 @@ pub async fn register_finish(
         return Err(Error::Unauthorized("challenge expired".into()));
     }
 
-    let passkey = wa.core
+    let passkey = wa
+        .core
         .finish_passkey_registration(&req.credential, &entry.data)
         .map_err(|e| Error::Unauthorized(format!("{:?}", e)))?;
 
@@ -216,17 +226,21 @@ pub async fn auth_start(
     }
 
     // Rate limit per user
-    state.rate_limiter.check_user(&req.user_id)
+    state
+        .rate_limiter
+        .check_user(&req.user_id)
         .map_err(|e| Error::RateLimited(e.to_string()))?;
 
-    let passkey = wa.credentials
+    let passkey = wa
+        .credentials
         .read()
         .unwrap()
         .get(req.user_id.as_str())
         .cloned()
         .ok_or_else(|| Error::Unauthorized("user not registered".into()))?;
 
-    let (challenge, auth_state) = wa.core
+    let (challenge, auth_state) = wa
+        .core
         .start_passkey_authentication(&[passkey])
         .map_err(|e| Error::Unauthorized(format!("{:?}", e)))?;
 
@@ -234,10 +248,13 @@ pub async fn auth_start(
         let mut challenges = wa.auth_challenges.write().unwrap();
         WebAuthnState::cleanup_expired(&mut challenges);
         WebAuthnState::check_capacity(&challenges)?;
-        challenges.insert(req.user_id.into_boxed_str(), ChallengeEntry {
-            data: auth_state,
-            created: Instant::now(),
-        });
+        challenges.insert(
+            req.user_id.into_boxed_str(),
+            ChallengeEntry {
+                data: auth_state,
+                created: Instant::now(),
+            },
+        );
     }
 
     Ok(Json(AuthStartRes { challenge }))
@@ -254,7 +271,8 @@ pub async fn auth_finish(
         return Err(Error::RateLimited("account temporarily locked".into()));
     }
 
-    let entry = wa.auth_challenges
+    let entry = wa
+        .auth_challenges
         .write()
         .unwrap()
         .remove(req.user_id.as_str())
@@ -265,7 +283,10 @@ pub async fn auth_finish(
         return Err(Error::Unauthorized("challenge expired".into()));
     }
 
-    match wa.core.finish_passkey_authentication(&req.credential, &entry.data) {
+    match wa
+        .core
+        .finish_passkey_authentication(&req.credential, &entry.data)
+    {
         Ok(_) => {
             wa.clear_failures(&req.user_id);
             crate::console::log_webauthn_auth(&req.user_id);
@@ -295,11 +316,11 @@ mod tests {
     #[test]
     fn lockout_after_threshold() {
         let wa = WebAuthnState::new("test.com", "https://test.com").unwrap();
-        
+
         for _ in 0..LOCKOUT_THRESHOLD {
             wa.record_failure("alice");
         }
-        
+
         assert!(wa.is_locked_out("alice"));
         assert!(!wa.is_locked_out("bob"));
     }
@@ -307,11 +328,11 @@ mod tests {
     #[test]
     fn clear_failures_removes_lockout() {
         let wa = WebAuthnState::new("test.com", "https://test.com").unwrap();
-        
+
         for _ in 0..LOCKOUT_THRESHOLD {
             wa.record_failure("alice");
         }
-        
+
         assert!(wa.is_locked_out("alice"));
         wa.clear_failures("alice");
         assert!(!wa.is_locked_out("alice"));

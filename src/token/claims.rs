@@ -79,7 +79,10 @@ impl Claims {
         claims.receipt_type = Some("delegated".into());
         claims.parent_jti = Some(parent.jti.clone());
         claims.original_approver = Some(
-            parent.original_approver.clone().unwrap_or_else(|| parent.sub.clone())
+            parent
+                .original_approver
+                .clone()
+                .unwrap_or_else(|| parent.sub.clone()),
         );
         claims.depth = Some(parent.depth.unwrap_or(0) + 1);
         claims.scope = parent.scope.clone();
@@ -165,12 +168,8 @@ mod tests {
             vec![],
             2,
         );
-        let child = Claims::new_delegated(
-            "build-agent".into(),
-            "build:docker".into(),
-            300,
-            &parent,
-        );
+        let child =
+            Claims::new_delegated("build-agent".into(), "build:docker".into(), 300, &parent);
         assert_eq!(child.receipt_type, Some("delegated".into()));
         assert_eq!(child.parent_jti, Some(parent.jti.clone()));
         assert_eq!(child.original_approver, Some("aniketh@company.com".into()));

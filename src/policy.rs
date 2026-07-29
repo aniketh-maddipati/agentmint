@@ -28,7 +28,10 @@ impl PolicyEngine {
     pub fn from_file(path: &str) -> Result<Self, Error> {
         let content = std::fs::read_to_string(path)?;
         let raw: HashMap<String, PolicyLimit> = serde_json::from_str(&content)?;
-        let limits = raw.into_iter().map(|(k, v)| (k.into_boxed_str(), v)).collect();
+        let limits = raw
+            .into_iter()
+            .map(|(k, v)| (k.into_boxed_str(), v))
+            .collect();
         Ok(Self { limits })
     }
 
@@ -73,13 +76,13 @@ fn parse_action_type(action: &str) -> &str {
 #[inline]
 fn parse_amount(action: &str) -> Option<u64> {
     let mut parts = action.split(':').peekable();
-    
+
     while let Some(part) = parts.next() {
         if part == "amount" {
             return parts.next().and_then(|v| v.parse().ok());
         }
     }
-    
+
     None
 }
 

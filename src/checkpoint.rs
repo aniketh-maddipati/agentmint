@@ -129,34 +129,44 @@ where
             .runner
             .run_optional(repo_root, &["symbolic-ref", "--quiet", "--short", "HEAD"])?;
         let detached_head = branch_name.is_none();
-        let upstream_branch = self
-            .runner
-            .run_optional(repo_root, &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])?;
-        let (ahead_count, behind_count) = ahead_behind_counts(&self.runner, repo_root, upstream_branch.as_deref())?;
+        let upstream_branch = self.runner.run_optional(
+            repo_root,
+            &[
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{upstream}",
+            ],
+        )?;
+        let (ahead_count, behind_count) =
+            ahead_behind_counts(&self.runner, repo_root, upstream_branch.as_deref())?;
         let staged_binary_patch = String::from_utf8_lossy(&self.runner.run_bytes(
             repo_root,
             &["diff", "--binary", "--cached", "--no-ext-diff", "--", "."],
         )?)
         .to_string();
-        let unstaged_binary_patch = String::from_utf8_lossy(&self.runner.run_bytes(
-            repo_root,
-            &["diff", "--binary", "--no-ext-diff", "--", "."],
-        )?)
+        let unstaged_binary_patch = String::from_utf8_lossy(
+            &self
+                .runner
+                .run_bytes(repo_root, &["diff", "--binary", "--no-ext-diff", "--", "."])?,
+        )
         .to_string();
         let staged_paths = nul_split(self.runner.run_bytes(
             repo_root,
             &["diff", "--name-only", "--cached", "-z", "--", "."],
         )?);
-        let unstaged_paths = nul_split(self.runner.run_bytes(
-            repo_root,
-            &["diff", "--name-only", "-z", "--", "."],
-        )?);
+        let unstaged_paths = nul_split(
+            self.runner
+                .run_bytes(repo_root, &["diff", "--name-only", "-z", "--", "."])?,
+        );
         let unresolved_conflicts = nul_split(self.runner.run_bytes(
             repo_root,
             &["diff", "--name-only", "--diff-filter=U", "-z", "--", "."],
         )?);
-        let untracked_paths =
-            nul_split(self.runner.run_bytes(repo_root, &["ls-files", "--others", "--exclude-standard", "-z"])?);
+        let untracked_paths = nul_split(self.runner.run_bytes(
+            repo_root,
+            &["ls-files", "--others", "--exclude-standard", "-z"],
+        )?);
         let untracked_files = build_untracked_metadata(repo_root, &untracked_paths)?;
         let changed_paths = merged_paths(&staged_paths, &unstaged_paths, &untracked_paths);
         let branch_state = BranchState {
@@ -180,7 +190,8 @@ where
                 "git apply --binary {unstaged_patch}".to_owned(),
             ],
         };
-        let reasons = capture_rejections(repo_root, &self.runner, &checkpoint, unresolved_conflicts)?;
+        let reasons =
+            capture_rejections(repo_root, &self.runner, &checkpoint, unresolved_conflicts)?;
         if reasons.is_empty() {
             return Ok(checkpoint);
         }
@@ -259,12 +270,8 @@ pub trait GitRunner {
     fn run_bytes(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<Vec<u8>>;
     fn run_optional(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<Option<String>>;
     fn run_no_output(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<()>;
-    fn run_with_stdin(
-        &self,
-        repo_root: &Path,
-        args: &[&str],
-        stdin: &[u8],
-    ) -> CheckpointResult<()>;
+    fn run_with_stdin(&self, repo_root: &Path, args: &[&str], stdin: &[u8])
+        -> CheckpointResult<()>;
 }
 
 pub struct SystemGitRunner;
@@ -276,7 +283,10 @@ impl GitRunner for SystemGitRunner {
     }
 
     fn run_bytes(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<Vec<u8>> {
-        let output = Command::new("git").args(args).current_dir(repo_root).output()?;
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo_root)
+            .output()?;
         if output.status.success() {
             return Ok(output.stdout);
         }
@@ -287,9 +297,14 @@ impl GitRunner for SystemGitRunner {
     }
 
     fn run_optional(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<Option<String>> {
-        let output = Command::new("git").args(args).current_dir(repo_root).output()?;
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo_root)
+            .output()?;
         if output.status.success() {
-            return Ok(Some(String::from_utf8_lossy(&output.stdout).trim().to_owned()));
+            return Ok(Some(
+                String::from_utf8_lossy(&output.stdout).trim().to_owned(),
+            ));
         }
         if matches!(output.status.code(), Some(1) | Some(128)) {
             return Ok(None);
@@ -301,7 +316,10 @@ impl GitRunner for SystemGitRunner {
     }
 
     fn run_no_output(&self, repo_root: &Path, args: &[&str]) -> CheckpointResult<()> {
-        let output = Command::new("git").args(args).current_dir(repo_root).output()?;
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo_root)
+            .output()?;
         if output.status.success() {
             return Ok(());
         }
@@ -347,10 +365,24 @@ fn ahead_behind_counts<R: GitRunner>(
     let Some(upstream) = upstream_branch else {
         return Ok((0, 0));
     };
-    let counts = runner.run(repo_root, &["rev-list", "--left-right", "--count", &format!("HEAD...{upstream}")])?;
+    let counts = runner.run(
+        repo_root,
+        &[
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("HEAD...{upstream}"),
+        ],
+    )?;
     let mut parts = counts.split_whitespace();
-    let ahead = parts.next().and_then(|part| part.parse::<u32>().ok()).unwrap_or(0);
-    let behind = parts.next().and_then(|part| part.parse::<u32>().ok()).unwrap_or(0);
+    let ahead = parts
+        .next()
+        .and_then(|part| part.parse::<u32>().ok())
+        .unwrap_or(0);
+    let behind = parts
+        .next()
+        .and_then(|part| part.parse::<u32>().ok())
+        .unwrap_or(0);
     Ok((ahead, behind))
 }
 
@@ -386,7 +418,9 @@ fn capture_rejections<R: GitRunner>(
         reasons.push(CheckpointRejection::BisectInProgress);
     }
     if !unresolved_conflicts.is_empty() {
-        reasons.push(CheckpointRejection::UnresolvedConflicts(unresolved_conflicts));
+        reasons.push(CheckpointRejection::UnresolvedConflicts(
+            unresolved_conflicts,
+        ));
     }
     if !checkpoint.untracked_files.is_empty() {
         reasons.push(CheckpointRejection::UntrackedFilesPresent(
@@ -427,7 +461,11 @@ fn materialization_rejections(
     Ok(reasons)
 }
 
-fn git_path_exists<R: GitRunner>(runner: &R, repo_root: &Path, name: &str) -> CheckpointResult<bool> {
+fn git_path_exists<R: GitRunner>(
+    runner: &R,
+    repo_root: &Path,
+    name: &str,
+) -> CheckpointResult<bool> {
     let path = runner.run(repo_root, &["rev-parse", "--git-path", name])?;
     Ok(Path::new(&path).exists())
 }
@@ -436,7 +474,10 @@ fn build_untracked_metadata(
     repo_root: &Path,
     paths: &[String],
 ) -> CheckpointResult<Vec<UntrackedFileMetadata>> {
-    paths.iter().map(|path| untracked_metadata(repo_root, path)).collect()
+    paths
+        .iter()
+        .map(|path| untracked_metadata(repo_root, path))
+        .collect()
 }
 
 fn untracked_metadata(repo_root: &Path, path: &str) -> CheckpointResult<UntrackedFileMetadata> {
@@ -487,7 +528,8 @@ fn worktree_path(repo_root: &Path, checkpoint_id: &str) -> PathBuf {
 }
 
 fn nul_split(bytes: Vec<u8>) -> Vec<String> {
-    bytes.split(|byte| *byte == 0)
+    bytes
+        .split(|byte| *byte == 0)
         .filter(|entry| !entry.is_empty())
         .map(|entry| String::from_utf8_lossy(entry).to_string())
         .collect()
@@ -503,7 +545,10 @@ fn display_command(args: &[&str]) -> String {
 }
 
 fn shell_escape(arg: &str) -> String {
-    if arg.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '-' | '_' | '.' | '=' | ':' | '@' | '{' | '}')) {
+    if arg.chars().all(|ch| {
+        ch.is_ascii_alphanumeric()
+            || matches!(ch, '/' | '-' | '_' | '.' | '=' | ':' | '@' | '{' | '}')
+    }) {
         return arg.to_owned();
     }
     format!("{arg:?}")
@@ -534,16 +579,20 @@ mod tests {
         fs::write(repo.join("notes.bin"), [0_u8, 1, 2, 3]).expect("write untracked");
 
         let service = GitCliCheckpointService::new();
-        let err = service.capture_checkpoint(&repo).expect_err("should reject");
+        let err = service
+            .capture_checkpoint(&repo)
+            .expect_err("should reject");
 
         match err {
             CheckpointError::UnsafeState {
                 reasons,
                 snapshot: Some(snapshot),
             } => {
-                assert!(reasons.contains(&CheckpointRejection::UntrackedFilesPresent(vec![
-                    "notes.bin".to_owned()
-                ])));
+                assert!(
+                    reasons.contains(&CheckpointRejection::UntrackedFilesPresent(vec![
+                        "notes.bin".to_owned()
+                    ]))
+                );
                 assert_eq!(snapshot.untracked_files.len(), 1);
                 assert_eq!(snapshot.untracked_files[0].path, "notes.bin");
                 assert_eq!(snapshot.untracked_files[0].kind, UntrackedFileKind::File);
@@ -573,14 +622,18 @@ mod tests {
             .materialize_checkpoint(&repo, &checkpoint)
             .expect("materialize");
 
-        let materialized_contents =
-            fs::read_to_string(materialized.worktree_path.join("demo.txt")).expect("read materialized");
+        let materialized_contents = fs::read_to_string(materialized.worktree_path.join("demo.txt"))
+            .expect("read materialized");
         assert_eq!(materialized_contents, "three\n");
         assert!(checkpoint.changed_paths.contains(&"demo.txt".to_owned()));
         assert!(!checkpoint.staged_binary_patch.is_empty());
         assert!(!checkpoint.unstaged_binary_patch.is_empty());
         assert_eq!(
-            git(&materialized.worktree_path, &["diff", "--cached", "--name-only"]).expect("cached diff"),
+            git(
+                &materialized.worktree_path,
+                &["diff", "--cached", "--name-only"]
+            )
+            .expect("cached diff"),
             "demo.txt"
         );
         assert_eq!(

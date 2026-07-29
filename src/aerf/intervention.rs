@@ -85,14 +85,8 @@ impl<'de> Deserialize<'de> for InputEnvelope {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum InputItem {
-    Message {
-        role: String,
-        content: String,
-    },
-    ToolCall {
-        tool_name: String,
-        arguments: Value,
-    },
+    Message { role: String, content: String },
+    ToolCall { tool_name: String, arguments: Value },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -471,8 +465,9 @@ fn build_episode_evidence(kind: SemanticEpisodeKind, events: &[&RawEvent]) -> Ve
             "Collapsed {} API inspection events while preserving their raw-event IDs.",
             events.len()
         ),
-        SemanticEpisodeKind::EditSchema => "Updated the schema shape for deterministic episodes."
-            .to_owned(),
+        SemanticEpisodeKind::EditSchema => {
+            "Updated the schema shape for deterministic episodes.".to_owned()
+        }
         SemanticEpisodeKind::UpdateClient => {
             "Adjusted the client flow to match the revised schema.".to_owned()
         }
@@ -617,10 +612,7 @@ pub fn generate_recorded_demo_correction_preview(
     })
 }
 
-pub fn generate_live_correction_preview(
-    run: &Run,
-    episode_id: &str,
-) -> Option<CorrectionPreview> {
+pub fn generate_live_correction_preview(run: &Run, episode_id: &str) -> Option<CorrectionPreview> {
     let packet = generate_compact_correction_packet(run, episode_id)?;
     let original_attempt = original_correctable_attempt(run)?;
     let corrected_attempt = live_corrected_attempt(run, packet.request.clone());
@@ -639,21 +631,21 @@ pub fn generate_live_correction_preview(
     })
 }
 
-pub fn apply_recorded_demo_correction(
-    run: &Run,
-    episode_id: &str,
-) -> Option<CorrectionFork> {
+pub fn apply_recorded_demo_correction(run: &Run, episode_id: &str) -> Option<CorrectionFork> {
     let preview = generate_recorded_demo_correction_preview(run, episode_id)?;
     let appended_episode = corrected_episode();
     let appended_episode_id = appended_episode.episode_id.clone();
-    let appended_event = corrected_raw_event(&preview.packet, &preview.comparison.corrected_attempt);
+    let appended_event =
+        corrected_raw_event(&preview.packet, &preview.comparison.corrected_attempt);
     let mut forked_run = run.clone();
     forked_run.run_id = format!("{}-fixture-fork", run.run_id);
     forked_run.session_id = format!("{}-fixture-fork", run.session_id);
     forked_run.raw_events.push(appended_event);
     forked_run.episodes.push(appended_episode);
     forked_run.correction_packets.push(preview.packet.clone());
-    forked_run.attempts.push(preview.comparison.corrected_attempt.clone());
+    forked_run
+        .attempts
+        .push(preview.comparison.corrected_attempt.clone());
     forked_run.verification = corrected_verification(&run.verification);
     forked_run.token_usage = corrected_token_usage();
 
@@ -667,10 +659,7 @@ pub fn apply_recorded_demo_correction(
     })
 }
 
-pub fn generate_compact_correction_packet(
-    run: &Run,
-    episode_id: &str,
-) -> Option<CorrectionPacket> {
+pub fn generate_compact_correction_packet(run: &Run, episode_id: &str) -> Option<CorrectionPacket> {
     if episode_id != RECORDED_DEMO_SCHEMA_EPISODE_ID {
         return None;
     }
@@ -702,7 +691,8 @@ pub fn recorded_verification_command(run: &Run) -> Vec<String> {
             if event.tool_name.as_deref() != Some("run_tests") {
                 return None;
             }
-            event.body
+            event
+                .body
                 .as_ref()
                 .and_then(|body| body.get("test"))
                 .and_then(Value::as_str)
@@ -719,7 +709,9 @@ pub fn recorded_verification_command(run: &Run) -> Vec<String> {
 }
 
 fn original_correctable_attempt(run: &Run) -> Option<&Attempt> {
-    run.attempts.iter().find(|attempt| attempt.attempt_id == "attempt-v2")
+    run.attempts
+        .iter()
+        .find(|attempt| attempt.attempt_id == "attempt-v2")
 }
 
 fn corrected_packet(run: &Run) -> CorrectionPacket {
@@ -891,7 +883,9 @@ fn corrected_token_usage() -> TokenUsage {
 fn corrected_verification(original: &Verification) -> Verification {
     let mut verification = original.clone();
     verification.verified_at = "2026-07-28T12:00:04Z".to_owned();
-    verification.observed_fact_ids.push("episode-fixture-corrected-attempt-observed".to_owned());
+    verification
+        .observed_fact_ids
+        .push("episode-fixture-corrected-attempt-observed".to_owned());
     verification
         .agent_statement_ids
         .push("episode-fixture-corrected-attempt-agent".to_owned());
@@ -950,7 +944,9 @@ fn corrected_raw_event(packet: &CorrectionPacket, attempt: &Attempt) -> RawEvent
         request: packet.request.clone(),
         tool_name: Some("fork_correction".to_owned()),
         file_path: Some("src/aerf/intervention.rs".to_owned()),
-        summary: Some("Fixture-backed corrected attempt appended from the schema episode.".to_owned()),
+        summary: Some(
+            "Fixture-backed corrected attempt appended from the schema episode.".to_owned(),
+        ),
         outcome: Some(RawEventOutcome::Succeeded),
         parse_state: RawEventParseState::Complete,
         status_code: attempt.status_code,
@@ -991,7 +987,9 @@ mod tests {
 
         let err = serde_json::from_value::<InputEnvelope>(value).expect_err("subset validation");
 
-        assert!(err.to_string().contains("cached_input must be a subset of input"));
+        assert!(err
+            .to_string()
+            .contains("cached_input must be a subset of input"));
     }
 
     #[test]
@@ -1167,15 +1165,19 @@ mod tests {
 
         assert_eq!(episodes.len(), 2);
         assert_eq!(episodes[0].raw_event_ids, vec!["inspect-a", "inspect-b"]);
-        assert!(matches!(episodes[0].evidence[1], Evidence::DerivedInference { .. }));
+        assert!(matches!(
+            episodes[0].evidence[1],
+            Evidence::DerivedInference { .. }
+        ));
         assert_eq!(episodes[1].title, "passing test");
     }
 
     #[test]
     fn snapshots_recorded_demo_correction_preview() {
         let run = recorded_demo_run();
-        let preview = generate_recorded_demo_correction_preview(&run, super::RECORDED_DEMO_SCHEMA_EPISODE_ID)
-            .expect("preview");
+        let preview =
+            generate_recorded_demo_correction_preview(&run, super::RECORDED_DEMO_SCHEMA_EPISODE_ID)
+                .expect("preview");
 
         let packet = serde_json::to_string_pretty(&preview.packet).expect("packet json");
         let comparison =
@@ -1317,15 +1319,20 @@ mod tests {
     #[test]
     fn applies_recorded_demo_correction_as_forked_branch() {
         let run = recorded_demo_run();
-        let fork =
-            apply_recorded_demo_correction(&run, super::RECORDED_DEMO_SCHEMA_EPISODE_ID)
-                .expect("fork");
+        let fork = apply_recorded_demo_correction(&run, super::RECORDED_DEMO_SCHEMA_EPISODE_ID)
+            .expect("fork");
 
-        assert_eq!(fork.appended_episode_id, "episode-fixture-corrected-attempt");
+        assert_eq!(
+            fork.appended_episode_id,
+            "episode-fixture-corrected-attempt"
+        );
         assert_eq!(fork.forked_run.episodes.len(), run.episodes.len() + 1);
         assert_eq!(fork.forked_run.attempts.len(), run.attempts.len() + 1);
         assert_eq!(
-            fork.forked_run.episodes.last().map(|episode| episode.title.as_str()),
+            fork.forked_run
+                .episodes
+                .last()
+                .map(|episode| episode.title.as_str()),
             Some("fixture-backed corrected attempt")
         );
     }

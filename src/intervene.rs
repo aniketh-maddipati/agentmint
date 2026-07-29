@@ -11,9 +11,7 @@ use axum::{Json, Router};
 use rand::RngCore;
 use serde::Serialize;
 
-use crate::aerf::intervention::{
-    CorrectionFork, CorrectionPreview, Episode, Evidence, Run,
-};
+use crate::aerf::intervention::{CorrectionFork, CorrectionPreview, Episode, Evidence, Run};
 use crate::fork_from_here::{
     default_executor_for_run_path, CorrectionExecutor, ForkFromHereError, OfflineFixtureExecutor,
 };
@@ -60,7 +58,10 @@ pub async fn run_with_listener(
     token: &str,
 ) -> std::io::Result<()> {
     let router = build_router(run, token);
-    tracing::info!("agentmint-intervene listening on {:?}", listener.local_addr());
+    tracing::info!(
+        "agentmint-intervene listening on {:?}",
+        listener.local_addr()
+    );
     axum::serve(listener, router).await
 }
 
@@ -71,10 +72,13 @@ pub async fn run_with_listener_for_path(
     run_path: &std::path::Path,
     repo_root: &std::path::Path,
 ) -> std::io::Result<()> {
-    let executor = default_executor_for_run_path(run_path, repo_root)
-        .map_err(std::io::Error::other)?;
+    let executor =
+        default_executor_for_run_path(run_path, repo_root).map_err(std::io::Error::other)?;
     let router = build_router_with_executor(run, token, executor);
-    tracing::info!("agentmint-intervene listening on {:?}", listener.local_addr());
+    tracing::info!(
+        "agentmint-intervene listening on {:?}",
+        listener.local_addr()
+    );
     axum::serve(listener, router).await
 }
 
@@ -99,8 +103,14 @@ fn protected_router() -> Router<InterveneState> {
         .route("/run", get(get_run))
         .route("/episodes/{episode_id}", get(get_episode))
         .route("/evidence/{evidence_id}", get(get_evidence))
-        .route("/corrections/preview/{episode_id}", post(preview_correction))
-        .route("/corrections/confirm/{episode_id}", post(confirm_correction))
+        .route(
+            "/corrections/preview/{episode_id}",
+            post(preview_correction),
+        )
+        .route(
+            "/corrections/confirm/{episode_id}",
+            post(confirm_correction),
+        )
 }
 
 async fn get_app_shell() -> Response {
@@ -175,15 +185,16 @@ async fn confirm_correction(
         .map_err(correction_error_response)
 }
 
-fn correction_error_response(
-    error: ForkFromHereError,
-) -> (StatusCode, Json<serde_json::Value>) {
+fn correction_error_response(error: ForkFromHereError) -> (StatusCode, Json<serde_json::Value>) {
     match error {
         ForkFromHereError::UnsupportedEpisode(_) => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": error.to_string() })),
         ),
-        ForkFromHereError::Checkpoint(crate::checkpoint::CheckpointError::UnsafeState { ref reasons, .. }) => (
+        ForkFromHereError::Checkpoint(crate::checkpoint::CheckpointError::UnsafeState {
+            ref reasons,
+            ..
+        }) => (
             StatusCode::CONFLICT,
             Json(serde_json::json!({
                 "error": error.to_string(),
@@ -1272,15 +1283,16 @@ mod tests {
         let (base, client) = spawn_server().await?;
 
         let response = client
-            .get(format!(
-                "{base}/evidence/episode-revise-fixture-observed"
-            ))
+            .get(format!("{base}/evidence/episode-revise-fixture-observed"))
             .send()
             .await?;
 
         assert_eq!(response.status(), StatusCode::OK);
         let body: serde_json::Value = response.json().await?;
-        assert_eq!(body["episode_id"], serde_json::json!("episode-revise-fixture"));
+        assert_eq!(
+            body["episode_id"],
+            serde_json::json!("episode-revise-fixture")
+        );
         assert_eq!(
             body["evidence"]["summary"],
             serde_json::json!("Revised the recorded fixture after the failing test.")
@@ -1429,7 +1441,11 @@ mod tests {
             None
         }
 
-        fn confirm(&self, _run: &Run, episode_id: &str) -> Result<CorrectionFork, ForkFromHereError> {
+        fn confirm(
+            &self,
+            _run: &Run,
+            episode_id: &str,
+        ) -> Result<CorrectionFork, ForkFromHereError> {
             if episode_id == RECORDED_DEMO_SCHEMA_EPISODE_ID {
                 return Ok(self.fork.clone());
             }

@@ -74,11 +74,15 @@ pub(crate) fn by_native<'a>(schemas: &'a [ToolSchema], native: &str) -> Option<&
 }
 
 pub(crate) fn native_tool(schema: Option<&ToolSchema>, canonical: &str) -> String {
-    schema.map(|schema| schema.native.to_owned()).unwrap_or_else(|| canonical.to_owned())
+    schema
+        .map(|schema| schema.native.to_owned())
+        .unwrap_or_else(|| canonical.to_owned())
 }
 
 pub(crate) fn canonical_tool(schema: Option<&ToolSchema>, native: &str) -> String {
-    schema.map(|schema| schema.canonical.to_owned()).unwrap_or_else(|| native.to_owned())
+    schema
+        .map(|schema| schema.canonical.to_owned())
+        .unwrap_or_else(|| native.to_owned())
 }
 
 pub(crate) fn to_native_args(schema: Option<&ToolSchema>, args: &Value) -> Value {
@@ -137,6 +141,9 @@ fn rename_to_canonical(schema: Option<&ToolSchema>, native_field: &str) -> Strin
 
 fn is_injected(schema: Option<&ToolSchema>, native_field: &str) -> bool {
     schema.is_some_and(|schema| {
-        schema.injected.iter().any(|(name, _)| *name == native_field)
+        schema
+            .injected
+            .iter()
+            .any(|(name, _)| *name == native_field)
     })
 }

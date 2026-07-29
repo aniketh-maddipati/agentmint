@@ -46,11 +46,16 @@ fn validate_request(req: &MintRequest) -> Result<()> {
         return Err(Error::InvalidToken("sub must be 1-256 characters".into()));
     }
     if req.sub.chars().any(|c| c.is_control()) {
-        return Err(Error::InvalidToken("sub contains control characters".into()));
+        return Err(Error::InvalidToken(
+            "sub contains control characters".into(),
+        ));
     }
     if req.action.is_empty()
         || req.action.len() > 64
-        || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
+        || !req
+            .action
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
     {
         return Err(Error::InvalidToken(
             "action must be 1-64 chars (alphanumeric, underscore, colon, hyphen)".into(),
@@ -144,7 +149,12 @@ pub async fn mint(
     crate::console::log_mint(&claims.sub, &claims.action, &jti);
     state.metrics.record_mint();
 
-    Ok(Json(MintResponse { token, jti, exp, receipt_type }))
+    Ok(Json(MintResponse {
+        token,
+        jti,
+        exp,
+        receipt_type,
+    }))
 }
 
 #[cfg(test)]

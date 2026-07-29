@@ -41,7 +41,9 @@ fn action_matches_pattern(action: &str, pattern: &str) -> bool {
 }
 
 fn action_in_scope(action: &str, scope: &[String]) -> bool {
-    scope.iter().any(|pattern| action_matches_pattern(action, pattern))
+    scope
+        .iter()
+        .any(|pattern| action_matches_pattern(action, pattern))
 }
 
 fn build_chain(parent: &Claims) -> Vec<String> {
@@ -59,11 +61,16 @@ pub async fn delegate(
 ) -> Result<Json<DelegateResponse>> {
     // Validate input
     if req.agent_id.is_empty() || req.agent_id.len() > 256 {
-        return Err(Error::InvalidToken("agent_id must be 1-256 characters".into()));
+        return Err(Error::InvalidToken(
+            "agent_id must be 1-256 characters".into(),
+        ));
     }
     if req.action.is_empty()
         || req.action.len() > 64
-        || !req.action.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
+        || !req
+            .action
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-')
     {
         return Err(Error::InvalidToken(
             "action must be 1-64 chars (alphanumeric, underscore, colon, hyphen)".into(),
@@ -86,7 +93,11 @@ pub async fn delegate(
                 action = %req.action,
                 "delegate: agent not authorized"
             );
-            crate::console::log_delegation_denied(&req.agent_id, &req.action, "agent_not_authorized");
+            crate::console::log_delegation_denied(
+                &req.agent_id,
+                &req.action,
+                "agent_not_authorized",
+            );
             return Ok(Json(DelegateResponse {
                 status: "denied".into(),
                 token: None,
@@ -130,7 +141,10 @@ pub async fn delegate(
                 status: "checkpoint_required".into(),
                 token: None,
                 jti: None,
-                reason: Some(format!("action '{}' requires explicit human approval", req.action)),
+                reason: Some(format!(
+                    "action '{}' requires explicit human approval",
+                    req.action
+                )),
                 chain,
             }));
         }
@@ -144,7 +158,11 @@ pub async fn delegate(
                 action = %req.action,
                 "delegate: action not in scope"
             );
-            crate::console::log_delegation_denied(&req.agent_id, &req.action, "action_not_in_scope");
+            crate::console::log_delegation_denied(
+                &req.agent_id,
+                &req.action,
+                "action_not_in_scope",
+            );
             return Ok(Json(DelegateResponse {
                 status: "denied".into(),
                 token: None,
@@ -159,17 +177,14 @@ pub async fn delegate(
     let remaining_seconds = (parent.exp - chrono::Utc::now()).num_seconds().max(1);
     let ttl = remaining_seconds.min(300);
 
-    let claims = Claims::new_delegated(
-        req.agent_id.clone(),
-        req.action.clone(),
-        ttl,
-        &parent,
-    );
+    let claims = Claims::new_delegated(req.agent_id.clone(), req.action.clone(), ttl, &parent);
     let jti = claims.jti.clone();
     let token = sign_token(&claims, &state.signing_key)?;
 
     // Audit log
-    state.audit_log.log(&jti, &req.agent_id, &req.action, chrono::Utc::now())?;
+    state
+        .audit_log
+        .log(&jti, &req.agent_id, &req.action, chrono::Utc::now())?;
 
     tracing::info!(
         agent = %req.agent_id,
@@ -209,7 +224,10 @@ mod tests {
     #[test]
     fn exact_matches() {
         assert!(action_matches_pattern("deploy:staging", "deploy:staging"));
-        assert!(!action_matches_pattern("deploy:production", "deploy:staging"));
+        assert!(!action_matches_pattern(
+            "deploy:production",
+            "deploy:staging"
+        ));
     }
 
     #[test]

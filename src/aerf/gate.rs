@@ -146,13 +146,11 @@ impl GateConfig {
                 "branch",
                 vec!["main".to_owned(), "master".to_owned()],
             )],
-            requires: vec![RequiresRule::new("write_file", vec!["read_file".to_owned()])],
-            cross_refs: vec![CrossRefRule::new(
+            requires: vec![RequiresRule::new(
                 "write_file",
-                "path",
-                "read_file",
-                "path",
+                vec!["read_file".to_owned()],
             )],
+            cross_refs: vec![CrossRefRule::new("write_file", "path", "read_file", "path")],
             max_identical_calls: 3,
             policy_hash: "tier1-gate-policy-v1".to_owned(),
         }
@@ -292,11 +290,7 @@ pub struct GateEngine {
 
 impl GateEngine {
     pub fn tier1() -> Arc<Self> {
-        Self::new(
-            GateConfig::tier1(),
-            "tier1-gate",
-            "tier1-correctness-suite",
-        )
+        Self::new(GateConfig::tier1(), "tier1-gate", "tier1-correctness-suite")
     }
 
     pub fn with_config(config: GateConfig, agent: &str, plan_id: &str) -> Arc<Self> {
@@ -349,13 +343,18 @@ impl GateSession {
         } else {
             None
         };
-        let receipt = build_receipt(&self.engine, &state, &call, ReceiptDraft {
-            decision: decision.0,
-            reason: decision.1.clone(),
-            scope_status,
-            stub_result: stub_result.as_ref(),
-            loop_count: identical_calls + 1,
-        })?;
+        let receipt = build_receipt(
+            &self.engine,
+            &state,
+            &call,
+            ReceiptDraft {
+                decision: decision.0,
+                reason: decision.1.clone(),
+                scope_status,
+                stub_result: stub_result.as_ref(),
+                loop_count: identical_calls + 1,
+            },
+        )?;
         let summary = DecisionSummary {
             actor: receipt.agent.clone(),
             tool: call.tool.clone(),
@@ -395,13 +394,18 @@ impl GateSession {
             "incomplete": true,
             "reason": reason
         });
-        let receipt = build_receipt(&self.engine, &state, &call, ReceiptDraft {
-            decision: GateDecision::Block,
-            reason: format!("receipt recording interrupted: {reason}"),
-            scope_status: ScopeStatus::Unscoped,
-            stub_result: Some(&stub_result),
-            loop_count: 1,
-        })?;
+        let receipt = build_receipt(
+            &self.engine,
+            &state,
+            &call,
+            ReceiptDraft {
+                decision: GateDecision::Block,
+                reason: format!("receipt recording interrupted: {reason}"),
+                scope_status: ScopeStatus::Unscoped,
+                stub_result: Some(&stub_result),
+                loop_count: 1,
+            },
+        )?;
         let summary = DecisionSummary {
             actor: receipt.agent.clone(),
             tool: call.tool.clone(),
@@ -437,9 +441,7 @@ impl GateSession {
         }
         let stub_result = simulate_tool(&call);
         state.unreceipted_actions.push(UnrecordedAction {
-            actor: call
-                .actor
-                .unwrap_or_else(|| self.engine.agent.clone()),
+            actor: call.actor.unwrap_or_else(|| self.engine.agent.clone()),
             tool: call.tool,
             summary: summarize_unrecorded_args(&call.args),
         });
@@ -593,7 +595,11 @@ fn decide(
         let Some(value) = string_field(&call.args, &rule.field) else {
             continue;
         };
-        if let Some(pattern) = rule.patterns.iter().find(|pattern| matches_pattern(pattern, value)) {
+        if let Some(pattern) = rule
+            .patterns
+            .iter()
+            .find(|pattern| matches_pattern(pattern, value))
+        {
             return (
                 GateDecision::Block,
                 format!(
@@ -612,7 +618,11 @@ fn decide(
         let Some(value) = string_field(&call.args, &rule.field) else {
             continue;
         };
-        if let Some(blocked_value) = rule.values.iter().find(|blocked_value| blocked_value.as_str() == value) {
+        if let Some(blocked_value) = rule
+            .values
+            .iter()
+            .find(|blocked_value| blocked_value.as_str() == value)
+        {
             return (
                 GateDecision::Block,
                 format!(
@@ -633,7 +643,10 @@ fn decide(
             if !seen {
                 return (
                     GateDecision::Block,
-                    format!("{tool} requires prior `{required_tool}` in the same session", tool = call.tool),
+                    format!(
+                        "{tool} requires prior `{required_tool}` in the same session",
+                        tool = call.tool
+                    ),
                 );
             }
         }
@@ -812,7 +825,9 @@ fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
 }
 
 fn has_related_prior_read(prior_paths: &HashSet<String>, candidate: &str) -> bool {
-    prior_paths.iter().any(|prior_path| paths_are_related(prior_path, candidate))
+    prior_paths
+        .iter()
+        .any(|prior_path| paths_are_related(prior_path, candidate))
 }
 
 fn paths_are_related(prior_path: &str, candidate: &str) -> bool {
@@ -896,7 +911,8 @@ pub fn verify_receipt_set(
     receipts
         .iter()
         .map(|receipt| {
-            let verification = verify_aerf_receipt(receipt, verifying_key, VerifyOptions::default());
+            let verification =
+                verify_aerf_receipt(receipt, verifying_key, VerifyOptions::default());
             Ok(VerificationSummary {
                 receipt_signed: !receipt.signature.is_empty(),
                 receipt_verifies: verification.ok,
@@ -933,7 +949,11 @@ fn summarize_unrecorded_args(args: &Value) -> String {
     args.to_string()
 }
 
-fn compliance_tags(call: &ToolCall, decision: GateDecision, scope_status: ScopeStatus) -> Vec<String> {
+fn compliance_tags(
+    call: &ToolCall,
+    decision: GateDecision,
+    scope_status: ScopeStatus,
+) -> Vec<String> {
     let mut tags = vec![
         format!("gate:{}", decision.as_str()),
         scope_status.tag().to_owned(),
@@ -973,7 +993,9 @@ mod tests {
     #[test]
     fn scans_full_command_without_truncation() -> AerfResult<()> {
         let session = engine().open_session("padding");
-        let prefix = std::iter::repeat_n("true", 50).collect::<Vec<_>>().join(" && ");
+        let prefix = std::iter::repeat_n("true", 50)
+            .collect::<Vec<_>>()
+            .join(" && ");
         let command = format!("{prefix} && rm -rf /");
         let outcome =
             session.evaluate(ToolCall::new("run_command", json!({ "command": command })))?;
@@ -991,7 +1013,8 @@ mod tests {
             "gate-unavailable",
         )
         .open_session("gate-unavailable");
-        let outcome = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
+        let outcome =
+            session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
 
         assert_eq!(outcome.decision, GateDecision::Block);
         assert!(outcome.reason.contains("gate unavailable"));
@@ -1015,7 +1038,10 @@ mod tests {
     #[test]
     fn allows_prefix_related_sibling_write() -> AerfResult<()> {
         let session = engine().open_session("prefix-related-sibling");
-        let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/notes.ts" })))?;
+        let _ = session.evaluate(ToolCall::new(
+            "read_file",
+            json!({ "path": "src/notes.ts" }),
+        ))?;
         let outcome = session.evaluate(ToolCall::new(
             "write_file",
             json!({ "path": "src/notes_and_credentials.ts" }),
@@ -1040,8 +1066,10 @@ mod tests {
     fn blocks_cross_ref_mismatch() -> AerfResult<()> {
         let session = engine().open_session("cross-ref");
         let _ = session.evaluate(ToolCall::new("read_file", json!({ "path": "src/app.ts" })))?;
-        let outcome =
-            session.evaluate(ToolCall::new("write_file", json!({ "path": "src/other.ts" })))?;
+        let outcome = session.evaluate(ToolCall::new(
+            "write_file",
+            json!({ "path": "src/other.ts" }),
+        ))?;
 
         assert_eq!(outcome.decision, GateDecision::Block);
         assert!(outcome.reason.contains("failed cross_ref"));
@@ -1069,7 +1097,9 @@ mod tests {
         let _ = session.evaluate(ToolCall::new("write_file", json!({ "path": "src/app.ts" })))?;
 
         let verification = session.verify_receipts()?;
-        assert!(verification.iter().all(|item| item.receipt_signed && item.receipt_verifies));
+        assert!(verification
+            .iter()
+            .all(|item| item.receipt_signed && item.receipt_verifies));
         Ok(())
     }
 
@@ -1097,7 +1127,10 @@ mod tests {
         assert_eq!(sentinel.receipt.action, "recording_interrupted");
         let status = session.recording_status()?;
         assert!(status.incomplete);
-        assert_eq!(status.failure_reason.as_deref(), Some("signing key unavailable"));
+        assert_eq!(
+            status.failure_reason.as_deref(),
+            Some("signing key unavailable")
+        );
         assert_eq!(status.dropped_actions, 1);
         assert_eq!(
             status.dropped_action_summaries,

@@ -58,9 +58,15 @@ impl AgentAdapter for CursorAdapter {
     }
 
     fn from_native(&self, native: &Value) -> AerfResult<CanonicalEvent> {
-        let name = native.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = native
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let schema = by_native(SCHEMAS, name);
-        let arguments = native.get("arguments").cloned().unwrap_or_else(|| json!({}));
+        let arguments = native
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
         Ok(CanonicalEvent {
             tool: canonical_tool(schema, name),
             args: from_native_args(schema, &arguments),

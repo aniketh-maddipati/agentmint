@@ -42,7 +42,10 @@ fn golden_episode_labels_and_order_match_fixture() -> Result<(), Box<dyn Error>>
 
     assert_eq!(built, run.episodes);
     assert_eq!(
-        built.iter().map(|episode| episode.title.as_str()).collect::<Vec<_>>(),
+        built
+            .iter()
+            .map(|episode| episode.title.as_str())
+            .collect::<Vec<_>>(),
         vec![
             "inspect API",
             "edit schema",
@@ -119,11 +122,17 @@ fn malformed_and_truncated_events_recover_deterministically() {
     let built = build_semantic_episodes(&events);
 
     assert_eq!(
-        built.iter().map(|episode| episode.title.as_str()).collect::<Vec<_>>(),
+        built
+            .iter()
+            .map(|episode| episode.title.as_str())
+            .collect::<Vec<_>>(),
         vec!["inspect API", "passing test"]
     );
     assert_eq!(built[0].raw_event_ids, vec!["inspect-a", "inspect-b"]);
-    assert!(matches!(built[0].evidence[1], Evidence::DerivedInference { .. }));
+    assert!(matches!(
+        built[0].evidence[1],
+        Evidence::DerivedInference { .. }
+    ));
 }
 
 #[test]
@@ -160,7 +169,9 @@ fn rejects_cached_input_that_is_not_in_input() {
 
     let err = serde_json::from_value::<Run>(invalid).expect_err("subset error");
 
-    assert!(err.to_string().contains("cached_input must be a subset of input"));
+    assert!(err
+        .to_string()
+        .contains("cached_input must be a subset of input"));
 }
 
 fn raw_event(

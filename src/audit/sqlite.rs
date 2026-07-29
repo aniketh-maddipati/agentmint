@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::error::{Result, lock_err};
+use crate::error::{lock_err, Result};
 
 const MAX_SUB_LEN: usize = 256;
 const MAX_ACTION_LEN: usize = 64;
@@ -25,7 +25,10 @@ pub struct AuditEntry {
 }
 
 fn truncate(value: &str, max: usize) -> &str {
-    value.char_indices().nth(max).map_or(value, |(i, _)| &value[..i])
+    value
+        .char_indices()
+        .nth(max)
+        .map_or(value, |(i, _)| &value[..i])
 }
 
 impl AuditLog {
@@ -49,7 +52,13 @@ impl AuditLog {
         Self::open(":memory:")
     }
 
-    pub fn log(&self, jti: &str, sub: &str, action: &str, verified_at: DateTime<Utc>) -> Result<()> {
+    pub fn log(
+        &self,
+        jti: &str,
+        sub: &str,
+        action: &str,
+        verified_at: DateTime<Utc>,
+    ) -> Result<()> {
         let sub = truncate(sub, MAX_SUB_LEN);
         let action = truncate(action, MAX_ACTION_LEN);
         let conn = self.conn.lock().map_err(lock_err("audit"))?;
