@@ -48,15 +48,18 @@ pub enum Error {
 impl Error {
     fn status(&self) -> StatusCode {
         match self {
-            Self::TokenExpired | Self::InvalidSignature | Self::InvalidToken(_) | Self::Unauthorized(_) => {
-                StatusCode::UNAUTHORIZED
-            }
+            Self::TokenExpired
+            | Self::InvalidSignature
+            | Self::InvalidToken(_)
+            | Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::ReplayDetected(_) => StatusCode::CONFLICT,
             Self::PolicyViolation(_) => StatusCode::FORBIDDEN,
             Self::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,
             Self::Validation(_) | Self::Base64(_) => StatusCode::BAD_REQUEST,
             Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 
@@ -72,7 +75,9 @@ impl Error {
             Self::RateLimited(_) => "rate limited",
             Self::Validation(_) => "invalid request",
             Self::ServiceUnavailable(_) => "service unavailable",
-            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) | Self::Base64(_) => "internal error",
+            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) | Self::Base64(_) => {
+                "internal error"
+            }
         }
     }
 }
@@ -98,15 +103,33 @@ mod tests {
     #[test]
     fn status_codes() {
         assert_eq!(Error::TokenExpired.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(Error::ReplayDetected("x".into()).status(), StatusCode::CONFLICT);
-        assert_eq!(Error::PolicyViolation("x".into()).status(), StatusCode::FORBIDDEN);
-        assert_eq!(Error::RateLimited("x".into()).status(), StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(Error::ServiceUnavailable("x".into()).status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            Error::ReplayDetected("x".into()).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            Error::PolicyViolation("x".into()).status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            Error::RateLimited("x".into()).status(),
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        assert_eq!(
+            Error::ServiceUnavailable("x".into()).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 
     #[test]
     fn no_internal_leak() {
-        assert_eq!(Error::Database(rusqlite::Error::QueryReturnedNoRows).client_msg(), "internal error");
-        assert_eq!(Error::Signing("secret key".into()).client_msg(), "internal error");
+        assert_eq!(
+            Error::Database(rusqlite::Error::QueryReturnedNoRows).client_msg(),
+            "internal error"
+        );
+        assert_eq!(
+            Error::Signing("secret key".into()).client_msg(),
+            "internal error"
+        );
     }
 }

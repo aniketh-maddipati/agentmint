@@ -74,10 +74,16 @@ fn summarize_receipt_input(receipt: &Receipt) -> String {
         return append_observed(format!("branch={branch}"), observed);
     }
     if let Some(message) = args.get("message").and_then(Value::as_str) {
-        return append_observed(format!("message={}", summarize_string(message, 96)), observed);
+        return append_observed(
+            format!("message={}", summarize_string(message, 96)),
+            observed,
+        );
     }
     if let Some(command) = args.get("command").and_then(Value::as_str) {
-        return append_observed(format!("command={}", summarize_string(command, 120)), observed);
+        return append_observed(
+            format!("command={}", summarize_string(command, 120)),
+            observed,
+        );
     }
     if let Some(text) = args.get("text").and_then(Value::as_str) {
         return append_observed(format!("text={}", summarize_string(text, 120)), observed);
@@ -228,7 +234,13 @@ mod tests {
         let entries = reconstruct_chain(&[first, second]).expect("entries");
         let rendered = render_entries(&entries);
 
-        assert!(rendered.lines().next().is_some_and(|line| line.contains("read_file")));
-        assert!(rendered.lines().nth(1).is_some_and(|line| line.contains("write_file")));
+        assert!(rendered
+            .lines()
+            .next()
+            .is_some_and(|line| line.contains("read_file")));
+        assert!(rendered
+            .lines()
+            .nth(1)
+            .is_some_and(|line| line.contains("write_file")));
     }
 }

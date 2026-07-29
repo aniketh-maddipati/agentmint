@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::error::{Error, Result, lock_err};
+use crate::error::{lock_err, Error, Result};
 
 const DEFAULT_MAX_CAPACITY: usize = 100_000;
 
@@ -50,10 +50,7 @@ impl JtiStore {
     }
 
     pub fn len(&self) -> usize {
-        self.entries
-            .lock()
-            .map(|e| e.len())
-            .unwrap_or(0)
+        self.entries.lock().map(|e| e.len()).unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {

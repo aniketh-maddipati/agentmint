@@ -3,7 +3,7 @@
 
 use std::fs;
 use std::io::{BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -298,12 +298,11 @@ where
 }
 
 pub fn installed_codex_version() -> AerfResult<CodexInstalledVersion> {
-    let package_json_path = installed_codex_package_json_path().ok_or_else(|| {
-        AerfError::UnsupportedValue {
+    let package_json_path =
+        installed_codex_package_json_path().ok_or_else(|| AerfError::UnsupportedValue {
             path: "$".to_owned(),
             kind: "unable to locate installed Codex package.json".to_owned(),
-        }
-    })?;
+        })?;
     let value: Value = serde_json::from_slice(&fs::read(&package_json_path)?)?;
     let version = value
         .get("version")
@@ -320,7 +319,9 @@ pub fn installed_codex_version() -> AerfResult<CodexInstalledVersion> {
     })
 }
 
-pub fn generate_protocol_schemas(installed_version: &CodexInstalledVersion) -> CodexProtocolSchemas {
+pub fn generate_protocol_schemas(
+    installed_version: &CodexInstalledVersion,
+) -> CodexProtocolSchemas {
     CodexProtocolSchemas {
         codex_version: installed_version.version.clone(),
         transport: "stdio-jsonl".to_owned(),
@@ -423,7 +424,10 @@ fn normalize_events(value: &Value) -> AerfResult<Vec<NormalizedCodexEvent>> {
                 turn_id: string_value(params, &["turn_id", "turnId", "turn.id"]),
                 item_id: string_value(params, &["item_id", "itemId", "item.id"]),
                 input_tokens: number_field(usage, &["input_tokens", "inputTokens"]),
-                cached_input_tokens: number_field(usage, &["cached_input_tokens", "cachedInputTokens"]),
+                cached_input_tokens: number_field(
+                    usage,
+                    &["cached_input_tokens", "cachedInputTokens"],
+                ),
                 output_tokens: number_field(usage, &["output_tokens", "outputTokens"]),
                 total_tokens: number_field(usage, &["total_tokens", "totalTokens"]),
             }));
@@ -431,16 +435,18 @@ fn normalize_events(value: &Value) -> AerfResult<Vec<NormalizedCodexEvent>> {
         return Ok(out);
     }
     if is_command_event(&event_name, params) {
-        out.push(NormalizedCodexEvent::CommandExecution(NormalizedCommandExecution {
-            raw_event_name: event_name,
-            phase: lifecycle_phase(value),
-            thread_id: string_value(params, &["thread_id", "threadId", "thread.id"]),
-            turn_id: string_value(params, &["turn_id", "turnId", "turn.id"]),
-            item_id: string_value(params, &["item_id", "itemId", "item.id"]),
-            command: string_value(params, &["command", "cmd", "execution.command"]),
-            exit_code: integer_value(params, &["exit_code", "exitCode", "execution.exitCode"]),
-            cwd: string_value(params, &["cwd", "execution.cwd"]),
-        }));
+        out.push(NormalizedCodexEvent::CommandExecution(
+            NormalizedCommandExecution {
+                raw_event_name: event_name,
+                phase: lifecycle_phase(value),
+                thread_id: string_value(params, &["thread_id", "threadId", "thread.id"]),
+                turn_id: string_value(params, &["turn_id", "turnId", "turn.id"]),
+                item_id: string_value(params, &["item_id", "itemId", "item.id"]),
+                command: string_value(params, &["command", "cmd", "execution.command"]),
+                exit_code: integer_value(params, &["exit_code", "exitCode", "execution.exitCode"]),
+                cwd: string_value(params, &["cwd", "execution.cwd"]),
+            },
+        ));
         return Ok(out);
     }
     if is_file_change_event(&event_name, params) {
@@ -492,14 +498,16 @@ fn normalize_events(value: &Value) -> AerfResult<Vec<NormalizedCodexEvent>> {
         }
     }
     if is_item_event(&event_name, params) {
-        out.push(NormalizedCodexEvent::ItemLifecycle(NormalizedItemLifecycle {
-            raw_event_name: event_name,
-            phase: lifecycle_phase(value),
-            thread_id: string_value(params, &["thread_id", "threadId", "thread.id"]),
-            turn_id: string_value(params, &["turn_id", "turnId", "turn.id"]),
-            item_id: string_value(params, &["item_id", "itemId", "item.id", "id"]),
-            item_type: string_value(params, &["item_type", "itemType", "type"]),
-        }));
+        out.push(NormalizedCodexEvent::ItemLifecycle(
+            NormalizedItemLifecycle {
+                raw_event_name: event_name,
+                phase: lifecycle_phase(value),
+                thread_id: string_value(params, &["thread_id", "threadId", "thread.id"]),
+                turn_id: string_value(params, &["turn_id", "turnId", "turn.id"]),
+                item_id: string_value(params, &["item_id", "itemId", "item.id", "id"]),
+                item_type: string_value(params, &["item_type", "itemType", "type"]),
+            },
+        ));
         return Ok(out);
     }
     if out.is_empty() {
@@ -588,15 +596,23 @@ fn usage_payload(value: &Value) -> Option<&Value> {
 }
 
 fn string_value(value: &Value, paths: &[&str]) -> Option<String> {
-    paths.iter().find_map(|path| find_path(value, path).and_then(Value::as_str).map(str::to_owned))
+    paths.iter().find_map(|path| {
+        find_path(value, path)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    })
 }
 
 fn integer_value(value: &Value, paths: &[&str]) -> Option<i64> {
-    paths.iter().find_map(|path| find_path(value, path).and_then(Value::as_i64))
+    paths
+        .iter()
+        .find_map(|path| find_path(value, path).and_then(Value::as_i64))
 }
 
 fn number_field(value: &Value, paths: &[&str]) -> Option<u64> {
-    paths.iter().find_map(|path| find_path(value, path).and_then(Value::as_u64))
+    paths
+        .iter()
+        .find_map(|path| find_path(value, path).and_then(Value::as_u64))
 }
 
 fn validate_token_usage(usage: &Value, path: &str) -> AerfResult<()> {
@@ -622,29 +638,83 @@ fn find_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
 }
 
 fn installed_codex_package_json_path() -> Option<PathBuf> {
-    let env_path = std::env::var_os("AGENTMINT_CODEX_PACKAGE_JSON").map(PathBuf::from);
-    let candidates = [
-        env_path,
-        Some(PathBuf::from("/usr/local/lib/node_modules/@openai/codex/package.json")),
-        Some(PathBuf::from("/opt/homebrew/lib/node_modules/@openai/codex/package.json")),
-    ];
+    select_existing_path(codex_package_json_candidates(), |path| path.exists())
+}
+
+fn codex_package_json_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(env_path) = std::env::var_os("AGENTMINT_CODEX_PACKAGE_JSON") {
+        candidates.push(PathBuf::from(env_path));
+    }
+    candidates.push(PathBuf::from(
+        "/usr/local/lib/node_modules/@openai/codex/package.json",
+    ));
+    candidates.push(PathBuf::from(
+        "/opt/homebrew/lib/node_modules/@openai/codex/package.json",
+    ));
     candidates
-        .into_iter()
-        .flatten()
-        .find(|path| path.exists())
+}
+
+fn select_existing_path<F>(candidates: Vec<PathBuf>, exists: F) -> Option<PathBuf>
+where
+    F: Fn(&Path) -> bool,
+{
+    candidates.into_iter().find(|path| exists(path))
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
+    use std::path::{Path, PathBuf};
 
     use serde_json::{json, Value};
 
     use super::{
-        generate_protocol_schemas, installed_codex_version, CodexAppServerAdapter,
-        JsonlTransport, NormalizedCodexEvent,
+        generate_protocol_schemas, select_existing_path, CodexAppServerAdapter,
+        CodexInstalledVersion, JsonlTransport, NormalizedCodexEvent,
     };
     use crate::aerf::{AerfError, AerfResult};
+
+    fn test_installed_version() -> CodexInstalledVersion {
+        CodexInstalledVersion {
+            version: "0.130.0".to_owned(),
+            package_json_path: PathBuf::from("/agentmint/test/@openai/codex/package.json"),
+        }
+    }
+
+    #[test]
+    fn select_existing_path_prefers_first_existing_candidate() {
+        let candidates = vec![
+            PathBuf::from("/first/missing/package.json"),
+            PathBuf::from("/second/present/package.json"),
+            PathBuf::from("/third/present/package.json"),
+        ];
+        let present = [
+            "/second/present/package.json",
+            "/third/present/package.json",
+        ];
+
+        let selected = select_existing_path(candidates, |path: &Path| {
+            present.contains(&path.to_string_lossy().as_ref())
+        });
+
+        assert_eq!(
+            selected,
+            Some(PathBuf::from("/second/present/package.json"))
+        );
+    }
+
+    #[test]
+    fn select_existing_path_returns_none_when_no_candidate_exists() {
+        let candidates = vec![
+            PathBuf::from("/a/package.json"),
+            PathBuf::from("/b/package.json"),
+        ];
+
+        let selected = select_existing_path(candidates, |_path: &Path| false);
+
+        assert_eq!(selected, None);
+    }
 
     #[derive(Default)]
     struct MockTransport {
@@ -674,7 +744,7 @@ mod tests {
 
     #[test]
     fn installed_version_generates_protocol_schemas() {
-        let installed = installed_codex_version().expect("installed version");
+        let installed = test_installed_version();
         let schemas = generate_protocol_schemas(&installed);
         let snapshot = serde_json::to_string_pretty(&schemas).expect("schema json");
 
@@ -740,7 +810,7 @@ mod tests {
 
     #[test]
     fn performs_initialize_handshake_and_normalizes_transcript() {
-        let installed = installed_codex_version().expect("installed version");
+        let installed = test_installed_version();
         let transport = MockTransport::with_reads(vec![
             json!({
                 "jsonrpc": "2.0",
@@ -822,8 +892,14 @@ mod tests {
         let transcript = adapter.collect_transcript().expect("transcript");
 
         assert_eq!(transcript.codex_version, "0.130.0");
-        assert_eq!(transcript.handshake.initialize_request["method"], json!("initialize"));
-        assert_eq!(transcript.handshake.initialized_notification["method"], json!("initialized"));
+        assert_eq!(
+            transcript.handshake.initialize_request["method"],
+            json!("initialize")
+        );
+        assert_eq!(
+            transcript.handshake.initialized_notification["method"],
+            json!("initialized")
+        );
         assert_eq!(transcript.events.len(), 10);
         assert!(matches!(
             transcript.events[0],
@@ -869,7 +945,7 @@ mod tests {
 
     #[test]
     fn rejects_cached_input_tokens_above_input_tokens() {
-        let installed = installed_codex_version().expect("installed version");
+        let installed = test_installed_version();
         let transport = MockTransport::with_reads(vec![
             json!({
                 "jsonrpc": "2.0",
@@ -899,7 +975,9 @@ mod tests {
         ]);
 
         let mut adapter = CodexAppServerAdapter::new(transport, installed);
-        let err = adapter.collect_transcript().expect_err("invalid usage should fail");
+        let err = adapter
+            .collect_transcript()
+            .expect_err("invalid usage should fail");
 
         assert!(matches!(
             err,
@@ -910,7 +988,7 @@ mod tests {
 
     #[test]
     fn call_collects_events_until_matching_response() {
-        let installed = installed_codex_version().expect("installed version");
+        let installed = test_installed_version();
         let transport = MockTransport::with_reads(vec![
             json!({
                 "jsonrpc": "2.0",

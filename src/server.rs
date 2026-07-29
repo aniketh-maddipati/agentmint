@@ -3,7 +3,7 @@
 use axum::http::header::{self, HeaderValue};
 use axum::response::Response;
 use axum::routing::{get, post};
-use axum::{Router, middleware};
+use axum::{middleware, Router};
 use tower_http::cors::CorsLayer;
 
 use crate::handlers;
@@ -13,7 +13,10 @@ use crate::webauthn;
 async fn security_headers(req: axum::extract::Request, next: middleware::Next) -> Response {
     let mut resp = next.run(req).await;
     let h = resp.headers_mut();
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     resp
@@ -44,7 +47,10 @@ pub async fn run(state: AppState, addr: &str) -> std::io::Result<()> {
     run_with_listener(state, listener).await
 }
 
-pub async fn run_with_listener(state: AppState, listener: tokio::net::TcpListener) -> std::io::Result<()> {
+pub async fn run_with_listener(
+    state: AppState,
+    listener: tokio::net::TcpListener,
+) -> std::io::Result<()> {
     let router = build_router(state);
     tracing::info!("listening on {:?}", listener.local_addr());
     axum::serve(listener, router).await
@@ -73,11 +79,17 @@ mod tests {
 
         assert_eq!(response.status(), reqwest::StatusCode::OK);
         assert_eq!(
-            response.headers().get("x-content-type-options").and_then(|value| value.to_str().ok()),
+            response
+                .headers()
+                .get("x-content-type-options")
+                .and_then(|value| value.to_str().ok()),
             Some("nosniff")
         );
         assert_eq!(
-            response.headers().get("x-frame-options").and_then(|value| value.to_str().ok()),
+            response
+                .headers()
+                .get("x-frame-options")
+                .and_then(|value| value.to_str().ok()),
             Some("DENY")
         );
         Ok(())

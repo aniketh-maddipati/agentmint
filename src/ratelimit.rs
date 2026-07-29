@@ -42,7 +42,10 @@ struct WindowCounter {
 
 impl WindowCounter {
     fn new() -> Self {
-        Self { count: 0, window_start: Instant::now() }
+        Self {
+            count: 0,
+            window_start: Instant::now(),
+        }
     }
 
     fn increment(&mut self, limit: u32, window: Duration) -> bool {
@@ -74,12 +77,16 @@ impl RateLimiter {
         self.maybe_cleanup(&mut state);
 
         // Global check (per second)
-        if !state.global_count.increment(self.config.global_per_sec, Duration::from_secs(1)) {
+        if !state
+            .global_count
+            .increment(self.config.global_per_sec, Duration::from_secs(1))
+        {
             return Err(RateLimitError::Global);
         }
 
         // Per-IP check (per minute)
-        let counter = state.ip_counts
+        let counter = state
+            .ip_counts
             .entry(ip.into())
             .or_insert_with(WindowCounter::new);
 
@@ -96,7 +103,8 @@ impl RateLimiter {
     pub fn check_user(&self, user_id: &str) -> Result<(), RateLimitError> {
         let mut state = self.state.lock().unwrap();
 
-        let counter = state.user_counts
+        let counter = state
+            .user_counts
             .entry(user_id.into())
             .or_insert_with(WindowCounter::new);
 
@@ -142,7 +150,11 @@ impl std::fmt::Display for RateLimitError {
                 write!(f, "rate limit: {} requests per {}s", limit, window_secs)
             }
             Self::PerUser { limit, window_secs } => {
-                write!(f, "rate limit: {} requests per {}s per user", limit, window_secs)
+                write!(
+                    f,
+                    "rate limit: {} requests per {}s per user",
+                    limit, window_secs
+                )
             }
         }
     }

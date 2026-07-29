@@ -6,32 +6,101 @@ use colored::Colorize;
 
 pub fn print_banner() {
     println!();
-    println!("{}", "╔═══════════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║                                                           ║".cyan());
+    println!(
+        "{}",
+        "╔═══════════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║                                                           ║".cyan()
+    );
     println!("║     {}     ║", "🔐 AgentMint v0.1.0".bold().white());
-    println!("║     {}     ║", "Cryptographic proof of human authorization".dimmed());
-    println!("{}", "║                                                           ║".cyan());
-    println!("{}", "╚═══════════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "║     {}     ║",
+        "Cryptographic proof of human authorization".dimmed()
+    );
+    println!(
+        "{}",
+        "║                                                           ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚═══════════════════════════════════════════════════════════╝".cyan()
+    );
     println!();
 }
 
 pub fn print_startup(addr: &str) {
     println!("{} {}", "✓".green().bold(), "Server ready".white().bold());
-    println!("  {} {}", "→".dimmed(), format!("http://{}", addr).cyan().underline());
+    println!(
+        "  {} {}",
+        "→".dimmed(),
+        format!("http://{}", addr).cyan().underline()
+    );
     println!();
     println!("{}", "Endpoints:".white().bold());
-    println!("  {} {}  {}", "POST".yellow(), "/mint".white(), "Issue signed token".dimmed());
-    println!("  {} {}  {}", "POST".yellow(), "/proxy".white(), "Verify & consume token".dimmed());
-    println!("  {} {} {}", "POST".yellow(), "/delegate".white(), "Delegate scoped authorization".dimmed());
-    println!("  {} {}  {}", "GET ".green(), "/audit".white(), "View audit log".dimmed());
-    println!("  {} {} {}", "GET ".green(), "/metrics".white(), "Telemetry".dimmed());
-    println!("  {} {} {}", "GET ".green(), "/health".white(), "Health check".dimmed());
+    println!(
+        "  {} {}  {}",
+        "POST".yellow(),
+        "/mint".white(),
+        "Issue signed token".dimmed()
+    );
+    println!(
+        "  {} {}  {}",
+        "POST".yellow(),
+        "/proxy".white(),
+        "Verify & consume token".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "POST".yellow(),
+        "/delegate".white(),
+        "Delegate scoped authorization".dimmed()
+    );
+    println!(
+        "  {} {}  {}",
+        "GET ".green(),
+        "/audit".white(),
+        "View audit log".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "GET ".green(),
+        "/metrics".white(),
+        "Telemetry".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "GET ".green(),
+        "/health".white(),
+        "Health check".dimmed()
+    );
     println!();
     println!("{}", "WebAuthn:".white().bold());
-    println!("  {} {} {}", "POST".yellow(), "/webauthn/register/start".white(), "Begin registration".dimmed());
-    println!("  {} {} {}", "POST".yellow(), "/webauthn/register/finish".white(), "Complete registration".dimmed());
-    println!("  {} {} {}", "POST".yellow(), "/webauthn/auth/start".white(), "Begin authentication".dimmed());
-    println!("  {} {} {}", "POST".yellow(), "/webauthn/auth/finish".white(), "Complete authentication".dimmed());
+    println!(
+        "  {} {} {}",
+        "POST".yellow(),
+        "/webauthn/register/start".white(),
+        "Begin registration".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "POST".yellow(),
+        "/webauthn/register/finish".white(),
+        "Complete registration".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "POST".yellow(),
+        "/webauthn/auth/start".white(),
+        "Begin authentication".dimmed()
+    );
+    println!(
+        "  {} {} {}",
+        "POST".yellow(),
+        "/webauthn/auth/finish".white(),
+        "Complete authentication".dimmed()
+    );
     println!();
 }
 
@@ -42,7 +111,11 @@ fn badge(text: &str, fg: colored::Color, bg: colored::Color) -> colored::Colored
 }
 
 fn short_jti(jti: &str) -> &str {
-    if jti.len() >= 8 { &jti[..8] } else { jti }
+    if jti.len() >= 8 {
+        &jti[..8]
+    } else {
+        jti
+    }
 }
 
 // === Core Events ===
@@ -51,8 +124,10 @@ pub fn log_mint(sub: &str, action: &str, jti: &str) {
     println!(
         "{} {} {} {} {} {}",
         badge("MINT", colored::Color::Black, colored::Color::Green),
-        "sub:".dimmed(), sub.white(),
-        "action:".dimmed(), action.cyan(),
+        "sub:".dimmed(),
+        sub.white(),
+        "action:".dimmed(),
+        action.cyan(),
         format!("jti:{}", short_jti(jti)).dimmed()
     );
 }
@@ -68,7 +143,11 @@ pub fn log_verify(jti: &str, time_us: u128) {
 }
 
 pub fn log_reject(reason: &str) {
-    println!("{} {}", badge("DENY", colored::Color::White, colored::Color::Red), reason.red());
+    println!(
+        "{} {}",
+        badge("DENY", colored::Color::White, colored::Color::Red),
+        reason.red()
+    );
 }
 
 pub fn log_replay(jti: &str) {
@@ -101,7 +180,8 @@ pub fn log_oidc_success(sub: &str) {
     println!(
         "{} {} {} {}",
         badge("OIDC", colored::Color::Black, colored::Color::Green),
-        "sub:".dimmed(), sub.white(),
+        "sub:".dimmed(),
+        sub.white(),
         "✓ verified".green()
     );
 }
@@ -153,7 +233,8 @@ pub fn log_webauthn_register(user_id: &str) {
     println!(
         "{} {} {} {}",
         badge("WEBAUTHN", colored::Color::Black, colored::Color::Green),
-        "user:".dimmed(), user_id.white(),
+        "user:".dimmed(),
+        user_id.white(),
         "✓ registered".green()
     );
 }
@@ -162,7 +243,8 @@ pub fn log_webauthn_auth(user_id: &str) {
     println!(
         "{} {} {} {}",
         badge("WEBAUTHN", colored::Color::Black, colored::Color::Blue),
-        "user:".dimmed(), user_id.white(),
+        "user:".dimmed(),
+        user_id.white(),
         "✓ authenticated".green()
     );
 }
@@ -171,7 +253,8 @@ pub fn log_webauthn_failure(user_id: &str) {
     println!(
         "{} {} {} {}",
         badge("WEBAUTHN", colored::Color::White, colored::Color::Red),
-        "user:".dimmed(), user_id.yellow(),
+        "user:".dimmed(),
+        user_id.yellow(),
         "✗ auth failed".red()
     );
 }
@@ -180,7 +263,8 @@ pub fn log_webauthn_lockout(user_id: &str) {
     println!(
         "{} {} {} {}",
         badge("LOCKOUT", colored::Color::White, colored::Color::Red),
-        "user:".dimmed(), user_id.yellow(),
+        "user:".dimmed(),
+        user_id.yellow(),
         "🔒 account locked".red()
     );
 }
@@ -191,7 +275,8 @@ pub fn log_delegation_approved(agent: &str, action: &str, jti: &str) {
     println!(
         "{} {} {} {} {} {}",
         badge("DELEGATE", colored::Color::Black, colored::Color::Green),
-        "agent:".dimmed(), agent.white(),
+        "agent:".dimmed(),
+        agent.white(),
         format!("action:{}", action).cyan(),
         format!("jti:{}", short_jti(jti)).dimmed(),
         "✓".green().bold()

@@ -1,9 +1,9 @@
 //! Ed25519 token signing.
 //! Used by: handlers::mint.
 
-use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use ed25519_dalek::{SigningKey, Signer};
+use base64::Engine;
+use ed25519_dalek::{Signer, SigningKey};
 
 use crate::error::Result;
 use crate::token::claims::Claims;

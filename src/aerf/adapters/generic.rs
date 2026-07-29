@@ -38,7 +38,10 @@ impl AgentAdapter for GenericAdapter {
 
     fn from_native(&self, native: &Value) -> AerfResult<CanonicalEvent> {
         let function = native.get("function").unwrap_or(&Value::Null);
-        let name = function.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = function
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let args = match function.get("arguments").and_then(Value::as_str) {
             Some(raw) => serde_json::from_str(raw)?,
             None => json!({}),

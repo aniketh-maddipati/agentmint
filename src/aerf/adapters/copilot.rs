@@ -30,7 +30,10 @@ const SCHEMAS: &[ToolSchema] = &[
         canonical: "run_command",
         native: "run_in_terminal",
         fields: &[("command", "command")],
-        injected: &[("explanation", "synthetic replay"), ("isBackground", "false")],
+        injected: &[
+            ("explanation", "synthetic replay"),
+            ("isBackground", "false"),
+        ],
     },
 ];
 
@@ -63,7 +66,10 @@ impl AgentAdapter for CopilotAdapter {
 
     fn from_native(&self, native: &Value) -> AerfResult<CanonicalEvent> {
         let function = native.get("function").unwrap_or(&Value::Null);
-        let name = function.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = function
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let schema = by_native(SCHEMAS, name);
         let arguments = decode_arguments(function)?;
         Ok(CanonicalEvent {

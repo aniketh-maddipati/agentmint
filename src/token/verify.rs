@@ -1,8 +1,8 @@
 //! Ed25519 token verification with size limits.
 //! Used by: handlers::proxy.
 
-use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
 use crate::error::{Error, Result};
@@ -11,7 +11,10 @@ use crate::token::claims::Claims;
 const MAX_TOKEN_BYTES: usize = 2048;
 
 fn validate_base64_url(input: &str) -> Result<()> {
-    if input.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'=') {
+    if input
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'=')
+    {
         return Ok(());
     }
     Err(Error::InvalidToken("invalid base64url characters".into()))
@@ -30,8 +33,8 @@ pub fn verify_token(token: &str, key: &VerifyingKey) -> Result<Claims> {
     validate_base64_url(sig_b64)?;
 
     let sig_bytes = URL_SAFE_NO_PAD.decode(sig_b64)?;
-    let signature = Signature::from_slice(&sig_bytes)
-        .map_err(|e| Error::InvalidToken(e.to_string()))?;
+    let signature =
+        Signature::from_slice(&sig_bytes).map_err(|e| Error::InvalidToken(e.to_string()))?;
 
     key.verify(payload_b64.as_bytes(), &signature)
         .map_err(|_| Error::InvalidSignature)?;

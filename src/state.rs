@@ -1,7 +1,7 @@
 //! Shared application state.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::Arc;
 
 use ed25519_dalek::{SigningKey, VerifyingKey};
 
@@ -10,7 +10,7 @@ use crate::error::Result;
 use crate::jti::memory::JtiStore;
 use crate::oidc::OidcVerifier;
 use crate::policy::PolicyEngine;
-use crate::ratelimit::{RateLimiter, RateLimitConfig};
+use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use crate::telemetry::Metrics;
 use crate::token::sign::generate_keypair;
 use crate::webauthn::WebAuthnState;
@@ -51,7 +51,9 @@ impl StateBuilder {
     fn build(self) -> AppState {
         let signing_key = generate_keypair();
         let verifying_key = signing_key.verifying_key();
-        let require_oidc = std::env::var("REQUIRE_OIDC").map(|v| v == "true").unwrap_or(false);
+        let require_oidc = std::env::var("REQUIRE_OIDC")
+            .map(|v| v == "true")
+            .unwrap_or(false);
 
         if require_oidc && self.oidc.is_none() {
             tracing::warn!("REQUIRE_OIDC=true but no OIDC configured");
@@ -79,7 +81,8 @@ pub fn build_state(db_path: &str) -> Result<AppState> {
         policy: PolicyEngine::from_default_file(),
         oidc: OidcVerifier::from_env(),
         webauthn: WebAuthnState::from_env(),
-    }.build())
+    }
+    .build())
 }
 
 pub fn build_test_state() -> Result<AppState> {
@@ -88,5 +91,6 @@ pub fn build_test_state() -> Result<AppState> {
         policy: PolicyEngine::default(),
         oidc: None,
         webauthn: None,
-    }.build())
+    }
+    .build())
 }
