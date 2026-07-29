@@ -38,7 +38,6 @@ pub struct EngineChunk {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EngineCompletion {
     pub text: String,
-    pub chunks: Vec<EngineChunk>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -49,6 +48,14 @@ pub enum EngineError {
     Json(#[from] serde_json::Error),
     #[error("engine returned no model id")]
     MissingModel,
+    #[error("could not reach model server at {url}: {source}\nhint: is the LM Studio server running? does the model id match {url}?")]
+    Unreachable { url: String, source: reqwest::Error },
+    #[error("model `{requested}` is not served at {url}; available ids: {available}\nhint: pass --model with one of the ids above, or load the model in LM Studio")]
+    ModelNotFound {
+        requested: String,
+        url: String,
+        available: String,
+    },
 }
 
 pub struct Engine {
@@ -76,13 +83,49 @@ impl Engine {
         requested_model: Option<&str>,
     ) -> Result<ModelSnapshot, EngineError> {
         let url = format!("{}/v1/models", base_url.trim_end_matches('/'));
-        let response = self.client.get(url).send().await?;
-        let body = response.json::<ModelsResponse>().await?;
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .and_then(reqwest::Response::error_for_status)
+            .map_err(|source| EngineError::Unreachable {
+                url: url.clone(),
+                source,
+            })?;
+        let body = response
+            .json::<ModelsResponse>()
+            .await
+            .map_err(|source| EngineError::Unreachable {
+                url: url.clone(),
+                source,
+            })?;
+        let available = body
+            .data
+            .iter()
+            .map(|entry| entry.id.clone())
+            .collect::<Vec<_>>();
         let selected = match requested_model {
             Some(model) => body.data.into_iter().find(|entry| entry.id == model),
             None => body.data.into_iter().next(),
         };
-        let selected = selected.ok_or(EngineError::MissingModel)?;
+        let selected = match selected {
+            Some(selected) => selected,
+            None => {
+                return match requested_model {
+                    Some(model) => Err(EngineError::ModelNotFound {
+                        requested: model.to_owned(),
+                        url,
+                        available: if available.is_empty() {
+                            "<none>".to_owned()
+                        } else {
+                            available.join(", ")
+                        },
+                    }),
+                    None => Err(EngineError::MissingModel),
+                };
+            }
+        };
         let raw = serde_json::to_value(&selected)?;
         Ok(ModelSnapshot {
             id: Some(selected.id),
@@ -152,7 +195,6 @@ impl Engine {
         let mut buffered = String::new();
         let mut pending_lines = VecDeque::new();
         let mut text = String::new();
-        let mut chunks = Vec::new();
 
         while let Some(chunk) = response.chunk().await? {
             buffered.push_str(&String::from_utf8_lossy(&chunk));
@@ -170,20 +212,18 @@ impl Engine {
 
                 let data = &line[6..];
                 if data == "[DONE]" {
-                    return Ok(EngineCompletion { text, chunks });
+                    return Ok(EngineCompletion { text });
                 }
 
                 let event = serde_json::from_str::<ChatCompletionChunk>(data)?;
-                let parsed_chunks = event.into_engine_chunks();
-                for parsed in parsed_chunks {
+                for parsed in event.into_engine_chunks() {
                     text.push_str(&parsed.text_delta);
                     on_chunk(&parsed);
-                    chunks.push(parsed);
                 }
             }
         }
 
-        Ok(EngineCompletion { text, chunks })
+        Ok(EngineCompletion { text })
     }
 }
 
@@ -193,7 +233,10 @@ fn logprobs_unsupported(error: &EngineError) -> bool {
             .status()
             .map(|status| status.is_client_error())
             .unwrap_or(false),
-        EngineError::Json(_) | EngineError::MissingModel => false,
+        EngineError::Json(_)
+        | EngineError::MissingModel
+        | EngineError::Unreachable { .. }
+        | EngineError::ModelNotFound { .. } => false,
     }
 }
 

@@ -85,10 +85,6 @@ impl StreamBeliefParser {
         std::mem::take(&mut self.events)
     }
 
-    pub fn current_text(&self) -> &str {
-        &self.buffer
-    }
-
     pub fn belief(&self) -> Option<BeliefRecord> {
         self.events.iter().find_map(|event| match event {
             ParserEvent::Belief(record) => Some(record.clone()),

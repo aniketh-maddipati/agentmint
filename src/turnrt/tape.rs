@@ -3,11 +3,11 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::aerf::intervention::{
     Attempt, AttemptOutcome, CorrectionPacket, InputEnvelope, InputItem, Intervention, Run,
@@ -50,19 +50,13 @@ pub enum TapeError {
 }
 
 pub struct Tape {
-    path: PathBuf,
     file: File,
 }
 
 impl Tape {
     pub fn create(path: impl AsRef<Path>) -> Result<Self, TapeError> {
-        let path = path.as_ref().to_path_buf();
-        let file = OpenOptions::new().create(true).append(true).open(&path)?;
-        Ok(Self { path, file })
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
+        Ok(Self { file })
     }
 
     pub fn append(&mut self, event: &TapeEvent) -> Result<(), TapeError> {
@@ -207,24 +201,13 @@ impl Tape {
     }
 }
 
-pub fn new_event(seq: u64, kind: EventKind, body: Value) -> TapeEvent {
-    TapeEvent {
-        seq,
-        branch: 0,
-        parent: None,
-        ts: Utc::now(),
-        kind,
-        body,
-    }
-}
-
-pub fn event_json(kind: EventKind, seq: u64, key: &str, value: Value) -> TapeEvent {
-    new_event(seq, kind, json!({ key: value }))
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
+
+    use std::path::PathBuf;
+
+    use serde_json::json;
 
     use super::*;
 

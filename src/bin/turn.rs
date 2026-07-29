@@ -8,7 +8,14 @@ use agentmint::turnrt::tape::Tape;
 use agentmint::turnrt::{engine::EngineConfig, tape::EventKind};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
+    if let Err(error) = dispatch().await {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
+}
+
+async fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1).collect::<Vec<_>>();
     let Some(command) = args.first().cloned() else {
         print_usage();
