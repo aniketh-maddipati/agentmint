@@ -26,7 +26,7 @@ pub enum CheckpointError {
     #[error("unsafe or non-restorable checkpoint state: {reasons:?}")]
     UnsafeState {
         reasons: Vec<CheckpointRejection>,
-        snapshot: Option<CheckpointCapture>,
+        snapshot: Option<Box<CheckpointCapture>>,
     },
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -107,6 +107,12 @@ impl GitCliCheckpointService<SystemGitRunner> {
     }
 }
 
+impl Default for GitCliCheckpointService<SystemGitRunner> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<R> GitCliCheckpointService<R> {
     pub fn with_runner(runner: R) -> Self {
         Self { runner }
@@ -181,7 +187,7 @@ where
 
         Err(CheckpointError::UnsafeState {
             reasons,
-            snapshot: Some(checkpoint),
+            snapshot: Some(Box::new(checkpoint)),
         })
     }
 

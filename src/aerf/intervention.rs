@@ -574,7 +574,7 @@ fn event_kind_matches(event: &RawEvent, accepted: &[&str]) -> bool {
     let Some(tool_name) = event.tool_name.as_deref() else {
         return true;
     };
-    accepted.iter().any(|candidate| tool_name == *candidate)
+    accepted.contains(&tool_name)
 }
 
 fn event_hints(event: &RawEvent) -> Vec<String> {

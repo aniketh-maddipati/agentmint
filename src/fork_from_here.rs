@@ -345,16 +345,16 @@ impl CorrectionExecutor for LiveCodexExecutor {
             &verification_output,
             &now,
         );
-        let forked_run = build_live_forked_run(
+        let forked_run = build_live_forked_run(LiveForkedRunInputs {
             run,
-            &preview.packet,
-            corrected_attempt.clone(),
+            packet: &preview.packet,
+            corrected_attempt: corrected_attempt.clone(),
             appended_episode,
             appended_event,
-            captured_token_usage.clone(),
-            &now,
-            verification_output.exit_code,
-        );
+            captured_token_usage: captured_token_usage.clone(),
+            now: &now,
+            verification_exit_code: verification_output.exit_code,
+        });
 
         Ok(CorrectionFork {
             branch_from_episode_id: episode_id.to_owned(),
@@ -534,16 +534,28 @@ fn build_live_raw_event(
     }
 }
 
-fn build_live_forked_run(
-    run: &Run,
-    packet: &CorrectionPacket,
+struct LiveForkedRunInputs<'a> {
+    run: &'a Run,
+    packet: &'a CorrectionPacket,
     corrected_attempt: Attempt,
     appended_episode: Episode,
     appended_event: RawEvent,
     captured_token_usage: TokenUsage,
-    now: &str,
+    now: &'a str,
     verification_exit_code: i32,
-) -> Run {
+}
+
+fn build_live_forked_run(inputs: LiveForkedRunInputs) -> Run {
+    let LiveForkedRunInputs {
+        run,
+        packet,
+        corrected_attempt,
+        appended_episode,
+        appended_event,
+        captured_token_usage,
+        now,
+        verification_exit_code,
+    } = inputs;
     let observed_id = "episode-codex-corrected-attempt-observed".to_owned();
     let agent_id = "episode-codex-corrected-attempt-agent".to_owned();
     let inference_id = "episode-codex-corrected-attempt-inference".to_owned();
