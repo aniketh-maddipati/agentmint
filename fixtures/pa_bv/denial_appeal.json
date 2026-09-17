@@ -1,0 +1,34 @@
+{
+  "id": "denial_appeal",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-DENY-001",
+    "plan_id": "PLAN-GOLD",
+    "dos": "2026-10-04"
+  },
+  "intake_complete": true,
+  "required_docs": ["clinical_notes", "order"],
+  "scripted_payer_answers": [
+    "Member is active. Prior authorization is required for CPT 72148. Required documentation: clinical notes and signed order."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "pa_required",
+    "decision_outcome": "denied",
+    "denial_reason": "medical necessity not established (synthetic)",
+    "limitations": [],
+    "appeal_decision_outcome": "approved"
+  },
+  "expected_disposition": "approved_handoff",
+  "document_fixtures": {
+    "clinical_notes": "Synthetic clinical notes for denial/appeal path.",
+    "order": "Synthetic order for denial/appeal path."
+  },
+  "auto_review_approve": true,
+  "appeal_after_denial": true
+}

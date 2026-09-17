@@ -1,0 +1,287 @@
+//! CLI entrypoints for `mint lab ...`.
+//! Used by: binary main routing.
+
+use std::env;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::time::Duration;
+
+use uuid::Uuid;
+
+use crate::lab::console;
+use crate::lab::error::{LabError, LabResult};
+use crate::lab::inspect::{events_json, inspect_run, inspect_text};
+use crate::lab::scenarios::{fixtures_dir, list_scenarios_from, load_scenario_from};
+use crate::lab::workflow::LabEngine;
+
+pub fn run(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    if args.is_empty() || args.iter().any(|a| a == "-h" || a == "--help") {
+        print_help();
+        return Ok(ExitCode::SUCCESS);
+    }
+    match args[0].as_str() {
+        "start" => cmd_start(&args[1..]),
+        "console" => cmd_console(&args[1..]),
+        "inspect" => cmd_inspect(&args[1..]),
+        "events" => cmd_events(&args[1..]),
+        "advance" => cmd_advance(&args[1..]),
+        "fault" => cmd_fault(&args[1..]),
+        "check" => cmd_check(&args[1..]),
+        "run" => cmd_run(&args[1..]),
+        "list" => cmd_list(&args[1..]),
+        other => {
+            eprintln!("unknown lab command: {other}");
+            print_help();
+            Ok(ExitCode::from(2))
+        }
+    }
+}
+
+fn print_help() {
+    println!(
+        "mint lab — synthetic medical-benefit PA/BV case console (experimental)\n\n\
+         Usage:\n\
+         \tmint lab start --scenario ID [--json] [--dir PATH]\n\
+         \tmint lab console <run-id> [--dir PATH]\n\
+         \tmint lab inspect <run-id> [--json] [--dir PATH]\n\
+         \tmint lab events <run-id> [--json] [--dir PATH]\n\
+         \tmint lab advance <run-id> --by DURATION [--dir PATH]\n\
+         \tmint lab fault <run-id> <fault> [--dir PATH]\n\
+         \tmint lab check <run-id> [--dir PATH]\n\
+         \tmint lab run <scenario> [--json] [--dir PATH]\n\
+         \tmint lab list [--json] [--dir PATH]\n\n\
+         Default data dir: ./lab-data or MINT_LAB_DIR.\n\
+         Synthetic CPT 72148 outpatient MRI lumbar spine only. No real patient data.\n"
+    );
+}
+
+fn data_dir(args: &[String]) -> PathBuf {
+    if let Some(path) = flag(args, "--dir") {
+        return PathBuf::from(path);
+    }
+    env::var("MINT_LAB_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("./lab-data"))
+}
+
+fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+    args.windows(2)
+        .find(|pair| pair[0] == name)
+        .map(|pair| pair[1].as_str())
+}
+
+fn wants_json(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--json")
+}
+
+fn open_engine(args: &[String]) -> LabResult<LabEngine> {
+    let dir = data_dir(args);
+    LabEngine::open(&dir, &fixtures_dir())
+}
+
+fn cmd_start(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let scenario = flag(args, "--scenario").ok_or("missing --scenario")?;
+    let engine = open_engine(args)?;
+    let run_id = engine.start_run(scenario)?;
+    let report = engine.process_pending(run_id)?;
+    if wants_json(args) {
+        println!(
+            "{}",
+            serde_json::json!({
+                "run_id": run_id,
+                "stage": report.stage,
+                "happened": report.happened,
+            })
+        );
+    } else {
+        println!("started run_id={run_id} stage={:?}", report.stage);
+        for h in report.happened {
+            println!("  - {h}");
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_console(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let engine = open_engine(args)?;
+    console::run_console(&engine, run_id)?;
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_inspect(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let engine = open_engine(args)?;
+    let report = inspect_run(&engine, run_id)?;
+    if wants_json(args) {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        print!("{}", inspect_text(&report));
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_events(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let engine = open_engine(args)?;
+    let events = events_json(&engine, run_id)?;
+    if wants_json(args) {
+        println!("{}", serde_json::to_string_pretty(&events)?);
+    } else {
+        for event in events.as_array().cloned().unwrap_or_default() {
+            println!(
+                "#{} {} {}",
+                event.get("seq").and_then(|v| v.as_u64()).unwrap_or(0),
+                event.get("kind").and_then(|v| v.as_str()).unwrap_or("?"),
+                event
+                    .get("payload_json")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+            );
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_advance(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let by = flag(args, "--by").ok_or("missing --by")?;
+    let engine = open_engine(args)?;
+    engine.advance_clock(parse_duration(by)?)?;
+    let report = engine.process_pending(run_id)?;
+    println!("advanced; stage={:?}", report.stage);
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_fault(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let fault = args.get(1).ok_or("missing fault name")?;
+    let engine = open_engine(args)?;
+    let _ = engine.require_case(run_id)?;
+    engine.inject_fault(fault)?;
+    println!("fault {fault} injected for run {run_id}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_check(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = args
+        .first()
+        .ok_or("missing run-id")?
+        .parse::<Uuid>()
+        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let engine = open_engine(args)?;
+    let failures = engine.check_run(run_id)?;
+    if failures.is_empty() {
+        println!("check OK");
+        Ok(ExitCode::SUCCESS)
+    } else {
+        for f in failures {
+            println!("FAIL: {f}");
+        }
+        Ok(ExitCode::from(1))
+    }
+}
+
+fn cmd_run(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let scenario = args.first().ok_or("missing scenario id")?;
+    let engine = open_engine(args)?;
+    let (run_id, report) = engine.run_scripted(scenario)?;
+    let case = engine.require_case(run_id)?;
+    if wants_json(args) {
+        println!(
+            "{}",
+            serde_json::json!({
+                "run_id": run_id,
+                "stage": case.stage,
+                "disposition": case.disposition,
+                "happened": report.happened,
+            })
+        );
+    } else {
+        println!(
+            "run_id={run_id} stage={:?} disposition={:?}",
+            case.stage, case.disposition
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_list(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let dir = data_dir(args);
+    if wants_json(args) {
+        if dir.join("lab.db").exists() {
+            let engine = LabEngine::open(&dir, &fixtures_dir())?;
+            let runs = engine.store.list_runs()?;
+            println!("{}", serde_json::to_string_pretty(&runs)?);
+        } else {
+            let scenarios = list_scenarios_from(&fixtures_dir())?;
+            println!("{}", serde_json::to_string_pretty(&scenarios)?);
+        }
+    } else {
+        println!("scenarios:");
+        for id in list_scenarios_from(&fixtures_dir())? {
+            let fixture = load_scenario_from(&fixtures_dir(), &id)?;
+            println!("  {id} — {}", fixture.expected_disposition);
+        }
+        if dir.join("lab.db").exists() {
+            let engine = LabEngine::open(&dir, &fixtures_dir())?;
+            println!("runs in {}:", dir.display());
+            for (run_id, scenario, stage) in engine.store.list_runs()? {
+                println!("  {run_id} scenario={scenario} stage={stage:?}");
+            }
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn parse_duration(raw: &str) -> LabResult<Duration> {
+    let raw = raw.trim();
+    if let Some(num) = raw.strip_suffix('s') {
+        let n: u64 = num
+            .parse()
+            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
+        return Ok(Duration::from_secs(n));
+    }
+    if let Some(num) = raw.strip_suffix('m') {
+        let n: u64 = num
+            .parse()
+            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
+        return Ok(Duration::from_secs(n * 60));
+    }
+    if let Some(num) = raw.strip_suffix('h') {
+        let n: u64 = num
+            .parse()
+            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
+        return Ok(Duration::from_secs(n * 3600));
+    }
+    let n: u64 = raw
+        .parse()
+        .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
+    Ok(Duration::from_secs(n))
+}
+
+#[allow(dead_code)]
+fn ensure_dir(path: &Path) -> LabResult<()> {
+    std::fs::create_dir_all(path)?;
+    Ok(())
+}

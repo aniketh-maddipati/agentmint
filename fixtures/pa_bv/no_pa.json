@@ -1,0 +1,28 @@
+{
+  "id": "no_pa",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-NOPA-001",
+    "plan_id": "PLAN-SILVER",
+    "dos": "2026-10-02"
+  },
+  "intake_complete": true,
+  "required_docs": [],
+  "scripted_payer_answers": [
+    "Member is active. No prior authorization is required for CPT 72148 on this plan."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "pa_not_required",
+    "decision_outcome": null,
+    "limitations": []
+  },
+  "expected_disposition": "pa_not_required_handoff",
+  "document_fixtures": {},
+  "auto_review_approve": false
+}

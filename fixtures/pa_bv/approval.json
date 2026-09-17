@@ -1,0 +1,35 @@
+{
+  "id": "approval",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-APPROVAL-001",
+    "plan_id": "PLAN-GOLD",
+    "dos": "2026-10-01"
+  },
+  "intake_complete": true,
+  "required_docs": ["clinical_notes", "order"],
+  "scripted_payer_answers": [
+    "Member is active. Prior authorization is required for CPT 72148 outpatient MRI lumbar spine. Required documentation: clinical notes and signed order."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "pa_required",
+    "decision_outcome": "approved",
+    "limitations": [
+      "outpatient site of service only",
+      "authorization valid 30 days"
+    ]
+  },
+  "expected_disposition": "approved_handoff",
+  "document_fixtures": {
+    "clinical_notes": "Synthetic outpatient clinical notes supporting lumbar MRI for M54.5. No real patient identifiers.",
+    "order": "Synthetic signed order for CPT 72148 outpatient MRI lumbar spine without contrast."
+  },
+  "auto_supply_docs": false,
+  "auto_review_approve": true
+}
