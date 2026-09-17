@@ -1,221 +1,189 @@
+//! Deliberately small Stripe-refund policy and optional fail-closed HTTP PDP.
+//! Used by: propose path.
+
 use serde::Deserialize;
-use std::collections::HashMap;
+use serde_json::json;
 
-const DEFAULT_PATH: &str = "policies.json";
+use crate::config::Config;
+use crate::domain::{CanonicalAction, PolicyDecision, PolicyEffect};
+use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct PolicyLimit {
-    pub max_amount: u64,
+pub enum PolicyProvider {
+    StripeThreshold(StripeThresholdPolicy),
+    Http(HttpPolicy),
 }
 
-#[derive(Debug)]
-pub struct Violation<'a> {
-    pub action_type: &'a str,
-    pub limit: u64,
-    pub requested: u64,
+impl PolicyProvider {
+    pub fn from_config(config: &Config, http: reqwest::Client) -> Self {
+        if let Some(url) = &config.pdp_url {
+            Self::Http(HttpPolicy {
+                url: url.clone(),
+                http,
+                fallback: StripeThresholdPolicy::from_config(config),
+            })
+        } else {
+            Self::StripeThreshold(StripeThresholdPolicy::from_config(config))
+        }
+    }
+
+    pub async fn decide(&self, action: &CanonicalAction) -> Result<PolicyDecision> {
+        match self {
+            Self::StripeThreshold(policy) => policy.decide(action),
+            Self::Http(policy) => policy.decide(action).await,
+        }
+    }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct PolicyEngine {
-    limits: HashMap<Box<str>, PolicyLimit>,
+#[derive(Clone)]
+pub struct StripeThresholdPolicy {
+    pub auto_cents: i64,
+    pub approval_cents: i64,
+    pub policy_version: String,
 }
 
-impl PolicyEngine {
-    pub fn new(limits: HashMap<Box<str>, PolicyLimit>) -> Self {
-        Self { limits }
+impl StripeThresholdPolicy {
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            auto_cents: config.auto_cents,
+            approval_cents: config.approval_cents,
+            policy_version: config.policy_version.clone(),
+        }
     }
 
-    pub fn from_file(path: &str) -> Result<Self, Error> {
-        let content = std::fs::read_to_string(path)?;
-        let raw: HashMap<String, PolicyLimit> = serde_json::from_str(&content)?;
-        let limits = raw.into_iter().map(|(k, v)| (k.into_boxed_str(), v)).collect();
-        Ok(Self { limits })
-    }
-
-    pub fn from_default_file() -> Self {
-        Self::from_file(DEFAULT_PATH).unwrap_or_default()
-    }
-
-    #[inline]
-    pub fn check<'a>(&self, action: &'a str) -> Result<(), Violation<'a>> {
-        let action_type = parse_action_type(action);
-
-        let limit = match self.limits.get(action_type) {
-            Some(l) => l,
-            None => return Ok(()),
-        };
-
-        let amount = match parse_amount(action) {
-            Some(a) => a,
-            None => return Ok(()),
-        };
-
-        if amount > limit.max_amount {
-            return Err(Violation {
-                action_type,
-                limit: limit.max_amount,
-                requested: amount,
+    pub fn decide(&self, action: &CanonicalAction) -> Result<PolicyDecision> {
+        let amount = action.refund.amount_cents;
+        if amount <= 0 {
+            return Err(Error::MalformedRefund("amount must be positive"));
+        }
+        if amount <= self.auto_cents {
+            return Ok(PolicyDecision {
+                effect: PolicyEffect::Automatic,
+                policy_version: self.policy_version.clone(),
+                reason: format!("refund <= {} cents automatic", self.auto_cents),
             });
         }
-
-        Ok(())
-    }
-}
-
-#[inline]
-fn parse_action_type(action: &str) -> &str {
-    match action.find(':') {
-        Some(i) => &action[..i],
-        None => action,
-    }
-}
-
-#[inline]
-fn parse_amount(action: &str) -> Option<u64> {
-    let mut parts = action.split(':').peekable();
-    
-    while let Some(part) = parts.next() {
-        if part == "amount" {
-            return parts.next().and_then(|v| v.parse().ok());
+        if amount <= self.approval_cents {
+            return Ok(PolicyDecision {
+                effect: PolicyEffect::ApprovalRequired,
+                policy_version: self.policy_version.clone(),
+                reason: format!(
+                    "refund {}-{} cents requires approval",
+                    self.auto_cents + 1,
+                    self.approval_cents
+                ),
+            });
         }
-    }
-    
-    None
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Io(std::io::Error),
-    Parse(serde_json::Error),
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
+        Ok(PolicyDecision {
+            effect: PolicyEffect::Deny,
+            policy_version: self.policy_version.clone(),
+            reason: format!("refund > {} cents denied", self.approval_cents),
+        })
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Self {
-        Self::Parse(e)
-    }
+pub struct HttpPolicy {
+    url: String,
+    http: reqwest::Client,
+    fallback: StripeThresholdPolicy,
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Io(e) => write!(f, "io error: {}", e),
-            Self::Parse(e) => write!(f, "parse error: {}", e),
+#[derive(Deserialize)]
+struct PdpResponse {
+    decision: String,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    policy_version: Option<String>,
+}
+
+impl HttpPolicy {
+    async fn decide(&self, action: &CanonicalAction) -> Result<PolicyDecision> {
+        let body = json!({
+            "canonical_json": action.canonical_json,
+            "intent_hash": action.intent_hash,
+            "provider": action.provider,
+            "operation": action.operation,
+            "amount_cents": action.refund.amount_cents,
+            "currency": action.refund.currency,
+        });
+        let response = self
+            .http
+            .post(&self.url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|_| Error::PolicyDenied)?;
+        if !response.status().is_success() {
+            return Err(Error::PolicyDenied);
         }
+        let parsed: PdpResponse = response.json().await.map_err(|_| Error::PolicyDenied)?;
+        let effect = match parsed.decision.as_str() {
+            "automatic" => PolicyEffect::Automatic,
+            "approval_required" => PolicyEffect::ApprovalRequired,
+            "deny" => PolicyEffect::Deny,
+            _ => return Err(Error::PolicyDenied),
+        };
+        Ok(PolicyDecision {
+            effect,
+            policy_version: parsed
+                .policy_version
+                .unwrap_or_else(|| self.fallback.policy_version.clone()),
+            reason: parsed.reason.unwrap_or_else(|| "external pdp".into()),
+        })
     }
 }
-
-impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{RefundAction, CANONICALIZATION_VERSION};
+    use uuid::Uuid;
 
-    fn engine(policies: &[(&str, u64)]) -> PolicyEngine {
-        let limits = policies
-            .iter()
-            .map(|(k, v)| (Box::from(*k), PolicyLimit { max_amount: *v }))
-            .collect();
-        PolicyEngine::new(limits)
-    }
-
-    mod action_type {
-        use super::*;
-
-        #[test]
-        fn simple() {
-            assert_eq!(parse_action_type("deploy"), "deploy");
-        }
-
-        #[test]
-        fn with_segments() {
-            assert_eq!(parse_action_type("refund:order:123"), "refund");
-        }
-
-        #[test]
-        fn empty() {
-            assert_eq!(parse_action_type(""), "");
+    fn action(amount: i64) -> CanonicalAction {
+        CanonicalAction {
+            canonicalization_version: CANONICALIZATION_VERSION.to_owned(),
+            canonical_json: "{}".into(),
+            intent_hash: "sha256:x".into(),
+            provider: "stripe".into(),
+            operation: "refund.create".into(),
+            refund: RefundAction {
+                charge_or_pi: "ch_123".into(),
+                resource_type: "charge".into(),
+                amount_cents: amount,
+                currency: "usd".into(),
+                reason: "duplicate".into(),
+                mint_action_id: Uuid::nil(),
+                support_ticket_id: "ticket_982".into(),
+            },
         }
     }
 
-    mod amount {
-        use super::*;
-
-        #[test]
-        fn at_end() {
-            assert_eq!(parse_amount("refund:amount:50"), Some(50));
-        }
-
-        #[test]
-        fn in_middle() {
-            assert_eq!(parse_amount("refund:amount:50:order:1"), Some(50));
-        }
-
-        #[test]
-        fn missing() {
-            assert_eq!(parse_amount("refund:order:123"), None);
-        }
-
-        #[test]
-        fn invalid_number() {
-            assert_eq!(parse_amount("refund:amount:abc"), None);
-        }
-
-        #[test]
-        fn zero() {
-            assert_eq!(parse_amount("refund:amount:0"), Some(0));
-        }
-    }
-
-    mod check {
-        use super::*;
-
-        #[test]
-        fn under_limit_passes() {
-            let e = engine(&[("refund", 50)]);
-            assert!(e.check("refund:amount:49").is_ok());
-            assert!(e.check("refund:amount:50").is_ok());
-        }
-
-        #[test]
-        fn over_limit_fails() {
-            let e = engine(&[("refund", 50)]);
-            let err = e.check("refund:amount:51").unwrap_err();
-            assert_eq!(err.action_type, "refund");
-            assert_eq!(err.limit, 50);
-            assert_eq!(err.requested, 51);
-        }
-
-        #[test]
-        fn no_amount_passes() {
-            let e = engine(&[("refund", 50)]);
-            assert!(e.check("refund:order:123").is_ok());
-        }
-
-        #[test]
-        fn unknown_action_passes() {
-            let e = engine(&[("refund", 50)]);
-            assert!(e.check("deploy:amount:9999").is_ok());
-        }
-
-        #[test]
-        fn empty_engine_passes() {
-            let e = PolicyEngine::default();
-            assert!(e.check("refund:amount:9999").is_ok());
-        }
-
-        #[test]
-        fn multiple_policies() {
-            let e = engine(&[("refund", 50), ("compute", 200)]);
-            assert!(e.check("refund:amount:50").is_ok());
-            assert!(e.check("compute:amount:200").is_ok());
-            assert!(e.check("refund:amount:51").is_err());
-            assert!(e.check("compute:amount:201").is_err());
-        }
+    #[test]
+    fn threshold_policy_splits_automatic_approval_and_deny() {
+        let policy = StripeThresholdPolicy {
+            auto_cents: 5000,
+            approval_cents: 50_000,
+            policy_version: "stripe-refund-thresholds-v1".into(),
+        };
+        assert_eq!(
+            policy.decide(&action(4200)).expect("auto").effect,
+            PolicyEffect::Automatic
+        );
+        assert_eq!(
+            policy.decide(&action(5000)).expect("auto").effect,
+            PolicyEffect::Automatic
+        );
+        assert_eq!(
+            policy.decide(&action(5001)).expect("appr").effect,
+            PolicyEffect::ApprovalRequired
+        );
+        assert_eq!(
+            policy.decide(&action(50_000)).expect("appr").effect,
+            PolicyEffect::ApprovalRequired
+        );
+        assert_eq!(
+            policy.decide(&action(50_001)).expect("deny").effect,
+            PolicyEffect::Deny
+        );
     }
 }

@@ -1,78 +1,160 @@
-//! Unified error types with secure client messages.
+//! Versioned JSON errors with client-safe messages.
+//! Used by: API handlers and the execution engine.
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
+use serde_json::json;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("token expired")]
-    TokenExpired,
-
+    #[error("unauthenticated")]
+    Unauthenticated,
+    #[error("forbidden")]
+    Forbidden,
+    #[error("not found")]
+    NotFound,
+    #[error("cross-tenant access denied")]
+    CrossTenant,
+    #[error("invalid request")]
+    InvalidRequest(&'static str),
+    #[error("malformed refund")]
+    MalformedRefund(&'static str),
+    #[error("unsupported field")]
+    UnsupportedField(&'static str),
+    #[error("intent hash mismatch")]
+    IntentHashMismatch,
+    #[error("authorization expired")]
+    AuthorizationExpired,
+    #[error("not authorized to execute")]
+    NotExecutable,
+    #[error("denied by policy")]
+    PolicyDenied,
+    #[error("approval required")]
+    ApprovalRequired,
+    #[error("unknown outcome")]
+    UnknownOutcome,
+    #[error("reconciliation required")]
+    ReconciliationRequired,
+    #[error("live Stripe keys are refused")]
+    LiveStripeRefused,
+    #[error("provider rejected the request")]
+    ProviderRejected,
+    #[error("provider timeout")]
+    ProviderTimeout,
+    #[error("identity verification failed")]
+    IdentityFailed,
+    #[error("unknown receipt format")]
+    UnknownReceiptFormat,
+    #[error("unknown key id")]
+    UnknownKeyId,
     #[error("invalid signature")]
     InvalidSignature,
-
-    #[error("invalid token: {0}")]
-    InvalidToken(String),
-
-    #[error("replay: {0}")]
-    ReplayDetected(String),
-
-    #[error("policy: {0}")]
-    PolicyViolation(String),
-
-    #[error("unauthorized: {0}")]
-    Unauthorized(String),
-
-    #[error("rate limited: {0}")]
-    RateLimited(String),
-
-    #[error("validation: {0}")]
-    Validation(String),
-
-    #[error("unavailable: {0}")]
-    ServiceUnavailable(String),
-
-    #[error("db: {0}")]
-    Database(#[from] rusqlite::Error),
-
-    #[error("json: {0}")]
-    Serialization(#[from] serde_json::Error),
-
-    #[error("base64: {0}")]
-    Base64(#[from] base64::DecodeError),
-
-    #[error("signing: {0}")]
-    Signing(String),
+    #[error("failpoint")]
+    Failpoint(&'static str),
+    #[error("conflict")]
+    Conflict,
+    #[error("internal error")]
+    Internal,
+    #[error("misconfigured")]
+    Misconfigured(&'static str),
 }
 
 impl Error {
-    fn status(&self) -> StatusCode {
+    pub fn internal(context: &str, err: impl std::fmt::Display) -> Self {
+        tracing::error!(context, error = %err, "internal error");
+        Self::Internal
+    }
+
+    pub fn code(&self) -> &'static str {
         match self {
-            Self::TokenExpired | Self::InvalidSignature | Self::InvalidToken(_) | Self::Unauthorized(_) => {
-                StatusCode::UNAUTHORIZED
+            Self::Unauthenticated => "unauthenticated",
+            Self::Forbidden | Self::CrossTenant => "forbidden",
+            Self::NotFound => "not_found",
+            Self::InvalidRequest(_) | Self::MalformedRefund(_) | Self::UnsupportedField(_) => {
+                "invalid_request"
             }
-            Self::ReplayDetected(_) => StatusCode::CONFLICT,
-            Self::PolicyViolation(_) => StatusCode::FORBIDDEN,
-            Self::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,
-            Self::Validation(_) | Self::Base64(_) => StatusCode::BAD_REQUEST,
-            Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::IntentHashMismatch => "intent_hash_mismatch",
+            Self::AuthorizationExpired => "authorization_expired",
+            Self::NotExecutable => "not_executable",
+            Self::PolicyDenied => "policy_denied",
+            Self::ApprovalRequired => "approval_required",
+            Self::UnknownOutcome => "unknown_outcome",
+            Self::ReconciliationRequired => "reconciliation_required",
+            Self::LiveStripeRefused => "live_stripe_refused",
+            Self::ProviderRejected => "provider_rejected",
+            Self::ProviderTimeout => "provider_timeout",
+            Self::IdentityFailed => "identity_failed",
+            Self::UnknownReceiptFormat => "unknown_receipt_format",
+            Self::UnknownKeyId => "unknown_key_id",
+            Self::InvalidSignature => "invalid_signature",
+            Self::Failpoint(_) => "failpoint",
+            Self::Conflict => "conflict",
+            Self::Internal => "internal",
+            Self::Misconfigured(_) => "misconfigured",
         }
     }
 
-    /// Safe message for clients - never leak internals
-    fn client_msg(&self) -> &'static str {
+    fn client_message(&self) -> &'static str {
         match self {
-            Self::TokenExpired => "token expired",
+            Self::Unauthenticated => "authentication required",
+            Self::Forbidden | Self::CrossTenant => "access denied",
+            Self::NotFound => "action not found",
+            Self::InvalidRequest(_) => "invalid request",
+            Self::MalformedRefund(_) => "malformed or unsupported refund amount",
+            Self::UnsupportedField(_) => "unsupported field",
+            Self::IntentHashMismatch => "authorization is bound to a different action",
+            Self::AuthorizationExpired => "authorization has expired",
+            Self::NotExecutable => "action is not authorized for execution",
+            Self::PolicyDenied => "policy denied this action",
+            Self::ApprovalRequired => "human approval is required",
+            Self::UnknownOutcome => "provider outcome is unknown and requires reconciliation",
+            Self::ReconciliationRequired => "reconcile this action before retrying execution",
+            Self::LiveStripeRefused => "live Stripe credentials are refused",
+            Self::ProviderRejected => "provider rejected the request",
+            Self::ProviderTimeout => "provider timed out",
+            Self::IdentityFailed => "identity verification failed",
+            Self::UnknownReceiptFormat => "unknown receipt format",
+            Self::UnknownKeyId => "unknown signing key id",
             Self::InvalidSignature => "invalid signature",
-            Self::InvalidToken(_) => "invalid token",
-            Self::ReplayDetected(_) => "token already used",
-            Self::PolicyViolation(_) => "policy violation",
-            Self::Unauthorized(_) => "unauthorized",
-            Self::RateLimited(_) => "rate limited",
-            Self::Validation(_) => "invalid request",
-            Self::ServiceUnavailable(_) => "service unavailable",
-            Self::Database(_) | Self::Serialization(_) | Self::Signing(_) | Self::Base64(_) => "internal error",
+            Self::Failpoint(_) => "injected failure",
+            Self::Conflict => "conflicting action state",
+            Self::Internal | Self::Misconfigured(_) => "internal error",
+        }
+    }
+
+    pub fn retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::UnknownOutcome | Self::ReconciliationRequired | Self::ProviderTimeout
+        )
+    }
+
+    pub fn status(&self) -> StatusCode {
+        match self {
+            Self::Unauthenticated | Self::IdentityFailed => StatusCode::UNAUTHORIZED,
+            Self::Forbidden
+            | Self::CrossTenant
+            | Self::PolicyDenied
+            | Self::AuthorizationExpired => StatusCode::FORBIDDEN,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::InvalidRequest(_)
+            | Self::MalformedRefund(_)
+            | Self::UnsupportedField(_)
+            | Self::UnknownReceiptFormat
+            | Self::UnknownKeyId
+            | Self::InvalidSignature
+            | Self::LiveStripeRefused => StatusCode::BAD_REQUEST,
+            Self::IntentHashMismatch
+            | Self::NotExecutable
+            | Self::ApprovalRequired
+            | Self::Conflict
+            | Self::UnknownOutcome
+            | Self::ReconciliationRequired
+            | Self::ProviderRejected
+            | Self::ProviderTimeout
+            | Self::Failpoint(_) => StatusCode::CONFLICT,
+            Self::Internal | Self::Misconfigured(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -80,33 +162,28 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status();
-        tracing::warn!(error = %self, status = %status.as_u16(), "request failed");
-        (status, self.client_msg()).into_response()
+        tracing::warn!(code = self.code(), status = %status.as_u16(), "request failed");
+        let body = json!({
+            "error": {
+                "code": self.code(),
+                "message": self.client_message(),
+                "retryable": self.retryable()
+            }
+        });
+        (status, Json(body)).into_response()
     }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub fn lock_err<T>(name: &str) -> impl FnOnce(std::sync::PoisonError<T>) -> Error + '_ {
-    move |_| Error::Signing(format!("{name} lock poisoned"))
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn status_codes() {
-        assert_eq!(Error::TokenExpired.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(Error::ReplayDetected("x".into()).status(), StatusCode::CONFLICT);
-        assert_eq!(Error::PolicyViolation("x".into()).status(), StatusCode::FORBIDDEN);
-        assert_eq!(Error::RateLimited("x".into()).status(), StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(Error::ServiceUnavailable("x".into()).status(), StatusCode::SERVICE_UNAVAILABLE);
-    }
-
-    #[test]
-    fn no_internal_leak() {
-        assert_eq!(Error::Database(rusqlite::Error::QueryReturnedNoRows).client_msg(), "internal error");
-        assert_eq!(Error::Signing("secret key".into()).client_msg(), "internal error");
+    fn internal_errors_do_not_leak_details() {
+        let error = Error::internal("db", "secret connection string");
+        assert_eq!(error.client_message(), "internal error");
+        assert_eq!(error.code(), "internal");
     }
 }

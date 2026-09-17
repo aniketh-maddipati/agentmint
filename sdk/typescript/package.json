@@ -1,0 +1,11 @@
+{
+  "name": "@mint-run/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed fetch wrapper for mint.run",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  }
+}

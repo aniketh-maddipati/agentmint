@@ -1,0 +1,30 @@
+{
+  "name": "support-refund-base",
+  "canonicalization_version": "jcs-rfc8785-v1",
+  "expected_sha256": "sha256:0b47c42a94332c75a5996d7f51f0c154d89a35d3706562364e9776da22adf847",
+  "material": {
+    "version": "mint-intent-v1",
+    "tenant_id": "acme",
+    "actor": {
+      "subject": "user_123",
+      "agent_id": "support-agent-7",
+      "delegated_by": null,
+      "issuer": "https://identity.example.com"
+    },
+    "provider": "stripe",
+    "operation": "refund.create",
+    "resource": {
+      "resource_type": "charge",
+      "resource_id": "ch_123"
+    },
+    "arguments": {
+      "amount": 4200,
+      "currency": "usd",
+      "reason": "duplicate"
+    },
+    "context": {
+      "support_ticket_id": "ticket_982",
+      "reason": "duplicate"
+    }
+  }
+}
