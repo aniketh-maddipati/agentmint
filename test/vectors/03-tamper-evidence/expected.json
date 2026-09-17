@@ -1,6 +1,0 @@
-{
-  "outcome": "FAIL",
-  "reason_code": "issuer_signature",
-  "stderr_substring": "signature verification FAILED",
-  "notes": "Mutated action field after signing; signature no longer matches."
-}

@@ -1,42 +1,118 @@
-//! Axum router and server setup with security headers.
+//! HTTP server wiring, CORS, body limits, and security headers.
+//! Used by: mint serve and integration tests.
 
+use std::sync::Arc;
+use std::time::Duration;
+
+use axum::extract::DefaultBodyLimit;
 use axum::http::header::{self, HeaderValue};
+use axum::http::{HeaderName, Method};
+use axum::middleware::{self, Next};
 use axum::response::Response;
-use axum::routing::{get, post};
-use axum::{Router, middleware};
-use tower_http::cors::CorsLayer;
+use axum::Router;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 
-use crate::handlers;
-use crate::state::AppState;
-use crate::webauthn;
+use crate::config::{Config, ProviderKind};
+use crate::credentials::CredentialSource;
+use crate::error::{Error, Result};
+use crate::execution::Engine;
+use crate::identity::IdentityProvider;
+use crate::keys::KeyRing;
+use crate::packs::{FakePack, Pack, StripePack};
+use crate::policy::PolicyProvider;
+use crate::storage::Store;
 
-async fn security_headers(req: axum::extract::Request, next: middleware::Next) -> Response {
-    let mut resp = next.run(req).await;
-    let h = resp.headers_mut();
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
-    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    resp
+#[derive(Clone)]
+pub struct AppState {
+    pub engine: Engine,
+    pub keys: Arc<KeyRing>,
+    pub identity: Arc<IdentityProvider>,
+    pub config: Arc<Config>,
+}
+
+pub fn build_state(config: Config) -> Result<AppState> {
+    let config = Arc::new(config);
+    let keys = Arc::new(KeyRing::from_config(
+        &config.kid,
+        config.signing_key_file.as_deref(),
+        config.signing_key_env.as_deref(),
+    )?);
+    let store = Store::open(&config.database_path)?;
+    let http = reqwest::Client::builder()
+        .timeout(config.http_timeout)
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|err| Error::internal("http client", err))?;
+    let identity = Arc::new(IdentityProvider::from_config(&config, http.clone())?);
+    let policy = Arc::new(PolicyProvider::from_config(&config, http.clone())?);
+    let credentials = Arc::new(CredentialSource::from_config(&config, http.clone())?);
+    let pack = match config.provider {
+        ProviderKind::Fake => Pack::Fake(Arc::new(FakePack::default())),
+        ProviderKind::Stripe => Pack::Stripe(StripePack::new(http)),
+    };
+    let engine = Engine {
+        config: config.clone(),
+        store,
+        keys: keys.clone(),
+        policy,
+        credentials,
+        pack,
+    };
+    Ok(AppState {
+        engine,
+        keys,
+        identity,
+        config,
+    })
 }
 
 pub fn build_router(state: AppState) -> Router {
-    Router::new()
-        // Core endpoints
-        .route("/health", get(handlers::health::health))
-        .route("/mint", post(handlers::mint::mint))
-        .route("/delegate", post(handlers::delegate::delegate))
-        .route("/proxy", post(handlers::proxy::proxy))
-        .route("/audit", get(handlers::audit::recent))
-        .route("/metrics", get(handlers::metrics::metrics))
-        // WebAuthn endpoints
-        .route("/webauthn/register/start", post(webauthn::register_start))
-        .route("/webauthn/register/finish", post(webauthn::register_finish))
-        .route("/webauthn/auth/start", post(webauthn::auth_start))
-        .route("/webauthn/auth/finish", post(webauthn::auth_finish))
-        // Middleware
-        .layer(middleware::from_fn(security_headers))
-        .layer(CorsLayer::permissive())
-        .with_state(state)
+    let body_limit = state.config.body_limit_bytes;
+    let cors = cors_layer(&state.config.cors_origins);
+    let mut router = crate::api::router(state)
+        .layer(DefaultBodyLimit::max(body_limit))
+        .layer(RequestBodyLimitLayer::new(body_limit))
+        .layer(middleware::from_fn(security_headers));
+    if let Some(cors) = cors {
+        router = router.layer(cors);
+    }
+    router
+}
+
+fn cors_layer(origins: &[String]) -> Option<CorsLayer> {
+    if origins.is_empty() {
+        return None;
+    }
+    let parsed: Vec<HeaderValue> = origins
+        .iter()
+        .filter_map(|origin| origin.parse().ok())
+        .collect();
+    if parsed.is_empty() {
+        return None;
+    }
+    Some(
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(parsed))
+            .allow_methods([Method::GET, Method::POST])
+            .allow_headers([
+                header::AUTHORIZATION,
+                header::CONTENT_TYPE,
+                HeaderName::from_static("x-mint-failpoint"),
+            ]),
+    )
+}
+
+async fn security_headers(req: axum::extract::Request, next: Next) -> Response {
+    let mut resp = next.run(req).await;
+    let headers = resp.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    resp
 }
 
 pub async fn run(state: AppState, addr: &str) -> std::io::Result<()> {
@@ -44,79 +120,11 @@ pub async fn run(state: AppState, addr: &str) -> std::io::Result<()> {
     run_with_listener(state, listener).await
 }
 
-pub async fn run_with_listener(state: AppState, listener: tokio::net::TcpListener) -> std::io::Result<()> {
+pub async fn run_with_listener(
+    state: AppState,
+    listener: tokio::net::TcpListener,
+) -> std::io::Result<()> {
     let router = build_router(state);
-    tracing::info!("listening on {:?}", listener.local_addr());
+    tracing::info!(addr = ?listener.local_addr(), "mint.run listening");
     axum::serve(listener, router).await
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::state::build_test_state;
-
-    type TestResult = Result<(), Box<dyn std::error::Error>>;
-
-    async fn spawn_server() -> Result<(String, reqwest::Client), Box<dyn std::error::Error>> {
-        let state = build_test_state()?;
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let addr = listener.local_addr()?;
-        tokio::spawn(super::run_with_listener(state, listener));
-        let client = reqwest::Client::builder().no_proxy().build()?;
-        Ok((format!("http://{addr}"), client))
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn health_route_returns_ok_with_security_headers() -> TestResult {
-        let (base, client) = spawn_server().await?;
-
-        let response = client.get(format!("{base}/health")).send().await?;
-
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-        assert_eq!(
-            response.headers().get("x-content-type-options").and_then(|value| value.to_str().ok()),
-            Some("nosniff")
-        );
-        assert_eq!(
-            response.headers().get("x-frame-options").and_then(|value| value.to_str().ok()),
-            Some("DENY")
-        );
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn metrics_route_returns_json() -> TestResult {
-        let (base, client) = spawn_server().await?;
-
-        let response = client.get(format!("{base}/metrics")).send().await?;
-
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-        let body: serde_json::Value = response.json().await?;
-        assert!(body.is_object());
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn mint_rejects_malformed_body_via_extractor() -> TestResult {
-        let (base, client) = spawn_server().await?;
-
-        let response = client
-            .post(format!("{base}/mint"))
-            .header("content-type", "application/json")
-            .body("{ not json")
-            .send()
-            .await?;
-
-        assert!(response.status().is_client_error());
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn unknown_route_returns_not_found() -> TestResult {
-        let (base, client) = spawn_server().await?;
-
-        let response = client.get(format!("{base}/does-not-exist")).send().await?;
-
-        assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
-        Ok(())
-    }
 }

@@ -1,224 +1,143 @@
-# AgentMint
+# mint.run
 
-Cryptographic proof that a human approved an AI agent action.
+Make consequential agent actions safe to retry.
 
-Signed receipts. Single-use. Time-limited. Works for one agent or a delegation chain.
+Agents retry, race, and lose provider responses. Mint binds authorization to an exact action, chooses one execution winner, reconciles uncertain outcomes, and signs the result. The current proof of concept supports Stripe partial refunds.
 
-**[Live Site](https://agent-mint.dev)** | **[GitHub](https://github.com/aniketh-maddipati/agentmint)**
-
-## What it does
-
-AgentMint gives you a signed receipt for a specific action.
-
-That means:
-
-- a human approved it
-- the action string is fixed
-- the receipt expires
-- the receipt can only be used once
-- delegated agents stay inside scope
-
-Good fit for:
-
-- tool use with approval
-- multi-agent delegation
-- checkpoint / re-approval flows
-- audit trails that are more than plain logs
-
-## Quick start
+## Two-minute demo
 
 ```bash
-git clone https://github.com/aniketh-maddipati/agentmint
+git clone https://github.com/aniketh-maddipati/agentmint.git
 cd agentmint
-cargo run
+cargo build
+cargo run -- init
+./scripts/demo-local.sh
 ```
-
-Server:
 
 ```text
-http://0.0.0.0:3000
+proposed -> authorized
+executing -> succeeded (re_fake_…)
+retry -> same provider result
+receipt -> valid
+PASS — one action, one provider effect, retry returned same result, receipt valid
 ```
 
-Health check:
+No Stripe credentials required for the demo. Experimental — not production-ready.
+
+## What Mint adds
+
+| Problem                                  | Mint behavior                   |
+| ---------------------------------------- | ------------------------------- |
+| Concurrent callers                       | One execution winner            |
+| Retry after timeout                      | Stable provider idempotency     |
+| Arguments change after approval          | Hash mismatch; no provider call |
+| Provider succeeded but response was lost | Unknown, then reconcile         |
+| Audit question                           | Signed receipt                  |
+
+Stripe supplies strong primitives; Mint assembles them into an agent-facing execution boundary.
+
+## How it works
+
+```text
+agent -> exact intent -> identity/policy -> atomic claim -> Stripe -> signed receipt
+                                                |
+                                             reconcile
+```
+
+- Authorization is bound to a canonical intent hash (RFC 8785 + SHA-256).
+- Only one process wins `Authorized → Executing`.
+- A durable attempt is recorded before provider I/O.
+- Ambiguous outcomes become `Unknown` and require reconcile.
+- The result is an Ed25519-signed receipt.
+
+## Stripe test-mode proof
+
+Validated against Stripe test mode on September 17, 2026: concurrent callers converged on one $42.17 partial refund from a $100 test payment; simulated lost-response reconciliation recovered the same refund; the receipt verified.
+
+Optional (uses your Stripe test secret; creates Dashboard-visible test charges/refunds):
 
 ```bash
-curl http://localhost:3000/health
+read -s MINT_STRIPE_TEST_SECRET_KEY
+export MINT_STRIPE_TEST_SECRET_KEY
+export MINT_PROVIDER=stripe
+export MINT_RUN_STRIPE_E2E=1
+
+cargo run -- doctor
+./scripts/test-stripe-sandbox.sh
 ```
 
-## Simple flow
+Paste an `sk_test_...` key after `read` begins waiting.
 
-### 1. Mint a receipt
+> Never use a live Stripe key. This MVP intentionally refuses `sk_live_` and `rk_live_` credentials.
+
+## API example
+
+```typescript
+import { Mint, encodeDevToken } from "./sdk/typescript/src/index.ts";
+
+const mint = new Mint({
+  baseUrl: "http://127.0.0.1:8787",
+  token: encodeDevToken({
+    tenantId: "acme",
+    subject: "user_123",
+    agentId: "support-agent-7",
+    issuer: "https://identity.example.com",
+  }),
+});
+
+const action = await mint.actions.propose({
+  tenantId: "acme",
+  actor: {
+    subject: "user_123",
+    agentId: "support-agent-7",
+    issuer: "https://identity.example.com",
+  },
+  provider: "fake",
+  operation: "refund.create",
+  resource: { type: "charge", id: "ch_123" },
+  arguments: { amount: 4200, currency: "usd", reason: "duplicate" },
+  context: { supportTicketId: "ticket_982" },
+});
+
+const result = await mint.actions.execute(action.id);
+```
+
+## Guarantees and limits
+
+**Guarantees**
+
+- authorization bound to canonical intent
+- one internal execution winner
+- durable attempt before provider I/O
+- provider idempotency and reconciliation
+- tenant isolation
+- signed receipts
+- live Stripe credentials refused
+
+**Limits**
+
+- experimental and not production-ready
+- not universal exactly-once delivery
+- receipt proves Mint’s recorded result, not Stripe’s internal correctness
+- host or signing-key compromise is out of scope
+- authenticated approval does not prove a human identity
+- actions bypassing Mint are not protected
+- OIDC and external policy integrations remain unverified
+
+## Development
 
 ```bash
-curl -X POST http://localhost:3000/mint \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sub": "aniketh@company.com",
-    "action": "deploy:staging",
-    "ttl_seconds": 60
-  }'
+./scripts/launch-check.sh
 ```
 
-Example response:
+## Status
 
-```json
-{
-  "token": "<signed receipt>",
-  "jti": "87971956-..."
-}
-```
+Experimental proof of concept.
 
-### 2. Use it
+- Fake-provider and offline safety suite: verified
+- Stripe test-mode refund and reconciliation: verified
+- Live Stripe operation: intentionally disabled
+- OIDC and external policy integrations: implemented but unverified
+- Production readiness: no
 
-```bash
-curl -X POST http://localhost:3000/proxy \
-  -H "Authorization: Bearer <signed receipt>"
-```
-
-### 3. Reuse fails
-
-Same receipt again should be rejected because it is single-use.
-
-## Delegation flow
-
-Mint a plan receipt with scope:
-
-```bash
-curl -X POST http://localhost:3000/mint \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sub": "aniketh@company.com",
-    "action": "release:api",
-    "ttl_seconds": 300,
-    "scope": ["build:*", "test:*", "deploy:staging"],
-    "delegates_to": ["build-agent", "test-agent", "deploy-agent"],
-    "requires_checkpoint": ["deploy:production"],
-    "max_delegation_depth": 2
-  }'
-```
-
-Delegate from that receipt:
-
-```bash
-curl -X POST http://localhost:3000/delegate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "parent_token": "<plan receipt>",
-    "agent_id": "build-agent",
-    "action": "build:docker"
-  }'
-```
-
-Example success:
-
-```json
-{
-  "status": "ok",
-  "token": "<delegated receipt>",
-  "jti": "9fbd8b71-...",
-  "chain": ["87971956-...", "9fbd8b71-..."]
-}
-```
-
-Checkpoint example:
-
-```bash
-curl -X POST http://localhost:3000/delegate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "parent_token": "<plan receipt>",
-    "agent_id": "deploy-agent",
-    "action": "deploy:production"
-  }'
-```
-
-```json
-{
-  "status": "checkpoint_required",
-  "reason": "action '\''deploy:production'\'' requires explicit human approval"
-}
-```
-
-## Endpoints
-
-| Endpoint | Method | Use |
-|---|---|---|
-| `/mint` | `POST` | Mint a signed receipt |
-| `/delegate` | `POST` | Create a scoped delegated receipt |
-| `/proxy` | `POST` | Verify and consume a receipt |
-| `/audit` | `GET` | Read audit history |
-| `/metrics` | `GET` | Read counters |
-| `/health` | `GET` | Health check |
-
-## Request shapes
-
-Basic mint:
-
-```json
-{
-  "sub": "alice@company.com",
-  "action": "deploy:staging",
-  "ttl_seconds": 60
-}
-```
-
-Plan mint:
-
-```json
-{
-  "sub": "alice@company.com",
-  "action": "release:api",
-  "ttl_seconds": 300,
-  "scope": ["build:*", "test:*"],
-  "delegates_to": ["build-agent", "test-agent"],
-  "requires_checkpoint": ["deploy:production"],
-  "max_delegation_depth": 2
-}
-```
-
-Delegate:
-
-```json
-{
-  "parent_token": "<signed plan receipt>",
-  "agent_id": "build-agent",
-  "action": "build:docker"
-}
-```
-
-## Local demos
-
-Run the Python demo:
-
-```bash
-pip3 install requests
-python3 demo.py
-```
-
-Run the intervention viewer:
-
-```bash
-cargo run --bin agentmint-intervene
-```
-
-Open the printed local URL.
-
-## Notes
-
-- receipts are Ed25519 signed
-- receipts are single-use through JTI tracking
-- SQLite backs the audit log
-- actions outside scope are denied
-- checkpoint actions require fresh approval
-
-## Status values
-
-Delegate responses return one of:
-
-- `ok`
-- `denied`
-- `checkpoint_required`
-
-## License
-
-MIT
+[MIT](LICENSE)

@@ -1,0 +1,30 @@
+{
+  "name": "support-refund-key-reorder",
+  "canonicalization_version": "jcs-rfc8785-v1",
+  "expected_sha256": "sha256:0b47c42a94332c75a5996d7f51f0c154d89a35d3706562364e9776da22adf847",
+  "material": {
+    "context": {
+      "reason": "duplicate",
+      "support_ticket_id": "ticket_982"
+    },
+    "arguments": {
+      "reason": "duplicate",
+      "currency": "usd",
+      "amount": 4200
+    },
+    "resource": {
+      "resource_id": "ch_123",
+      "resource_type": "charge"
+    },
+    "operation": "refund.create",
+    "provider": "stripe",
+    "actor": {
+      "issuer": "https://identity.example.com",
+      "delegated_by": null,
+      "agent_id": "support-agent-7",
+      "subject": "user_123"
+    },
+    "tenant_id": "acme",
+    "version": "mint-intent-v1"
+  }
+}

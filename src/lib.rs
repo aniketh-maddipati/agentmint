@@ -1,7 +1,21 @@
-//! Library entrypoints for reusable verification code.
-//! Used by: integration tests and external callers.
+//! mint.run: transaction runtime for consequential AI-agent side effects.
+//! Used by: the `mint` binary, TypeScript client tests, and integration tests.
 
-pub mod aerf;
-pub mod checkpoint;
-pub mod fork_from_here;
-pub mod intervene;
+pub mod api;
+pub mod bench;
+pub mod canonical;
+pub mod config;
+pub mod credentials;
+pub mod doctor;
+pub mod domain;
+pub mod error;
+pub mod events;
+pub mod execution;
+pub mod failpoints;
+pub mod identity;
+pub mod keys;
+pub mod packs;
+pub mod policy;
+pub mod receipt;
+pub mod server;
+pub mod storage;
