@@ -1,7 +1,7 @@
 //! Startup configuration parsed once from `MINT_` environment variables.
 //! Unknown enum values fail closed. Used by: main, doctor, server, tests.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::credentials::assert_test_secret;
@@ -141,9 +141,13 @@ impl Config {
             mode,
             bind_addr: env_or("MINT_BIND_ADDR", "127.0.0.1:8787"),
             database_path: PathBuf::from(env_or("MINT_DATABASE_PATH", "mint.db")),
-            signing_key_file: std::env::var("MINT_SIGNING_KEY_FILE")
-                .ok()
-                .map(PathBuf::from),
+            signing_key_file: match std::env::var("MINT_SIGNING_KEY_FILE") {
+                Ok(path) => Some(PathBuf::from(path)),
+                Err(_) if Path::new("mint.ed25519.pem").is_file() => {
+                    Some(PathBuf::from("mint.ed25519.pem"))
+                }
+                Err(_) => None,
+            },
             signing_key_env: std::env::var("MINT_SIGNING_KEY").ok(),
             kid: env_or("MINT_KID", "mint-local-1"),
             provider,
@@ -372,4 +376,22 @@ mod tests {
             assert!(Config::from_env().is_err());
         });
     }
+
+    #[test]
+    fn defaults_to_local_pem_when_present() {
+        with_clean_env(|| {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let previous = std::env::current_dir().expect("cwd");
+            std::env::set_current_dir(dir.path()).expect("cd");
+            std::fs::write("mint.ed25519.pem", "placeholder").expect("write");
+            let config = Config::from_env().expect("config");
+            assert_eq!(
+                config.signing_key_file.as_deref(),
+                Some(std::path::Path::new("mint.ed25519.pem"))
+            );
+            std::env::set_current_dir(previous).expect("restore");
+        });
+    }
+
+
 }

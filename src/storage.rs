@@ -141,6 +141,18 @@ impl Store {
         self.with(move |conn| tamper_arguments(conn, &tenant_id, action_id, &arguments))
             .await
     }
+
+    pub async fn tamper_resource(
+        &self,
+        tenant_id: &str,
+        action_id: Uuid,
+        resource_id: &str,
+    ) -> Result<()> {
+        let tenant_id = tenant_id.to_owned();
+        let resource_id = resource_id.to_owned();
+        self.with(move |conn| tamper_resource(conn, &tenant_id, action_id, &resource_id))
+            .await
+    }
 }
 
 fn configure(conn: &Connection) -> Result<()> {
@@ -496,13 +508,33 @@ fn tamper_arguments(
 ) -> Result<()> {
     let mut record = get_action(conn, tenant_id, action_id)?.ok_or(Error::NotFound)?;
     record.intent.arguments = arguments.clone();
+    rewrite_intent(conn, tenant_id, action_id, &record)
+}
+
+fn tamper_resource(
+    conn: &Connection,
+    tenant_id: &str,
+    action_id: Uuid,
+    resource_id: &str,
+) -> Result<()> {
+    let mut record = get_action(conn, tenant_id, action_id)?.ok_or(Error::NotFound)?;
+    record.intent.resource.resource_id = resource_id.to_owned();
+    rewrite_intent(conn, tenant_id, action_id, &record)
+}
+
+fn rewrite_intent(
+    conn: &Connection,
+    tenant_id: &str,
+    action_id: Uuid,
+    record: &ActionRecord,
+) -> Result<()> {
     let intent_json =
         serde_json::to_string(&record.intent).map_err(|err| Error::internal("tamper json", err))?;
     conn.execute(
         "UPDATE actions SET intent_json = ?1, arguments_json = ?2 WHERE id = ?3 AND tenant_id = ?4",
         params![
             intent_json,
-            arguments.to_string(),
+            record.intent.arguments.to_string(),
             action_id.to_string(),
             tenant_id
         ],

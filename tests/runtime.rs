@@ -230,6 +230,59 @@ async fn modified_arguments_after_approval_do_not_call_provider() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn execute_body_amount_mismatch_is_rejected_before_provider() {
+    let env = TestEnv::spawn().await;
+    let proposed = json_body(env.propose("acme", refund_body(4200)).await).await;
+    let id = proposed["id"].as_str().expect("id");
+    let executed = env
+        .execute(
+            "acme",
+            id,
+            Some(json!({
+                "arguments": {
+                    "amount": 9999,
+                    "currency": "usd",
+                    "reason": "duplicate"
+                }
+            })),
+            None,
+        )
+        .await;
+    assert_eq!(executed.status(), reqwest::StatusCode::CONFLICT);
+    let err = json_body(executed).await;
+    assert_eq!(err["error"]["code"], "intent_hash_mismatch");
+    assert_eq!(
+        env.state.engine.pack.fake().expect("fake").effect_count(),
+        0
+    );
+    assert_eq!(env.state.engine.pack.fake().expect("fake").call_count(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn modified_resource_after_approval_do_not_call_provider() {
+    let env = TestEnv::spawn().await;
+    let proposed = json_body(env.propose("acme", refund_body(4200)).await).await;
+    assert_eq!(proposed["status"], "Authorized");
+    let id = proposed["id"].as_str().expect("id");
+    let action_id = Uuid::parse_str(id).expect("uuid");
+    env.state
+        .engine
+        .store
+        .tamper_resource("acme", action_id, "ch_other")
+        .await
+        .expect("tamper resource");
+    let executed = env.execute("acme", id, Some(json!({})), None).await;
+    assert_eq!(executed.status(), reqwest::StatusCode::CONFLICT);
+    let err = json_body(executed).await;
+    assert_eq!(err["error"]["code"], "intent_hash_mismatch");
+    assert_eq!(
+        env.state.engine.pack.fake().expect("fake").effect_count(),
+        0
+    );
+    assert_eq!(env.state.engine.pack.fake().expect("fake").call_count(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn concurrent_execute_results_in_one_provider_call() {
     let env = TestEnv::spawn().await;
     let proposed = json_body(env.propose("acme", refund_body(4200)).await).await;

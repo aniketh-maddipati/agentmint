@@ -217,3 +217,25 @@ async fn check_stripe_connectivity(config: &Config) -> CheckResult {
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn missing_signing_key_fails_readiness() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config = Config::for_test(
+            dir.path().join("mint.db"),
+            PathBuf::from("/nonexistent/mint.ed25519.pem"),
+        );
+        let results = run_doctor(&config).await;
+        let signing = results
+            .iter()
+            .find(|result| result.name == "signing.key")
+            .expect("signing.key check");
+        assert!(!signing.ok, "missing key must fail readiness");
+    }
+}

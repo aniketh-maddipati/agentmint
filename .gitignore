@@ -3,8 +3,13 @@ target/
 *.db-wal
 *.db-shm
 .env
+.env.*
 .DS_Store
 claims.rs.bak
+*.pem
 mint.ed25519.pem
 mint.ed25519.pub
 sdk/typescript/node_modules/
+**/node_modules/
+dist/
+*.log

@@ -25,8 +25,8 @@ PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); p
 export MINT_BIND_ADDR="127.0.0.1:${PORT}"
 export MINT_KID=mint-local-1
 
-./target/debug/mint init --key-file "$MINT_SIGNING_KEY_FILE"
-./target/debug/mint doctor
+./target/debug/mint init --key-file "$MINT_SIGNING_KEY_FILE" >/dev/null
+./target/debug/mint doctor >/dev/null
 ./target/debug/mint serve >"$TMP/server.log" 2>&1 &
 PID=$!
 
@@ -69,52 +69,33 @@ PROPOSE="$(curl -sf -X POST "http://127.0.0.1:${PORT}/v1/actions" \
     "context": { "supportTicketId": "ticket_982", "reason": "duplicate" }
   }')"
 
-echo "$PROPOSE" | python3 -m json.tool
 ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["id"])' "$PROPOSE")"
 STATUS="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$PROPOSE")"
 test "$STATUS" = "Authorized"
+echo "proposed -> authorized"
 
 EXECUTE="$(curl -sf -X POST "http://127.0.0.1:${PORT}/v1/actions/${ID}/execute" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{}')"
-echo "$EXECUTE" | python3 -m json.tool
-test "$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$EXECUTE")" = "Succeeded"
+EXEC_STATUS="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$EXECUTE")"
+PROVIDER_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["providerResourceId"])' "$EXECUTE")"
+test "$EXEC_STATUS" = "Succeeded"
+echo "executing -> succeeded ($PROVIDER_ID)"
+
+RETRY="$(curl -sf -X POST "http://127.0.0.1:${PORT}/v1/actions/${ID}/execute" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{}')"
+RETRY_STATUS="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$RETRY")"
+RETRY_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["providerResourceId"])' "$RETRY")"
+test "$RETRY_STATUS" = "Succeeded"
+test "$RETRY_ID" = "$PROVIDER_ID"
+echo "retry -> same provider result"
 
 curl -sf "http://127.0.0.1:${PORT}/v1/actions/${ID}/receipt" \
   -H "Authorization: Bearer ${TOKEN}" >"$TMP/receipt.json"
-python3 -m json.tool <"$TMP/receipt.json" >/dev/null
-./target/debug/mint verify --receipt "$TMP/receipt.json" --key-file "$MINT_SIGNING_KEY_FILE"
+./target/debug/mint verify --receipt "$TMP/receipt.json" --key-file "$MINT_SIGNING_KEY_FILE" >/dev/null
+echo "receipt -> valid"
 
-node --experimental-strip-types - <<PY
-import { Mint, encodeDevToken } from "${ROOT}/sdk/typescript/src/index.ts";
-const mint = new Mint({
-  baseUrl: "http://127.0.0.1:${PORT}",
-  token: encodeDevToken({
-    tenantId: "acme",
-    subject: "user_123",
-    agentId: "support-agent-7",
-    issuer: "https://identity.example.com",
-  }),
-});
-const action = await mint.actions.propose({
-  tenantId: "acme",
-  actor: {
-    subject: "user_123",
-    agentId: "support-agent-7",
-    issuer: "https://identity.example.com",
-  },
-  provider: "fake",
-  operation: "refund.create",
-  resource: { type: "charge", id: "ch_123" },
-  arguments: { amount: 4200, currency: "usd", reason: "duplicate" },
-  context: { supportTicketId: "ticket_982" },
-});
-const result = await mint.actions.execute(action.id);
-if (result.status !== "Succeeded") {
-  throw new Error("typescript client execute failed: " + result.status);
-}
-console.log("typescript client executed", result.id, result.status);
-PY
-
-echo "local fake-provider demo succeeded"
+echo "PASS — one action, one provider effect, retry returned same result, receipt valid"
