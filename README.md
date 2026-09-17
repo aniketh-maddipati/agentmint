@@ -74,6 +74,10 @@ Uses Stripe **test mode only**. Sandbox transactions move **no real money**.
 > Never paste a live Stripe key into mint.run. This MVP intentionally refuses live credentials.
 
 ```bash
+git fetch origin cursor/mint-run-poc-0c0c
+git checkout cursor/mint-run-poc-0c0c
+git pull --ff-only origin cursor/mint-run-poc-0c0c
+
 export MINT_STRIPE_TEST_SECRET_KEY='sk_test_...'
 export MINT_RUN_STRIPE_E2E=1
 export MINT_PROVIDER=stripe
@@ -83,13 +87,15 @@ cargo run -- doctor
 ./scripts/test-stripe-sandbox.sh
 ```
 
+The script prints `Tree: <sha>` first. Need `a2da7a8` or newer — older trees assert `Refund.livemode` (always `Null`) and fail with `left: Null right: false`. Fixed trees assert `Charge.livemode` via `retrieve_charge` and print `asserting Charge.livemode`.
+
 Successful output ends with `STRIPE_SANDBOX: PASS` and `PASS — Stripe sandbox test finished`.
 
 Then verify in the Stripe Dashboard (test mode):
 
 - one refund exists for the charge
 - refund amount matches (sandbox uses a distinctive amount)
-- test mode is active (`livemode=false`)
+- test mode is active (`Charge.livemode=false`; Refund has no `livemode`)
 - expected charge was refunded
 - Mint action ID is present in refund metadata
 - retries did not create additional refunds

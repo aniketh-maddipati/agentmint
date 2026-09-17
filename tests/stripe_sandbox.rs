@@ -169,13 +169,19 @@ async fn stripe_sandbox_partial_refund_round_trip() {
         refund_charge_id, charge_id,
         "refund.charge must match the charge Mint refunded"
     );
+    eprintln!(
+        "STRIPE_SANDBOX: asserting Charge.livemode via retrieve_charge (not Refund.livemode)"
+    );
     let stripe_charge = retrieve_charge(&http, &secret, refund_charge_id)
         .await
         .expect("retrieve charge for livemode check");
-    assert_eq!(
-        stripe_charge.get("livemode").and_then(|v| v.as_bool()),
-        Some(false),
-        "Charge.livemode must be false (test mode); Refund has no livemode field"
+    let charge_livemode = stripe_charge
+        .get("livemode")
+        .and_then(|v| v.as_bool())
+        .expect("Charge.livemode must be present on Stripe Charge objects");
+    assert!(
+        !charge_livemode,
+        "Charge.livemode must be false (test mode); got true — refuse live mode"
     );
     assert_eq!(stripe_refund["amount"], distinctive_amount);
     assert_eq!(stripe_refund["currency"], "usd");
