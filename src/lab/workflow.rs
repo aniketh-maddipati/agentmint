@@ -454,39 +454,35 @@ impl LabEngine {
                 }
                 happened.push(format!("recorded {} observations", obs_ids.len()));
 
-                if needs_human_review
-                    || obs_ids.iter().any(|_| {
-                        snap.conversation
-                            .iter()
-                            .any(|m| m.text.to_lowercase().contains("ignore previous"))
-                    })
-                {
-                    if self
-                        .store
-                        .load_snapshot(case.id)?
-                        .observations
-                        .iter()
-                        .any(|o| o.kind == ObservationKind::InjectionAttempt && !o.stale)
-                    {
-                        let t = Task {
-                            id: Uuid::new_v4(),
-                            case_id: case.id,
-                            purpose: TaskPurpose::HumanReview,
-                            status: TaskStatus::Open,
-                            owner: Role::Reviewer,
-                            context_json: json!({"reason":"injection_attempt"}).to_string(),
-                            created_at: self.now(),
-                            completed_at: None,
-                        };
-                        self.store.insert_task(&t)?;
-                        self.set_stage(case, CaseStage::ManualDisposition, "injection review")?;
-                        case.disposition = Some("injection_review".into());
-                        case.updated_at = self.now();
-                        self.store.update_case(case)?;
-                        happened.push("injection attempt escalated to human review".into());
-                        self.complete_task(&task)?;
-                        return Ok(());
-                    }
+                let injection_seen = self
+                    .store
+                    .load_snapshot(case.id)?
+                    .observations
+                    .iter()
+                    .any(|o| o.kind == ObservationKind::InjectionAttempt && !o.stale);
+                let injection_in_chat = snap
+                    .conversation
+                    .iter()
+                    .any(|m| m.text.to_lowercase().contains("ignore previous"));
+                if (needs_human_review || injection_in_chat) && injection_seen {
+                    let t = Task {
+                        id: Uuid::new_v4(),
+                        case_id: case.id,
+                        purpose: TaskPurpose::HumanReview,
+                        status: TaskStatus::Open,
+                        owner: Role::Reviewer,
+                        context_json: json!({"reason":"injection_attempt"}).to_string(),
+                        created_at: self.now(),
+                        completed_at: None,
+                    };
+                    self.store.insert_task(&t)?;
+                    self.set_stage(case, CaseStage::ManualDisposition, "injection review")?;
+                    case.disposition = Some("injection_review".into());
+                    case.updated_at = self.now();
+                    self.store.update_case(case)?;
+                    happened.push("injection attempt escalated to human review".into());
+                    self.complete_task(&task)?;
+                    return Ok(());
                 }
 
                 let fresh = self.store.load_snapshot(case.id)?;
@@ -1082,7 +1078,7 @@ impl LabEngine {
             .rev()
             .find(|s| latest_packet_id == Some(s.packet_id))
             .cloned()
-            .or_else(|| snap.submissions.iter().rev().next().cloned())
+            .or_else(|| snap.submissions.iter().next_back().cloned())
             .ok_or_else(|| LabError::Invalid("no submission for follow-up".into()))?;
 
         if sub.transport_state == SubmissionTransportState::Unknown {
@@ -1103,8 +1099,7 @@ impl LabEngine {
         let sub = snap
             .submissions
             .iter()
-            .rev()
-            .next()
+            .next_back()
             .cloned()
             .ok_or_else(|| LabError::Invalid("no submission after reconcile".into()))?;
         let receipt_id = match &sub.payer_receipt_id {

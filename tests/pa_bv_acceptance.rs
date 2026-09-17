@@ -214,7 +214,7 @@ fn f_packet_change_invalidates_review() {
     if let Some(new_packet) = snap.packets.last() {
         if new_packet.id != packet.id {
             let err = engine.review_packet(run_id, packet.id, ReviewDecision::Approve, "r1");
-            if let Ok(_) = err {
+            if err.is_ok() {
                 let snap2 = engine.snapshot(run_id).unwrap();
                 let approved_old = snap2.reviews.iter().any(|r| {
                     r.valid
