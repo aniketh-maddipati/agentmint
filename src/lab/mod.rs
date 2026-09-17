@@ -7,6 +7,7 @@ pub mod clock;
 pub mod console;
 pub mod domain;
 pub mod error;
+pub mod eval;
 pub mod inspect;
 pub mod payer;
 pub mod scenarios;

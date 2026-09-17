@@ -29,6 +29,7 @@ pub fn run(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
         "check" => cmd_check(&args[1..]),
         "run" => cmd_run(&args[1..]),
         "list" => cmd_list(&args[1..]),
+        "eval-model" => cmd_eval_model(&args[1..]),
         other => {
             eprintln!("unknown lab command: {other}");
             print_help();
@@ -49,9 +50,14 @@ fn print_help() {
          \tmint lab fault <run-id> <fault> [--dir PATH]\n\
          \tmint lab check <run-id> [--dir PATH]\n\
          \tmint lab run <scenario> [--json] [--dir PATH]\n\
-         \tmint lab list [--json] [--dir PATH]\n\n\
+         \tmint lab list [--json] [--dir PATH]\n\
+         \tmint lab eval-model [--scenario ID] [--live] [--json]\n\n\
+         Agents: MINT_LAB_AGENT=scripted|openai (default scripted).\n\
+         OpenAI: OPENAI_API_KEY + optional MINT_LAB_MODEL (default gpt-4.1-mini).\n\
+         Live eval: MINT_LAB_MODEL_EVAL=1 with --live (never required for CI).\n\
          Default data dir: ./lab-data or MINT_LAB_DIR.\n\
-         Synthetic CPT 72148 outpatient MRI lumbar spine only. No real patient data.\n"
+         Synthetic CPT 72148 outpatient MRI lumbar spine only. No real patient data.\n\
+         No reviewer/appeal/doc/payer LLM agents — those stay human or fixture-driven.\n"
     );
 }
 
@@ -252,6 +258,39 @@ fn cmd_list(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    use crate::lab::eval::{run_live_openai_eval, run_scripted_eval};
+
+    let live = args.iter().any(|a| a == "--live");
+    let scenario = flag(args, "--scenario").unwrap_or("approval");
+    let fixtures = fixtures_dir();
+    let report = if live {
+        run_live_openai_eval(&fixtures, scenario)?
+    } else {
+        run_scripted_eval(&fixtures, scenario)?
+    };
+    if wants_json(args) {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!(
+            "scenario={} model={} live={} overall={}",
+            report.scenario_id, report.model_id, report.live, report.overall_passed
+        );
+        for score in &report.scores {
+            let mark = if score.passed { "PASS" } else { "FAIL" };
+            println!("  {mark} {:?} — {}", score.dimension, score.detail);
+        }
+        for note in &report.notes {
+            println!("  note: {note}");
+        }
+    }
+    if report.overall_passed {
+        Ok(ExitCode::SUCCESS)
+    } else {
+        Ok(ExitCode::from(1))
+    }
 }
 
 fn parse_duration(raw: &str) -> LabResult<Duration> {

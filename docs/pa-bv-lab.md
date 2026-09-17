@@ -68,11 +68,29 @@ cargo test --test pa_bv_acceptance
 cargo test
 ```
 
+## Agents
+
+| Agent | When | Model |
+| ----- | ---- | ----- |
+| BV task (`ScriptedAgentRunner`) | Default (`MINT_LAB_AGENT=scripted` or unset) | `scripted` |
+| BV task (`OpenAiAgentRunner`) | `MINT_LAB_AGENT=openai` + `OPENAI_API_KEY` | `gpt-4.1-mini` (override `MINT_LAB_MODEL`) |
+
+Review, appeal initiation, document supply, and payer speech are **not** LLM agents — they stay human console roles or fixture-driven.
+
+```bash
+# Deterministic BV scoring (offline)
+cargo run --quiet -- lab eval-model --scenario unclear_bv --json
+
+# Optional live OpenAI eval (not CI)
+MINT_LAB_MODEL_EVAL=1 OPENAI_API_KEY=... cargo run --quiet -- lab eval-model --scenario approval --live --json
+```
+
 ## Limitations
 
 - Synthetic payer ledger and documents only.
 - Not FHIR CRD/DTR/PAS wire formats.
 - Not clinical guidance or a payment guarantee.
-- `OpenAiAgentRunner` is an **unverified stub**: without `OPENAI_API_KEY` (and even with one) it returns `Unverified` and does not fabricate success.
+- Live OpenAI path is optional and fail-closed without `OPENAI_API_KEY`; never fabricates success.
 - One appeal round; further denial → manual disposition.
 - Concurrency claim is in-process SQLite ownership generation — not a distributed lock service.
+- No reviewer / appeal-writer / documentation / payer LLM agents.

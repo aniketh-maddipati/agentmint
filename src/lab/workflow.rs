@@ -11,7 +11,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::lab::agent::{AgentOutput, AgentRunner, ScriptedAgentRunner};
+use crate::lab::agent::{select_agent, AgentOutput, AgentRunner};
 use crate::lab::clock::{Clock, MutableClock};
 use crate::lab::domain::*;
 use crate::lab::error::{LabError, LabResult};
@@ -49,11 +49,12 @@ impl LabEngine {
         let store = CaseStore::open(&data_dir.join("lab.db"))?;
         let payer = Arc::new(FakePayer::open(&data_dir.join("payer.db"))?);
         let clock = MutableClock::new(Utc::now());
+        let agent = select_agent()?;
         Ok(Self {
             store,
             payer,
             clock,
-            agent: Arc::new(ScriptedAgentRunner),
+            agent,
             fixtures_dir: fixtures_dir.to_path_buf(),
             scenario_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
             faults: std::sync::Mutex::new(HashSet::new()),
