@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::lab::agent::{
-    allowed_evidence_ids, validate_output_evidence, AgentOutput, AgentRunner, DraftObservation,
-    OpenAiAgentRunner, ScriptedAgentRunner,
+    allowed_evidence_ids, AgentOutput, AgentRunner, DraftObservation, OpenAiAgentRunner,
+    ScriptedAgentRunner,
 };
 use crate::lab::domain::{
     Case, CaseSnapshot, CaseStage, CoverageContext, ObservationKind, Role, ServiceContext, Task,
@@ -15,6 +15,9 @@ use crate::lab::domain::{
 };
 use crate::lab::error::{LabError, LabResult};
 use crate::lab::scenarios::{load_scenario_from, ScenarioFixture};
+use crate::lab::verifiers::{
+    verify_evidence, verify_schema, verify_tool_authority, verify_uncertainty,
+};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -125,20 +128,25 @@ pub fn score_output(
     output: &AgentOutput,
     allowed_evidence: &std::collections::HashSet<String>,
     payer_text: &str,
+    tool_calls_json: &str,
 ) -> EvalReport {
     let expectation = expectation_for_scenario(scenario_id);
     let mut scores = Vec::new();
     let mut notes = Vec::new();
+    let output_json = serde_json::to_string(output).unwrap_or_else(|_| "{}".into());
 
-    let evidence_ok = validate_output_evidence(output, allowed_evidence).is_ok();
+    let schema = verify_schema(&output_json);
+    let evidence = verify_evidence(output, allowed_evidence);
+    let tools = verify_tool_authority(tool_calls_json, output, allowed_evidence);
+    let uncertainty = verify_uncertainty(output, payer_text);
+    let tool_ok = schema.passed && evidence.passed && tools.passed;
     scores.push(DimensionScore {
         dimension: ScoreDimension::ToolAuthority,
-        passed: evidence_ok,
-        detail: if evidence_ok {
-            "evidence refs valid; schema accepted".into()
-        } else {
-            "invalid evidence refs or empty observations".into()
-        },
+        passed: tool_ok,
+        detail: format!(
+            "schema={}; evidence={}; tools={}",
+            schema.detail, evidence.detail, tools.detail
+        ),
     });
 
     match output {
@@ -151,8 +159,8 @@ pub fn score_output(
             });
             scores.push(DimensionScore {
                 dimension: ScoreDimension::Uncertainty,
-                passed: true,
-                detail: "no premature claim".into(),
+                passed: uncertainty.passed,
+                detail: uncertainty.detail.clone(),
             });
             scores.push(DimensionScore {
                 dimension: ScoreDimension::WorkflowDispositionHint,
@@ -168,8 +176,8 @@ pub fn score_output(
             });
             scores.push(DimensionScore {
                 dimension: ScoreDimension::Uncertainty,
-                passed: true,
-                detail: "clarification preserves uncertainty".into(),
+                passed: uncertainty.passed,
+                detail: uncertainty.detail.clone(),
             });
             let hint_ok = expectation
                 .disposition_hint
@@ -199,25 +207,10 @@ pub fn score_output(
                 detail: format!("kinds={kinds:?}"),
             });
 
-            let lower = payer_text.to_lowercase();
-            let uncertainty_ok = if expectation.require_unknown_if_may_require
-                && (lower.contains("may require") || lower.contains("conflict"))
-            {
-                observations
-                    .iter()
-                    .any(|o| o.uncertainty == Uncertainty::Unknown)
-                    || *needs_human_review
-            } else {
-                true
-            };
             scores.push(DimensionScore {
                 dimension: ScoreDimension::Uncertainty,
-                passed: uncertainty_ok,
-                detail: if uncertainty_ok {
-                    "uncertainty appropriate".into()
-                } else {
-                    "expected unknown uncertainty for ambiguous payer language".into()
-                },
+                passed: uncertainty.passed,
+                detail: uncertainty.detail.clone(),
             });
 
             let hint_ok = disposition_matches(expectation.disposition_hint, observations);
@@ -233,6 +226,9 @@ pub fn score_output(
         }
     }
 
+    if expectation.require_unknown_if_may_require {
+        notes.push("scenario expects unknown or escalation on ambiguous payer language".into());
+    }
     let overall_passed = scores.iter().all(|s| s.passed);
     EvalReport {
         scenario_id: scenario_id.to_owned(),
@@ -381,6 +377,7 @@ pub fn run_scripted_eval(
         &result.output,
         &allowed,
         &payer_text,
+        &result.record.tool_calls_json,
     ))
 }
 
@@ -421,6 +418,7 @@ pub fn run_live_openai_eval(
         &result.output,
         &allowed,
         &payer_text,
+        &result.record.tool_calls_json,
     ))
 }
 
@@ -438,6 +436,16 @@ mod tests {
 
         let unclear = run_scripted_eval(&dir, "unclear_bv").expect("unclear");
         assert!(unclear.overall_passed, "{unclear:?}");
+        let authority = unclear
+            .scores
+            .iter()
+            .find(|s| s.dimension == ScoreDimension::ToolAuthority)
+            .expect("tool authority");
+        assert!(
+            authority.detail.contains("allowlisted"),
+            "{}",
+            authority.detail
+        );
     }
 
     #[test]

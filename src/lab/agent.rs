@@ -15,6 +15,7 @@ use crate::lab::tools::{
     tool_call, ToolCallEntry, ToolTrace, ALLOWED_TOOLS, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT,
     TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
 };
+pub use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 
 pub const PROMPT_VERSION_SCRIPTED: &str = "bv-scripted-v1";
 pub const PROMPT_VERSION_OPENAI: &str = "bv-openai-v1";
@@ -256,25 +257,6 @@ impl AgentRunner for ScriptedAgentRunner {
     }
 }
 
-pub fn detect_injection(blobs: &[String]) -> Option<String> {
-    const MARKERS: &[&str] = &[
-        "ignore previous instructions",
-        "disregard all prior",
-        "system: you are now",
-        "[[inject]]",
-        "override safety",
-    ];
-    for blob in blobs {
-        let lower = blob.to_lowercase();
-        for marker in MARKERS {
-            if lower.contains(marker) {
-                return Some((*marker).to_string());
-            }
-        }
-    }
-    None
-}
-
 pub(crate) fn interpret_payer_text(text: &str, evidence_refs: &[String]) -> Vec<DraftObservation> {
     let lower = text.to_lowercase();
     let mut out = Vec::new();
@@ -507,42 +489,6 @@ pub fn allowed_evidence_ids(snapshot: &CaseSnapshot) -> HashSet<String> {
         ids.insert(format!("obs:{}", obs.id));
     }
     ids
-}
-
-pub fn validate_output_evidence(
-    output: &AgentOutput,
-    allowed: &HashSet<String>,
-) -> Result<(), String> {
-    match output {
-        AgentOutput::PendingQuestion(q) => {
-            if !allowed.contains(&q.evidence_hint) && q.evidence_hint != "payer_bv_response" {
-                return Err(format!("unknown evidence_hint {}", q.evidence_hint));
-            }
-            Ok(())
-        }
-        AgentOutput::Observations { observations, .. } => {
-            if observations.is_empty() {
-                return Err("observations empty".into());
-            }
-            for obs in observations {
-                if obs.evidence_refs.is_empty() {
-                    return Err("observation missing evidence_refs".into());
-                }
-                for reference in &obs.evidence_refs {
-                    if !allowed.contains(reference) {
-                        return Err(format!("unknown evidence ref {reference}"));
-                    }
-                }
-            }
-            Ok(())
-        }
-        AgentOutput::Clarification { message } => {
-            if message.trim().is_empty() {
-                return Err("clarification message empty".into());
-            }
-            Ok(())
-        }
-    }
 }
 
 pub fn assigned_context_value(task: &Task, snapshot: &CaseSnapshot) -> Value {
