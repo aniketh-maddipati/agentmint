@@ -38,6 +38,8 @@ pub enum Error {
     ReconciliationRequired,
     #[error("live Stripe keys are refused")]
     LiveStripeRefused,
+    #[error("self-approval refused")]
+    SelfApproval,
     #[error("provider rejected the request")]
     ProviderRejected,
     #[error("provider timeout")]
@@ -56,7 +58,7 @@ pub enum Error {
     Conflict,
     #[error("internal error")]
     Internal,
-    #[error("misconfigured")]
+    #[error("{0}")]
     Misconfigured(&'static str),
 }
 
@@ -82,6 +84,7 @@ impl Error {
             Self::UnknownOutcome => "unknown_outcome",
             Self::ReconciliationRequired => "reconciliation_required",
             Self::LiveStripeRefused => "live_stripe_refused",
+            Self::SelfApproval => "self_approval",
             Self::ProviderRejected => "provider_rejected",
             Self::ProviderTimeout => "provider_timeout",
             Self::IdentityFailed => "identity_failed",
@@ -107,10 +110,11 @@ impl Error {
             Self::AuthorizationExpired => "authorization has expired",
             Self::NotExecutable => "action is not authorized for execution",
             Self::PolicyDenied => "policy denied this action",
-            Self::ApprovalRequired => "human approval is required",
+            Self::ApprovalRequired => "authenticated approval is required",
             Self::UnknownOutcome => "provider outcome is unknown and requires reconciliation",
             Self::ReconciliationRequired => "reconcile this action before retrying execution",
             Self::LiveStripeRefused => "live Stripe credentials are refused",
+            Self::SelfApproval => "approver must differ from the originating actor",
             Self::ProviderRejected => "provider rejected the request",
             Self::ProviderTimeout => "provider timed out",
             Self::IdentityFailed => "identity verification failed",
@@ -136,7 +140,8 @@ impl Error {
             Self::Forbidden
             | Self::CrossTenant
             | Self::PolicyDenied
-            | Self::AuthorizationExpired => StatusCode::FORBIDDEN,
+            | Self::AuthorizationExpired
+            | Self::SelfApproval => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::InvalidRequest(_)
             | Self::MalformedRefund(_)

@@ -11,9 +11,9 @@ use uuid::Uuid;
 use crate::config::Config;
 use crate::credentials::CredentialSource;
 use crate::domain::{
-    provider_idempotency_key, ActionIntent, ActionRecord, ActionStatus, Approval, ExecutionAttempt,
-    ExecutionGrant, PolicyEffect, ProviderResult, ReceiptPayload, SignedReceipt, RECEIPT_VERSION,
-    SIGNED_OBJECT_VERSION,
+    provider_idempotency_key, ActionIntent, ActionRecord, ActionStatus, Approval, DecisionKind,
+    ExecutionAttempt, ExecutionGrant, PolicyEffect, ProviderResult, ReceiptPayload, SignedReceipt,
+    RECEIPT_VERSION, SIGNED_OBJECT_VERSION,
 };
 use crate::error::{Error, Result};
 use crate::failpoints::Failpoint;
@@ -112,6 +112,9 @@ impl Engine {
         if record.status != ActionStatus::PendingApproval {
             return Err(Error::NotExecutable);
         }
+        if auth.actor.subject == record.intent.actor.subject {
+            return Err(Error::SelfApproval);
+        }
         if record.intent.is_expired(Utc::now()) {
             return Err(Error::AuthorizationExpired);
         }
@@ -126,6 +129,7 @@ impl Engine {
             subject: auth.actor.subject.clone(),
             approved_at: Utc::now(),
             intent_hash: record.intent_hash.clone(),
+            decision: DecisionKind::Approved,
         };
         let grant = ExecutionGrant {
             intent_hash: record.intent_hash.clone(),
@@ -161,16 +165,25 @@ impl Engine {
         if record.status != ActionStatus::PendingApproval {
             return Err(Error::NotExecutable);
         }
+        if auth.actor.subject == record.intent.actor.subject {
+            return Err(Error::SelfApproval);
+        }
         if record.intent_hash != intent_hash {
             return Err(Error::IntentHashMismatch);
         }
+        let denial = Approval {
+            subject: auth.actor.subject.clone(),
+            approved_at: Utc::now(),
+            intent_hash: record.intent_hash.clone(),
+            decision: DecisionKind::Denied,
+        };
         self.store
             .record_approval(
                 &auth.tenant_id,
                 action_id,
                 ActionStatus::PendingApproval,
                 ActionStatus::Denied,
-                None,
+                Some(denial),
                 None,
                 None,
             )
@@ -202,6 +215,15 @@ impl Engine {
             return Err(Error::AuthorizationExpired);
         }
         self.assert_hash(&record, expected_arguments.as_ref())?;
+        let canonical = self.pack.canonicalize(&record.intent)?;
+        if canonical.intent_hash != record.intent_hash {
+            return Err(Error::IntentHashMismatch);
+        }
+        let credential = self
+            .credentials
+            .credential(&auth.tenant_id, &record.intent.provider)
+            .await?;
+        self.pack.preflight(&canonical, &credential).await?;
         if failpoint == Some(Failpoint::BeforeProvider) {
             return Err(Error::Failpoint("before_provider"));
         }

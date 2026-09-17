@@ -45,7 +45,7 @@ pub fn build_state(config: Config) -> Result<AppState> {
         .build()
         .map_err(|err| Error::internal("http client", err))?;
     let identity = Arc::new(IdentityProvider::from_config(&config, http.clone())?);
-    let policy = Arc::new(PolicyProvider::from_config(&config, http.clone()));
+    let policy = Arc::new(PolicyProvider::from_config(&config, http.clone())?);
     let credentials = Arc::new(CredentialSource::from_config(&config, http.clone())?);
     let pack = match config.provider {
         ProviderKind::Fake => Pack::Fake(Arc::new(FakePack::default())),

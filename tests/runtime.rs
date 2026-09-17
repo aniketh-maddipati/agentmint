@@ -65,6 +65,12 @@ impl TestEnv {
         format!("Bearer {}", encode_dev_token(tenant, &actor()))
     }
 
+    fn token_for(&self, tenant: &str, subject: &str) -> String {
+        let mut identity = actor();
+        identity.subject = subject.to_owned();
+        format!("Bearer {}", encode_dev_token(tenant, &identity))
+    }
+
     async fn propose(&self, tenant: &str, body: Value) -> reqwest::Response {
         self.client
             .post(format!("{}/v1/actions", self.base))
@@ -192,7 +198,7 @@ async fn modified_arguments_after_approval_do_not_call_provider() {
     let approved = json_body(
         env.client
             .post(format!("{}/v1/actions/{id}/approve", env.base))
-            .header("authorization", env.token("acme"))
+            .header("authorization", env.token_for("acme", "supervisor_1"))
             .json(&json!({ "intentHash": hash }))
             .send()
             .await
@@ -200,6 +206,7 @@ async fn modified_arguments_after_approval_do_not_call_provider() {
     )
     .await;
     assert_eq!(approved["status"], "Authorized");
+    assert_eq!(approved["approval"]["subject"], "supervisor_1");
     let action_id = Uuid::parse_str(id).expect("uuid");
     env.state
         .engine
@@ -412,4 +419,37 @@ async fn health_does_not_leak_configuration() {
         .expect("health");
     let body = json_body(response).await;
     assert_eq!(body, json!({"status":"ok"}));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn self_approval_is_rejected_separate_principal_can_approve() {
+    let env = TestEnv::spawn().await;
+    let proposed = json_body(env.propose("acme", refund_body(12_000)).await).await;
+    let id = proposed["id"].as_str().expect("id");
+    let hash = proposed["intentHash"].as_str().expect("hash");
+    let self_approve = env
+        .client
+        .post(format!("{}/v1/actions/{id}/approve", env.base))
+        .header("authorization", env.token("acme"))
+        .json(&json!({ "intentHash": hash }))
+        .send()
+        .await
+        .expect("self approve");
+    assert_eq!(self_approve.status(), reqwest::StatusCode::FORBIDDEN);
+    let err = json_body(self_approve).await;
+    assert_eq!(err["error"]["code"], "self_approval");
+
+    let approved = json_body(
+        env.client
+            .post(format!("{}/v1/actions/{id}/approve", env.base))
+            .header("authorization", env.token_for("acme", "supervisor_1"))
+            .json(&json!({ "intentHash": hash }))
+            .send()
+            .await
+            .expect("approve"),
+    )
+    .await;
+    assert_eq!(approved["status"], "Authorized");
+    assert_eq!(approved["approval"]["subject"], "supervisor_1");
+    assert_eq!(approved["approval"]["decision"], "approved");
 }

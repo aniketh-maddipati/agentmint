@@ -1,49 +1,76 @@
-//! mint.run CLI: init, serve, verify, and local overhead bench.
+//! mint.run CLI: init, serve, verify, doctor, and local overhead bench.
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 use mint_run::bench;
 use mint_run::config::Config;
+use mint_run::doctor;
 use mint_run::domain::SignedReceipt;
 use mint_run::keys::KeyRing;
 use mint_run::receipt::{verify_receipt, verify_with_public_key, verifying_key_from_jwk_x};
 use mint_run::server::{self, build_state};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = env::args().skip(1).collect::<Vec<_>>();
+async fn main() -> ExitCode {
+    match run().await {
+        Ok(code) => code,
+        Err(err) => {
+            eprintln!("error: {err}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+async fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let args = env::args().skip(1).collect::<Vec<_>>();
     if args.is_empty() || args.iter().any(|a| a == "-h" || a == "--help") {
         print_help();
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
     match args[0].as_str() {
-        "init" => cmd_init(&args[1..])?,
-        "serve" => cmd_serve().await?,
-        "verify" => cmd_verify(&args[1..]).await?,
+        "init" => {
+            cmd_init(&args[1..])?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "serve" => {
+            cmd_serve().await?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "verify" => {
+            cmd_verify(&args[1..]).await?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "doctor" => {
+            let config = Config::from_env()?;
+            let results = doctor::run_doctor(&config).await;
+            doctor::print_results(&results);
+            Ok(ExitCode::from(doctor::exit_code(&results) as u8))
+        }
         "bench" => {
             init_tracing(false);
             let iterations = parse_flag(&args[1..], "--iterations")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(200);
             print!("{}", bench::run_bench(iterations).await?);
+            Ok(ExitCode::SUCCESS)
         }
         other => {
             eprintln!("unknown command: {other}");
             print_help();
-            std::process::exit(2);
+            Ok(ExitCode::from(2))
         }
     }
-    let _ = &mut args;
-    Ok(())
 }
 
 fn print_help() {
     println!(
-        "mint.run — turn an agent tool call into a safe, recoverable, verifiable transaction\n\n\
+        "mint.run — consequential agent actions that are safe to retry\n\n\
          Usage:\n\
          \tmint init [--key-file PATH]\n\
+         \tmint doctor\n\
          \tmint serve\n\
          \tmint verify --receipt PATH [--key-file PATH | --keys-url URL]\n\
          \tmint bench [--iterations N]\n\n\
@@ -61,12 +88,13 @@ fn cmd_init(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     ring.write_pkcs8_pem(&path)?;
     println!("wrote signing key {}", path.display());
     println!("kid={}", ring.kid);
-    println!("set MINT_SIGNING_KEY_FILE to this path before `mint serve`");
+    println!("set MINT_SIGNING_KEY_FILE to this path before `mint serve` or `mint doctor`");
     Ok(())
 }
 
 async fn cmd_serve() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
+    config.validate_relationships()?;
     init_tracing(config.log_format_json);
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),

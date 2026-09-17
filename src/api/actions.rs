@@ -32,8 +32,6 @@ pub struct ProposeRequest {
     #[serde(default)]
     pub context: Option<ContextIn>,
     #[serde(default)]
-    pub idempotency_key: Option<String>,
-    #[serde(default)]
     pub ttl_seconds: Option<i64>,
 }
 
@@ -138,9 +136,10 @@ pub async fn propose(
     validate_identity(&auth, &req)?;
     let ttl = req.ttl_seconds.unwrap_or(300).clamp(0, 86_400);
     let now = Utc::now();
+    let action_id = Uuid::new_v4();
     let intent = ActionIntent {
         version: INTENT_VERSION.to_owned(),
-        action_id: Uuid::new_v4(),
+        action_id,
         tenant_id: req.tenant_id,
         actor: auth.actor.clone(),
         provider: req.provider,
@@ -157,9 +156,7 @@ pub async fn propose(
                 .and_then(|c| c.support_ticket_id.clone()),
             reason: req.context.as_ref().and_then(|c| c.reason.clone()),
         },
-        idempotency_key: req
-            .idempotency_key
-            .unwrap_or_else(|| Uuid::new_v4().to_string()),
+        idempotency_key: action_id.to_string(),
         created_at: now,
         expires_at: now + Duration::seconds(ttl),
     };
@@ -263,8 +260,9 @@ pub async fn approval_page(
          <dt>expiration</dt><dd>{}</dd>\
          <dt>intent hash</dt><dd><code>{}</code></dd>\
          </dl>\
-         <p>Approve with <code>POST /v1/actions/{}/approve</code> and body \
-         <code>{{\"intentHash\":\"{}\"}}</code>. The hash is bound to this exact action.</p>\
+         <p>Separate-principal approval: POST /v1/actions/{}/approve with body \
+         <code>{{\"intentHash\":\"{}\"}}</code>. Approver subject must differ from the originating actor. \
+         The hash is bound to this exact action.</p>\
          </body></html>",
         esc(&record.intent.tenant_id),
         esc(&record.intent.actor.subject),

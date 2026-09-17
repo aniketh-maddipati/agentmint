@@ -23,7 +23,6 @@ export type ProposeInput = {
   resource: ResourceRef;
   arguments: Record<string, unknown>;
   context?: ActionContext;
-  idempotencyKey?: string;
   ttlSeconds?: number;
 };
 

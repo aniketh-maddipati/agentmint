@@ -13,7 +13,8 @@ use crate::error::{Error, Result};
 /// `arguments`, `context.{support_ticket_id,reason}`.
 ///
 /// Non-material operational fields excluded from the hash:
-/// `action_id`, `idempotency_key`, `created_at`, `expires_at`.
+/// `action_id`, `created_at`, `expires_at`.
+/// Provider idempotency is derived internally from the Mint action ID.
 pub fn material_value(intent: &ActionIntent) -> Value {
     json!({
         "version": intent.version,

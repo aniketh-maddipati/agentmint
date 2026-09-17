@@ -71,6 +71,14 @@ impl FakePack {
         })
     }
 
+    pub async fn preflight(
+        &self,
+        _action: &CanonicalAction,
+        _credential: &ProviderCredential,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     pub async fn execute(
         &self,
         action: &CanonicalAction,

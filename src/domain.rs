@@ -145,10 +145,23 @@ pub struct PolicyDecision {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionKind {
+    Approved,
+    Denied,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Approval {
     pub subject: String,
     pub approved_at: DateTime<Utc>,
     pub intent_hash: String,
+    #[serde(default = "default_approved")]
+    pub decision: DecisionKind,
+}
+
+fn default_approved() -> DecisionKind {
+    DecisionKind::Approved
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

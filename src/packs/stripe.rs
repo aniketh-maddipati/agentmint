@@ -1,5 +1,6 @@
 //! Stripe sandbox refund pack. Test-mode secrets only.
-//! Used by: Pack::Stripe, optional sandbox tests.
+//! Create-refund never sends currency; charge/PI preflight validates livemode,
+//! currency match, and remaining refundable balance before any effect.
 
 use reqwest::Client;
 use serde_json::Value;
@@ -33,6 +34,17 @@ impl StripePack {
             amount_cents: action.refund.amount_cents,
             currency: action.refund.currency.clone(),
         })
+    }
+
+    pub async fn preflight(
+        &self,
+        action: &CanonicalAction,
+        credential: &ProviderCredential,
+    ) -> Result<()> {
+        assert_test_secret(&credential.secret)?;
+        let charge = self.resolve_refundable_charge(action, credential).await?;
+        validate_charge_for_refund(&charge, action)?;
+        Ok(())
     }
 
     pub async fn execute(
@@ -83,6 +95,66 @@ impl StripePack {
         redact_value(value)
     }
 
+    async fn resolve_refundable_charge(
+        &self,
+        action: &CanonicalAction,
+        credential: &ProviderCredential,
+    ) -> Result<Value> {
+        if action.refund.resource_type == "payment_intent" {
+            let pi = self
+                .get_json(
+                    &format!(
+                        "https://api.stripe.com/v1/payment_intents/{}",
+                        action.refund.charge_or_pi
+                    ),
+                    credential,
+                )
+                .await?;
+            if pi.get("livemode").and_then(Value::as_bool) != Some(false) {
+                return Err(Error::LiveStripeRefused);
+            }
+            let charge_id =
+                pi.get("latest_charge")
+                    .and_then(Value::as_str)
+                    .ok_or(Error::MalformedRefund(
+                        "payment_intent has no unambiguous refundable charge",
+                    ))?;
+            return self
+                .get_json(
+                    &format!("https://api.stripe.com/v1/charges/{charge_id}"),
+                    credential,
+                )
+                .await;
+        }
+        self.get_json(
+            &format!(
+                "https://api.stripe.com/v1/charges/{}",
+                action.refund.charge_or_pi
+            ),
+            credential,
+        )
+        .await
+    }
+
+    async fn get_json(&self, url: &str, credential: &ProviderCredential) -> Result<Value> {
+        let response = self
+            .http
+            .get(url)
+            .header("Authorization", format!("Bearer {}", credential.secret))
+            .send()
+            .await
+            .map_err(|_| Error::ProviderTimeout)?;
+        let status = response.status();
+        let payload: Value = response.json().await.map_err(|_| Error::UnknownOutcome)?;
+        if status.is_success() {
+            return Ok(payload);
+        }
+        if status.is_client_error() {
+            return Err(Error::ProviderRejected);
+        }
+        Err(Error::UnknownOutcome)
+    }
+
     async fn create_refund(
         &self,
         action: &CanonicalAction,
@@ -91,7 +163,6 @@ impl StripePack {
     ) -> Result<ProviderExecution> {
         let mut form = vec![
             ("amount", action.refund.amount_cents.to_string()),
-            ("currency", action.refund.currency.clone()),
             ("reason", action.refund.reason.clone()),
             (
                 "metadata[mint_action_id]",
@@ -152,6 +223,42 @@ impl StripePack {
         action: &CanonicalAction,
         credential: &ProviderCredential,
     ) -> Result<ReconciliationResult> {
+        let matches = self.list_refunds_for_action(action, credential).await?;
+        if matches.len() > 1 {
+            tracing::error!(
+                action_id = %action.refund.mint_action_id,
+                count = matches.len(),
+                "multiple stripe refunds share mint_action_id"
+            );
+            return Err(Error::UnknownOutcome);
+        }
+        if let Some(item) = matches.into_iter().next() {
+            let id = item
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or(Error::UnknownOutcome)?;
+            return Ok(ReconciliationResult {
+                established: true,
+                execution: Some(ProviderExecution {
+                    provider_request_id: None,
+                    provider_resource_id: id.to_owned(),
+                    redacted_payload: self.redact(&item),
+                }),
+                failed: false,
+            });
+        }
+        Ok(ReconciliationResult {
+            established: false,
+            execution: None,
+            failed: false,
+        })
+    }
+
+    pub async fn list_refunds_for_action(
+        &self,
+        action: &CanonicalAction,
+        credential: &ProviderCredential,
+    ) -> Result<Vec<Value>> {
         let param = if action.refund.resource_type == "payment_intent" {
             ("payment_intent", action.refund.charge_or_pi.as_str())
         } else {
@@ -166,47 +273,59 @@ impl StripePack {
             .await
             .map_err(|_| Error::UnknownOutcome)?;
         if !response.status().is_success() {
-            return Ok(ReconciliationResult {
-                established: false,
-                execution: None,
-                failed: false,
-            });
+            return Err(Error::UnknownOutcome);
         }
         let payload: Value = response.json().await.map_err(|_| Error::UnknownOutcome)?;
         let Some(data) = payload.get("data").and_then(Value::as_array) else {
-            return Ok(ReconciliationResult {
-                established: false,
-                execution: None,
-                failed: false,
-            });
+            return Ok(Vec::new());
         };
         let action_id = action.refund.mint_action_id.to_string();
-        for item in data {
-            let mint_id = item
-                .pointer("/metadata/mint_action_id")
-                .and_then(Value::as_str);
-            if mint_id == Some(action_id.as_str()) {
-                let id = item
-                    .get("id")
+        Ok(data
+            .iter()
+            .filter(|item| {
+                item.pointer("/metadata/mint_action_id")
                     .and_then(Value::as_str)
-                    .ok_or(Error::UnknownOutcome)?;
-                return Ok(ReconciliationResult {
-                    established: true,
-                    execution: Some(ProviderExecution {
-                        provider_request_id: None,
-                        provider_resource_id: id.to_owned(),
-                        redacted_payload: self.redact(item),
-                    }),
-                    failed: false,
-                });
-            }
-        }
-        Ok(ReconciliationResult {
-            established: false,
-            execution: None,
-            failed: false,
-        })
+                    == Some(action_id.as_str())
+            })
+            .cloned()
+            .collect())
     }
+}
+
+pub fn validate_charge_for_refund(charge: &Value, action: &CanonicalAction) -> Result<()> {
+    if charge.get("livemode").and_then(Value::as_bool) != Some(false) {
+        return Err(Error::LiveStripeRefused);
+    }
+    let currency = charge
+        .get("currency")
+        .and_then(Value::as_str)
+        .ok_or(Error::MalformedRefund("charge currency missing"))?;
+    if currency != action.refund.currency {
+        return Err(Error::MalformedRefund(
+            "authorized currency does not match charge currency",
+        ));
+    }
+    if charge.get("paid").and_then(Value::as_bool) != Some(true) {
+        return Err(Error::MalformedRefund("charge is not paid"));
+    }
+    if charge.get("captured").and_then(Value::as_bool) == Some(false) {
+        return Err(Error::MalformedRefund("charge is not captured"));
+    }
+    let amount = charge
+        .get("amount")
+        .and_then(Value::as_i64)
+        .ok_or(Error::MalformedRefund("charge amount missing"))?;
+    let amount_refunded = charge
+        .get("amount_refunded")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    let remaining = amount.saturating_sub(amount_refunded);
+    if action.refund.amount_cents > remaining {
+        return Err(Error::MalformedRefund(
+            "refund exceeds remaining refundable amount",
+        ));
+    }
+    Ok(())
 }
 
 fn encode_form(value: &str) -> String {
@@ -238,6 +357,9 @@ pub async fn create_test_charge(http: &Client, secret: &str, amount_cents: i64) 
         .await
         .map_err(|_| Error::ProviderTimeout)?;
     let payload: Value = response.json().await.map_err(|_| Error::UnknownOutcome)?;
+    if payload.get("livemode").and_then(Value::as_bool) == Some(true) {
+        return Err(Error::LiveStripeRefused);
+    }
     payload
         .get("id")
         .and_then(Value::as_str)
@@ -257,4 +379,44 @@ pub async fn retrieve_refund(http: &Client, secret: &str, refund_id: &str) -> Re
         return Err(Error::ProviderRejected);
     }
     response.json().await.map_err(|_| Error::UnknownOutcome)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{RefundAction, CANONICALIZATION_VERSION};
+    use serde_json::json;
+    use uuid::Uuid;
+
+    fn action(amount: i64, currency: &str) -> CanonicalAction {
+        CanonicalAction {
+            canonicalization_version: CANONICALIZATION_VERSION.to_owned(),
+            canonical_json: "{}".into(),
+            intent_hash: "sha256:x".into(),
+            provider: "stripe".into(),
+            operation: "refund.create".into(),
+            refund: RefundAction {
+                charge_or_pi: "ch_123".into(),
+                resource_type: "charge".into(),
+                amount_cents: amount,
+                currency: currency.into(),
+                reason: "duplicate".into(),
+                mint_action_id: Uuid::nil(),
+                support_ticket_id: "ticket_982".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn charge_preflight_rejects_live_currency_mismatch_and_over_refund() {
+        let live = json!({"livemode": true, "currency": "usd", "paid": true, "captured": true, "amount": 5000, "amount_refunded": 0});
+        assert!(validate_charge_for_refund(&live, &action(100, "usd")).is_err());
+
+        let mismatch = json!({"livemode": false, "currency": "eur", "paid": true, "captured": true, "amount": 5000, "amount_refunded": 0});
+        assert!(validate_charge_for_refund(&mismatch, &action(100, "usd")).is_err());
+
+        let over = json!({"livemode": false, "currency": "usd", "paid": true, "captured": true, "amount": 5000, "amount_refunded": 2000});
+        assert!(validate_charge_for_refund(&over, &action(4000, "usd")).is_err());
+        assert!(validate_charge_for_refund(&over, &action(3000, "usd")).is_ok());
+    }
 }

@@ -6,6 +6,7 @@ pub mod bench;
 pub mod canonical;
 pub mod config;
 pub mod credentials;
+pub mod doctor;
 pub mod domain;
 pub mod error;
 pub mod events;

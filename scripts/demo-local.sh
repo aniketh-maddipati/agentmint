@@ -26,6 +26,7 @@ export MINT_BIND_ADDR="127.0.0.1:${PORT}"
 export MINT_KID=mint-local-1
 
 ./target/debug/mint init --key-file "$MINT_SIGNING_KEY_FILE"
+./target/debug/mint doctor
 ./target/debug/mint serve >"$TMP/server.log" 2>&1 &
 PID=$!
 

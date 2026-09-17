@@ -48,6 +48,17 @@ impl Pack {
         }
     }
 
+    pub async fn preflight(
+        &self,
+        action: &CanonicalAction,
+        credential: &ProviderCredential,
+    ) -> Result<()> {
+        match self {
+            Self::Fake(pack) => pack.preflight(action, credential).await,
+            Self::Stripe(pack) => pack.preflight(action, credential).await,
+        }
+    }
+
     pub async fn reconcile(
         &self,
         action: &CanonicalAction,

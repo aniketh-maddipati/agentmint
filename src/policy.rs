@@ -4,7 +4,7 @@
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::config::Config;
+use crate::config::{Config, PolicyKind};
 use crate::domain::{CanonicalAction, PolicyDecision, PolicyEffect};
 use crate::error::{Error, Result};
 
@@ -14,15 +14,22 @@ pub enum PolicyProvider {
 }
 
 impl PolicyProvider {
-    pub fn from_config(config: &Config, http: reqwest::Client) -> Self {
-        if let Some(url) = &config.pdp_url {
-            Self::Http(HttpPolicy {
-                url: url.clone(),
-                http,
-                fallback: StripeThresholdPolicy::from_config(config),
-            })
-        } else {
-            Self::StripeThreshold(StripeThresholdPolicy::from_config(config))
+    pub fn from_config(config: &Config, http: reqwest::Client) -> Result<Self> {
+        match config.policy {
+            PolicyKind::Threshold => Ok(Self::StripeThreshold(StripeThresholdPolicy::from_config(
+                config,
+            ))),
+            PolicyKind::Http => {
+                let url = config
+                    .pdp_url
+                    .clone()
+                    .ok_or(Error::Misconfigured("MINT_PDP_URL required"))?;
+                Ok(Self::Http(HttpPolicy {
+                    url,
+                    http,
+                    fallback: StripeThresholdPolicy::from_config(config),
+                }))
+            }
         }
     }
 

@@ -6,7 +6,6 @@
 //!   resource.resource_id, arguments, context.support_ticket_id, context.reason
 //!
 //! Non-material operational fields excluded:
-//!   action_id, idempotency_key, created_at, expires_at
+//!   action_id, created_at, expires_at
 //!
-//! Canonicalization version: jcs-rfc8785-v1
-//! Hash: lowercase hex SHA-256 of the RFC 8785 UTF-8 bytes, prefixed with `sha256:`.
+//! Provider idempotency is derived internally as mint:{action_id}:{operation}:v1.
