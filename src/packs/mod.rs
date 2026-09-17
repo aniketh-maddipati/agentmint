@@ -5,7 +5,7 @@ mod fake;
 mod stripe;
 
 pub use fake::{FakePack, FakeScript};
-pub use stripe::{create_test_charge, retrieve_refund, StripePack};
+pub use stripe::{create_test_charge, retrieve_charge, retrieve_refund, StripePack};
 
 use serde_json::Value;
 

@@ -381,6 +381,20 @@ pub async fn retrieve_refund(http: &Client, secret: &str, refund_id: &str) -> Re
     response.json().await.map_err(|_| Error::UnknownOutcome)
 }
 
+pub async fn retrieve_charge(http: &Client, secret: &str, charge_id: &str) -> Result<Value> {
+    assert_test_secret(secret)?;
+    let response = http
+        .get(format!("https://api.stripe.com/v1/charges/{charge_id}"))
+        .header("Authorization", format!("Bearer {secret}"))
+        .send()
+        .await
+        .map_err(|_| Error::ProviderTimeout)?;
+    if !response.status().is_success() {
+        return Err(Error::ProviderRejected);
+    }
+    response.json().await.map_err(|_| Error::UnknownOutcome)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

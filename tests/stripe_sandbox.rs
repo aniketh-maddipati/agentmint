@@ -12,7 +12,7 @@ use mint_run::credentials::assert_test_secret;
 use mint_run::domain::{ActionStatus, ActorIdentity};
 use mint_run::identity::{encode_dev_token, AuthContext};
 use mint_run::keys::KeyRing;
-use mint_run::packs::{create_test_charge, retrieve_refund, StripePack};
+use mint_run::packs::{create_test_charge, retrieve_charge, retrieve_refund, StripePack};
 use mint_run::receipt::verify_receipt;
 use mint_run::server::{build_state, run_with_listener};
 use serde_json::json;
@@ -158,10 +158,17 @@ async fn stripe_sandbox_partial_refund_round_trip() {
     let stripe_refund = retrieve_refund(&http, &secret, &refund_id)
         .await
         .expect("retrieve");
-    assert_eq!(stripe_refund["livemode"], false);
+    // Stripe Refund objects do not expose `livemode`; test mode is on the Charge.
+    // See https://docs.stripe.com/api/refunds/object and
+    // https://docs.stripe.com/api/charges/object
+    let refund_charge_id = stripe_refund["charge"].as_str().expect("refund.charge");
+    assert_eq!(refund_charge_id, charge_id);
+    let stripe_charge = retrieve_charge(&http, &secret, refund_charge_id)
+        .await
+        .expect("retrieve charge");
+    assert_eq!(stripe_charge["livemode"], false);
     assert_eq!(stripe_refund["amount"], distinctive_amount);
     assert_eq!(stripe_refund["currency"], "usd");
-    assert_eq!(stripe_refund["charge"], charge_id);
     assert_eq!(stripe_refund["metadata"]["mint_action_id"], proposed["id"]);
 
     let pack = StripePack::new(http.clone());
