@@ -392,6 +392,4 @@ mod tests {
             std::env::set_current_dir(previous).expect("restore");
         });
     }
-
-
 }
