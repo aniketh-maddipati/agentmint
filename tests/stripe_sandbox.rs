@@ -161,12 +161,22 @@ async fn stripe_sandbox_partial_refund_round_trip() {
     // Stripe Refund objects do not expose `livemode`; test mode is on the Charge.
     // See https://docs.stripe.com/api/refunds/object and
     // https://docs.stripe.com/api/charges/object
-    let refund_charge_id = stripe_refund["charge"].as_str().expect("refund.charge");
-    assert_eq!(refund_charge_id, charge_id);
+    // Do not assert refund["livemode"] — it is Null and is not a Stripe Refund field.
+    let refund_charge_id = stripe_refund["charge"]
+        .as_str()
+        .expect("refund.charge must reference the source Charge");
+    assert_eq!(
+        refund_charge_id, charge_id,
+        "refund.charge must match the charge Mint refunded"
+    );
     let stripe_charge = retrieve_charge(&http, &secret, refund_charge_id)
         .await
-        .expect("retrieve charge");
-    assert_eq!(stripe_charge["livemode"], false);
+        .expect("retrieve charge for livemode check");
+    assert_eq!(
+        stripe_charge.get("livemode").and_then(|v| v.as_bool()),
+        Some(false),
+        "Charge.livemode must be false (test mode); Refund has no livemode field"
+    );
     assert_eq!(stripe_refund["amount"], distinctive_amount);
     assert_eq!(stripe_refund["currency"], "usd");
     assert_eq!(stripe_refund["metadata"]["mint_action_id"], proposed["id"]);
