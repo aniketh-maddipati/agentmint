@@ -177,16 +177,34 @@ pub fn inspect_run(engine: &LabEngine, run_id: Uuid) -> LabResult<InspectReport>
     }
 
     for run in &snap.agent_runs {
+        let plan = crate::lab::plan::plan_from_record(run);
+        let repair = crate::lab::plan::repair_from_record(run);
+        let plan_goal = plan.as_ref().map(|p| p.goal.as_str()).unwrap_or("none");
+        let repairs = repair.as_ref().map(|r| r.count).unwrap_or(0);
         items.push(InspectItem {
             class: EpistemicClass::AgentClaim,
             kind: "agent_run".into(),
             id: run.id.to_string(),
             summary: format!(
-                "model={} prompt={} context_v={}",
-                run.model_id, run.prompt_version, run.context_version
+                "model={} prompt={} context_v={} plan={} repairs={}",
+                run.model_id, run.prompt_version, run.context_version, plan_goal, repairs
             ),
             evidence_refs: run.evidence_refs.clone(),
         });
+        if let Some(plan) = plan {
+            items.push(InspectItem {
+                class: EpistemicClass::AgentClaim,
+                kind: "bv_plan".into(),
+                id: format!("{}:plan", run.id),
+                summary: format!(
+                    "{} steps={} stop={:?}",
+                    plan.plan_version,
+                    plan.steps.len(),
+                    plan.stop_conditions
+                ),
+                evidence_refs: plan.steps.iter().map(|s| s.action.clone()).collect(),
+            });
+        }
     }
 
     items.push(InspectItem {

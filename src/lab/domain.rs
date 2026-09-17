@@ -321,6 +321,10 @@ pub struct AgentRunRecord {
     pub structured_output_json: String,
     pub evidence_refs: Vec<String>,
     pub created_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

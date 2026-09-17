@@ -54,6 +54,10 @@ pub struct ToolCallEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolTrace {
     pub trace_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<crate::lab::plan::BvPlan>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repair: Option<crate::lab::plan::RepairMeta>,
     pub calls: Vec<ToolCallEntry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<Value>,
@@ -63,6 +67,8 @@ impl ToolTrace {
     pub fn new() -> Self {
         Self {
             trace_version: TRACE_VERSION.to_owned(),
+            plan: Some(crate::lab::plan::default_bv_plan()),
+            repair: Some(crate::lab::plan::RepairMeta::none()),
             calls: Vec::new(),
             diagnostics: Vec::new(),
         }
@@ -70,9 +76,8 @@ impl ToolTrace {
 
     pub fn with_calls(calls: Vec<ToolCallEntry>) -> Self {
         Self {
-            trace_version: TRACE_VERSION.to_owned(),
             calls,
-            diagnostics: Vec::new(),
+            ..Self::new()
         }
     }
 

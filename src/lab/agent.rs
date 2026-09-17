@@ -376,21 +376,22 @@ fn build_result(
     };
     let structured_output_json =
         serde_json::to_string(&output).unwrap_or_else(|_| "{}".to_string());
-    AgentRunResult {
-        record: AgentRunRecord {
-            id: Uuid::new_v4(),
-            case_id: snapshot.case.id,
-            task_id: task.id,
-            prompt_version: prompt_version.to_owned(),
-            model_id: model_id.to_owned(),
-            context_version: snapshot.case.coverage_version + snapshot.case.service_version,
-            tool_calls_json: tool_calls.to_json_string(),
-            structured_output_json,
-            evidence_refs,
-            created_at: snapshot.case.updated_at,
-        },
-        output,
-    }
+    let mut record = AgentRunRecord {
+        id: Uuid::new_v4(),
+        case_id: snapshot.case.id,
+        task_id: task.id,
+        prompt_version: prompt_version.to_owned(),
+        model_id: model_id.to_owned(),
+        context_version: snapshot.case.coverage_version + snapshot.case.service_version,
+        tool_calls_json: tool_calls.to_json_string(),
+        structured_output_json,
+        evidence_refs,
+        created_at: snapshot.case.updated_at,
+        plan_json: None,
+        reasoning_json: None,
+    };
+    crate::lab::plan::persist_reasoning_columns(&mut record, &tool_calls);
+    AgentRunResult { record, output }
 }
 
 fn run_task_ids(task: &Task, snapshot: &CaseSnapshot) -> Value {
@@ -688,7 +689,8 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
         let user = context.to_string();
 
         let mut last_err = None;
-        for attempt in 0..2 {
+        let mut repair = crate::lab::plan::RepairMeta::none();
+        for attempt in 0..crate::lab::plan::MAX_REPAIR_LOOPS {
             match self.complete_json(system, &user) {
                 Ok(raw) => {
                     trace.push_diagnostic(json!({
@@ -700,6 +702,7 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
                     match serde_json::from_str::<AgentOutput>(&raw) {
                         Ok(output) => match validate_output_evidence(&output, &allowed) {
                             Ok(()) => {
+                                trace.repair = Some(repair);
                                 trace.push(terminal_tool_for_output(
                                     &ids,
                                     &output,
@@ -720,7 +723,23 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
                                     "ok": false,
                                     "error": err
                                 }));
-                                last_err = Some(err);
+                                last_err = Some(err.clone());
+                                if !repair.record("unknown_evidence") {
+                                    break;
+                                }
+                                trace.push(tool_call(
+                                    TOOL_READ_PERMITTED_EVIDENCE,
+                                    &json!({
+                                        "run_id": snapshot.case.run_id,
+                                        "task_id": task.id,
+                                        "evidence_id": "assigned_context"
+                                    }),
+                                    true,
+                                    None,
+                                    elapsed_us(started),
+                                    Some("s4"),
+                                    Some("replan"),
+                                ));
                             }
                         },
                         Err(err) => {
@@ -730,6 +749,9 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
                                 "error": err.to_string()
                             }));
                             last_err = Some(err.to_string());
+                            if !repair.record("invalid_schema") {
+                                break;
+                            }
                         }
                     }
                 }
@@ -741,12 +763,11 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
                         "error": err.to_string()
                     }));
                     last_err = Some(err.to_string());
-                    if attempt == 0 {
-                        continue;
+                    if !repair.record("openai_error") {
+                        return Err(LabError::Unverified(
+                            last_err.unwrap_or_else(|| "openai call failed after retry".into()),
+                        ));
                     }
-                    return Err(LabError::Unverified(
-                        last_err.unwrap_or_else(|| "openai call failed after retry".into()),
-                    ));
                 }
             }
         }
@@ -758,6 +779,7 @@ Use only allowed evidence ids from the context. Never claim payment guarantees. 
         let output = AgentOutput::Clarification {
             message: message.clone(),
         };
+        trace.repair = Some(repair);
         trace.push(tool_call(
             TOOL_REQUEST_CLARIFICATION,
             &json!({
@@ -864,6 +886,12 @@ mod tests {
             .iter()
             .all(|c| c.ok && c.args_digest.starts_with("sha256:")));
         assert_eq!(trace.calls[1].result_status.as_deref(), Some("pending"));
+        assert_eq!(
+            trace.plan.as_ref().map(|p| p.plan_version.as_str()),
+            Some(crate::lab::plan::PLAN_VERSION)
+        );
+        assert_eq!(trace.repair.as_ref().map(|r| r.max), Some(2));
+        assert!(result.record.plan_json.is_none());
     }
 
     #[test]

@@ -10,6 +10,7 @@ pub mod error;
 pub mod eval;
 pub mod inspect;
 pub mod payer;
+pub mod plan;
 pub mod scenarios;
 pub mod store;
 pub mod tools;

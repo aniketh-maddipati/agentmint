@@ -153,7 +153,9 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     tool_calls_json TEXT NOT NULL,
     structured_output_json TEXT NOT NULL,
     evidence_refs_json TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    plan_json TEXT,
+    reasoning_json TEXT
 );
 CREATE TABLE IF NOT EXISTS outbound_dedup (
     dedup_key TEXT PRIMARY KEY,
@@ -175,6 +177,7 @@ impl CaseStore {
     pub fn open(path: &Path) -> LabResult<Self> {
         let conn = Connection::open(path)?;
         conn.execute_batch(MIGRATION)?;
+        ensure_agent_run_reasoning_columns(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
@@ -677,8 +680,9 @@ impl CaseStore {
             conn.execute(
                 "INSERT INTO agent_runs
                  (id, case_id, task_id, prompt_version, model_id, context_version,
-                  tool_calls_json, structured_output_json, evidence_refs_json, created_at)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                  tool_calls_json, structured_output_json, evidence_refs_json, created_at,
+                  plan_json, reasoning_json)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
                 params![
                     run.id.to_string(),
                     run.case_id.to_string(),
@@ -690,6 +694,8 @@ impl CaseStore {
                     run.structured_output_json,
                     serde_json::to_string(&run.evidence_refs)?,
                     run.created_at.to_rfc3339(),
+                    run.plan_json,
+                    run.reasoning_json,
                 ],
             )?;
             Ok(())
@@ -1042,7 +1048,8 @@ fn load_pending(conn: &Connection, case_id: Uuid) -> LabResult<Vec<PendingWork>>
 fn load_agent_runs(conn: &Connection, case_id: Uuid) -> LabResult<Vec<AgentRunRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, case_id, task_id, prompt_version, model_id, context_version,
-                tool_calls_json, structured_output_json, evidence_refs_json, created_at
+                tool_calls_json, structured_output_json, evidence_refs_json, created_at,
+                plan_json, reasoning_json
          FROM agent_runs WHERE case_id = ?1 ORDER BY created_at",
     )?;
     let rows = stmt.query_map(params![case_id.to_string()], |row| {
@@ -1057,9 +1064,26 @@ fn load_agent_runs(conn: &Connection, case_id: Uuid) -> LabResult<Vec<AgentRunRe
             structured_output_json: row.get(7)?,
             evidence_refs: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
             created_at: parse_dt(&row.get::<_, String>(9)?).unwrap_or_else(|_| Utc::now()),
+            plan_json: row.get(10)?,
+            reasoning_json: row.get(11)?,
         })
     })?;
     collect_rows(rows)
+}
+
+fn ensure_agent_run_reasoning_columns(conn: &Connection) -> LabResult<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(agent_runs)")?;
+    let names: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .filter_map(Result::ok)
+        .collect();
+    if !names.iter().any(|n| n == "plan_json") {
+        conn.execute("ALTER TABLE agent_runs ADD COLUMN plan_json TEXT", [])?;
+    }
+    if !names.iter().any(|n| n == "reasoning_json") {
+        conn.execute("ALTER TABLE agent_runs ADD COLUMN reasoning_json TEXT", [])?;
+    }
+    Ok(())
 }
 
 fn collect_rows<T>(
@@ -1115,5 +1139,63 @@ mod tests {
             .unwrap();
         assert_eq!(e1.seq, 1);
         assert_eq!(e2.seq, 2);
+    }
+
+    #[test]
+    fn agent_run_reasoning_columns_round_trip() {
+        let dir = tempdir().unwrap();
+        let store = CaseStore::open(&dir.path().join("lab.db")).unwrap();
+        let now = Utc::now();
+        let case = Case {
+            id: Uuid::new_v4(),
+            run_id: Uuid::new_v4(),
+            scenario_id: "t".into(),
+            workflow_version: WORKFLOW_VERSION.into(),
+            stage: CaseStage::Bv,
+            service: ServiceContext {
+                cpt: "72148".into(),
+                diagnosis: "M54.5".into(),
+                site: "outpatient".into(),
+            },
+            coverage: CoverageContext {
+                payer_name: "p".into(),
+                member_id: "m".into(),
+                plan_id: "pl".into(),
+                dos: "2026-10-01".into(),
+            },
+            service_version: 1,
+            coverage_version: 1,
+            disposition: None,
+            paused_from: None,
+            created_at: now,
+            updated_at: now,
+        };
+        store.insert_case(&case).unwrap();
+        let plan = crate::lab::plan::default_bv_plan();
+        let repair = crate::lab::plan::RepairMeta::none();
+        let run = AgentRunRecord {
+            id: Uuid::new_v4(),
+            case_id: case.id,
+            task_id: Uuid::new_v4(),
+            prompt_version: "bv-scripted-v1".into(),
+            model_id: "scripted".into(),
+            context_version: 2,
+            tool_calls_json: crate::lab::tools::ToolTrace::new().to_json_string(),
+            structured_output_json: "{}".into(),
+            evidence_refs: vec![],
+            created_at: now,
+            plan_json: Some(serde_json::to_string(&plan).unwrap()),
+            reasoning_json: Some(serde_json::to_string(&repair).unwrap()),
+        };
+        store.insert_agent_run(&run).unwrap();
+        let loaded = load_agent_runs(&store.conn.lock().expect("lock"), case.id).unwrap();
+        assert_eq!(loaded[0].plan_json, run.plan_json);
+        assert_eq!(loaded[0].reasoning_json, run.reasoning_json);
+        assert_eq!(
+            crate::lab::plan::plan_from_record(&loaded[0])
+                .expect("plan")
+                .goal,
+            "determine_pa_requirement"
+        );
     }
 }
