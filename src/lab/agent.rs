@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -11,6 +11,10 @@ use uuid::Uuid;
 
 use crate::lab::domain::{AgentRunRecord, CaseSnapshot, ObservationKind, Role, Task, Uncertainty};
 use crate::lab::error::{LabError, LabResult};
+use crate::lab::tools::{
+    tool_call, ToolCallEntry, ToolTrace, ALLOWED_TOOLS, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT,
+    TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
+};
 
 pub const PROMPT_VERSION_SCRIPTED: &str = "bv-scripted-v1";
 pub const PROMPT_VERSION_OPENAI: &str = "bv-openai-v1";
@@ -75,6 +79,19 @@ pub struct ScriptedAgentRunner;
 
 impl AgentRunner for ScriptedAgentRunner {
     fn run_bv(&self, task: &Task, snapshot: &CaseSnapshot) -> LabResult<AgentRunResult> {
+        let started = Instant::now();
+        let mut trace = ToolTrace::new();
+        let ids = run_task_ids(task, snapshot);
+        trace.push(tool_call(
+            TOOL_READ_ASSIGNED_CONTEXT,
+            &ids,
+            true,
+            None,
+            elapsed_us(started),
+            Some("s1"),
+            None,
+        ));
+
         let source_blobs: Vec<String> = snapshot
             .conversation
             .iter()
@@ -83,6 +100,20 @@ impl AgentRunner for ScriptedAgentRunner {
             .collect();
 
         if let Some(injection) = detect_injection(&source_blobs) {
+            let evidence_args = json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "evidence_id": "conversation"
+            });
+            trace.push(tool_call(
+                TOOL_READ_PERMITTED_EVIDENCE,
+                &evidence_args,
+                true,
+                None,
+                elapsed_us(started),
+                Some("s2"),
+                None,
+            ));
             let obs = DraftObservation {
                 kind: ObservationKind::InjectionAttempt,
                 statement: format!(
@@ -91,14 +122,16 @@ impl AgentRunner for ScriptedAgentRunner {
                 uncertainty: Uncertainty::Known,
                 evidence_refs: vec!["conversation".into()],
             };
+            let output = AgentOutput::Observations {
+                observations: vec![obs],
+                needs_human_review: true,
+            };
+            trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
             return Ok(build_result(
                 task,
                 snapshot,
-                AgentOutput::Observations {
-                    observations: vec![obs],
-                    needs_human_review: true,
-                },
-                json!([{"tool":"detect_injection","hit":true}]),
+                output,
+                trace,
                 PROMPT_VERSION_SCRIPTED,
                 "scripted",
             ));
@@ -111,21 +144,55 @@ impl AgentRunner for ScriptedAgentRunner {
             .collect();
 
         if payer_msgs.is_empty() {
+            let question = format!(
+                "Is prior authorization required for CPT {} on plan {} for DOS {}?",
+                snapshot.case.service.cpt,
+                snapshot.case.coverage.plan_id,
+                snapshot.case.coverage.dos
+            );
+            let args = json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "question": question,
+                "evidence_hint": "payer_bv_response"
+            });
+            trace.push(tool_call(
+                TOOL_ASK_PAYER,
+                &args,
+                true,
+                None,
+                elapsed_us(started),
+                Some("s2"),
+                Some("pending"),
+            ));
             return Ok(build_result(
                 task,
                 snapshot,
                 AgentOutput::PendingQuestion(PendingQuestion {
-                    question: format!(
-                        "Is prior authorization required for CPT {} on plan {} for DOS {}?",
-                        snapshot.case.service.cpt,
-                        snapshot.case.coverage.plan_id,
-                        snapshot.case.coverage.dos
-                    ),
+                    question,
                     evidence_hint: "payer_bv_response".into(),
                 }),
-                json!([{"tool":"ask_payer","status":"pending"}]),
+                trace,
                 PROMPT_VERSION_SCRIPTED,
                 "scripted",
+            ));
+        }
+
+        for msg in &payer_msgs {
+            let evidence_id = format!("msg:{}", msg.id);
+            let args = json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "evidence_id": evidence_id
+            });
+            trace.push(tool_call(
+                TOOL_READ_PERMITTED_EVIDENCE,
+                &args,
+                true,
+                None,
+                elapsed_us(started),
+                Some("s2"),
+                None,
             ));
         }
 
@@ -136,13 +203,28 @@ impl AgentRunner for ScriptedAgentRunner {
             .join("\n");
 
         if joined.trim().is_empty() || joined.to_lowercase().contains("garbled") {
+            let message =
+                "Payer response malformed or unsupported; need clarification.".to_string();
+            let args = json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "message": message,
+                "reason": "malformed_payer"
+            });
+            trace.push(tool_call(
+                TOOL_REQUEST_CLARIFICATION,
+                &args,
+                true,
+                None,
+                elapsed_us(started),
+                Some("s3"),
+                Some("accepted"),
+            ));
             return Ok(build_result(
                 task,
                 snapshot,
-                AgentOutput::Clarification {
-                    message: "Payer response malformed or unsupported; need clarification.".into(),
-                },
-                json!([{"tool":"parse_payer","status":"malformed"}]),
+                AgentOutput::Clarification { message },
+                trace,
                 PROMPT_VERSION_SCRIPTED,
                 "scripted",
             ));
@@ -157,15 +239,17 @@ impl AgentRunner for ScriptedAgentRunner {
                 || (o.uncertainty == Uncertainty::Unknown
                     && joined.to_lowercase().contains("may require"))
         });
+        let output = AgentOutput::Observations {
+            observations,
+            needs_human_review,
+        };
+        trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
 
         Ok(build_result(
             task,
             snapshot,
-            AgentOutput::Observations {
-                observations,
-                needs_human_review,
-            },
-            json!([{"tool":"parse_payer","status":"ok"}]),
+            output,
+            trace,
             PROMPT_VERSION_SCRIPTED,
             "scripted",
         ))
@@ -191,7 +275,7 @@ pub fn detect_injection(blobs: &[String]) -> Option<String> {
     None
 }
 
-fn interpret_payer_text(text: &str, evidence_refs: &[String]) -> Vec<DraftObservation> {
+pub(crate) fn interpret_payer_text(text: &str, evidence_refs: &[String]) -> Vec<DraftObservation> {
     let lower = text.to_lowercase();
     let mut out = Vec::new();
 
@@ -296,7 +380,7 @@ fn build_result(
     task: &Task,
     snapshot: &CaseSnapshot,
     output: AgentOutput,
-    tool_calls: Value,
+    tool_calls: ToolTrace,
     prompt_version: &str,
     model_id: &str,
 ) -> AgentRunResult {
@@ -318,12 +402,92 @@ fn build_result(
             prompt_version: prompt_version.to_owned(),
             model_id: model_id.to_owned(),
             context_version: snapshot.case.coverage_version + snapshot.case.service_version,
-            tool_calls_json: tool_calls.to_string(),
+            tool_calls_json: tool_calls.to_json_string(),
             structured_output_json,
             evidence_refs,
             created_at: snapshot.case.updated_at,
         },
         output,
+    }
+}
+
+fn run_task_ids(task: &Task, snapshot: &CaseSnapshot) -> Value {
+    json!({
+        "run_id": snapshot.case.run_id,
+        "task_id": task.id
+    })
+}
+
+fn elapsed_us(started: Instant) -> u64 {
+    started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64
+}
+
+fn report_observations_call(ids: &Value, output: &AgentOutput, latency_us: u64) -> ToolCallEntry {
+    let (observations, needs_human_review) = match output {
+        AgentOutput::Observations {
+            observations,
+            needs_human_review,
+        } => (observations, *needs_human_review),
+        _ => {
+            return tool_call(
+                TOOL_REPORT_OBSERVATIONS,
+                ids,
+                false,
+                Some("not an observations output".into()),
+                latency_us,
+                Some("s3"),
+                None,
+            )
+        }
+    };
+    let args = json!({
+        "run_id": ids.get("run_id"),
+        "task_id": ids.get("task_id"),
+        "observations": observations,
+        "needs_human_review": needs_human_review
+    });
+    tool_call(
+        TOOL_REPORT_OBSERVATIONS,
+        &args,
+        true,
+        None,
+        latency_us,
+        Some("s3"),
+        Some("accepted"),
+    )
+}
+
+fn terminal_tool_for_output(ids: &Value, output: &AgentOutput, latency_us: u64) -> ToolCallEntry {
+    match output {
+        AgentOutput::PendingQuestion(q) => tool_call(
+            TOOL_ASK_PAYER,
+            &json!({
+                "run_id": ids.get("run_id"),
+                "task_id": ids.get("task_id"),
+                "question": q.question,
+                "evidence_hint": q.evidence_hint
+            }),
+            true,
+            None,
+            latency_us,
+            Some("s2"),
+            Some("pending"),
+        ),
+        AgentOutput::Observations { .. } => report_observations_call(ids, output, latency_us),
+        AgentOutput::Clarification { message } => tool_call(
+            TOOL_REQUEST_CLARIFICATION,
+            &json!({
+                "run_id": ids.get("run_id"),
+                "task_id": ids.get("task_id"),
+                "message": message,
+                "reason": "other"
+            }),
+            true,
+            None,
+            latency_us,
+            Some("s3"),
+            Some("accepted"),
+        ),
     }
 }
 
@@ -382,6 +546,8 @@ pub fn validate_output_evidence(
 }
 
 pub fn assigned_context_value(task: &Task, snapshot: &CaseSnapshot) -> Value {
+    let mut evidence: Vec<String> = allowed_evidence_ids(snapshot).into_iter().collect();
+    evidence.sort();
     json!({
         "task_id": task.id,
         "task_purpose": task.purpose,
@@ -409,13 +575,8 @@ pub fn assigned_context_value(task: &Task, snapshot: &CaseSnapshot) -> Value {
             "name": d.fixture_name,
             "content_hash": d.content_hash,
         })).collect::<Vec<_>>(),
-        "allowed_tools": [
-            "read_assigned_context",
-            "ask_payer",
-            "read_permitted_evidence",
-            "report_observations",
-            "request_clarification_or_review"
-        ],
+        "allowed_evidence_ids": evidence,
+        "allowed_tools": ALLOWED_TOOLS,
         "rules": [
             "Do not invent clinical justifications.",
             "Do not approve packets or submit to payers.",
@@ -512,6 +673,19 @@ impl OpenAiAgentRunner {
 
 impl AgentRunner for OpenAiAgentRunner {
     fn run_bv(&self, task: &Task, snapshot: &CaseSnapshot) -> LabResult<AgentRunResult> {
+        let started = Instant::now();
+        let mut trace = ToolTrace::new();
+        let ids = run_task_ids(task, snapshot);
+        trace.push(tool_call(
+            TOOL_READ_ASSIGNED_CONTEXT,
+            &ids,
+            true,
+            None,
+            elapsed_us(started),
+            Some("s1"),
+            None,
+        ));
+
         let source_blobs: Vec<String> = snapshot
             .conversation
             .iter()
@@ -528,14 +702,29 @@ impl AgentRunner for OpenAiAgentRunner {
                 uncertainty: Uncertainty::Known,
                 evidence_refs: vec!["conversation".into()],
             };
+            let output = AgentOutput::Observations {
+                observations: vec![obs],
+                needs_human_review: true,
+            };
+            trace.push(tool_call(
+                TOOL_READ_PERMITTED_EVIDENCE,
+                &json!({
+                    "run_id": snapshot.case.run_id,
+                    "task_id": task.id,
+                    "evidence_id": "conversation"
+                }),
+                true,
+                None,
+                elapsed_us(started),
+                Some("s2"),
+                None,
+            ));
+            trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
             return Ok(build_result(
                 task,
                 snapshot,
-                AgentOutput::Observations {
-                    observations: vec![obs],
-                    needs_human_review: true,
-                },
-                json!([{"tool":"detect_injection","hit":true,"model":self.model}]),
+                output,
+                trace,
                 PROMPT_VERSION_OPENAI,
                 &self.model,
             ));
@@ -544,20 +733,20 @@ impl AgentRunner for OpenAiAgentRunner {
         let allowed = allowed_evidence_ids(snapshot);
         let context = assigned_context_value(task, snapshot);
         let system = "You are a narrow benefits-verification task agent for outpatient MRI CPT 72148. \
+Allowed tools: read_assigned_context, ask_payer, read_permitted_evidence, report_observations, request_clarification_or_review. \
 Respond with a single JSON object matching one of: \
 {\"type\":\"pending_question\",\"question\":\"...\",\"evidence_hint\":\"payer_bv_response\"}, \
 {\"type\":\"observations\",\"observations\":[{\"kind\":\"eligibility|coverage|pa_requirement|network|documentation_need|injection_attempt|clarification|other\",\"statement\":\"...\",\"uncertainty\":\"known|unknown|not_applicable\",\"evidence_refs\":[\"...\"]}],\"needs_human_review\":false}, \
 {\"type\":\"clarification\",\"message\":\"...\"}. \
-Use only allowed evidence ids from the context. Never claim payment guarantees.";
+Use only allowed evidence ids from the context. Never claim payment guarantees. Never call set_stage, approve_packet, submit_pa, write_ehr, or generate_clinical_justification.";
         let user = context.to_string();
 
-        let mut tool_trace = vec![json!({"tool":"read_assigned_context","ok":true})];
         let mut last_err = None;
         for attempt in 0..2 {
             match self.complete_json(system, &user) {
                 Ok(raw) => {
-                    tool_trace.push(json!({
-                        "tool":"openai_chat_completions",
+                    trace.push_diagnostic(json!({
+                        "component": "openai_chat_completions",
                         "attempt": attempt + 1,
                         "model": self.model,
                         "ok": true
@@ -565,18 +754,23 @@ Use only allowed evidence ids from the context. Never claim payment guarantees."
                     match serde_json::from_str::<AgentOutput>(&raw) {
                         Ok(output) => match validate_output_evidence(&output, &allowed) {
                             Ok(()) => {
+                                trace.push(terminal_tool_for_output(
+                                    &ids,
+                                    &output,
+                                    elapsed_us(started),
+                                ));
                                 return Ok(build_result(
                                     task,
                                     snapshot,
                                     output,
-                                    Value::Array(tool_trace),
+                                    trace,
                                     PROMPT_VERSION_OPENAI,
                                     &self.model,
                                 ));
                             }
                             Err(err) => {
-                                tool_trace.push(json!({
-                                    "tool":"validate_evidence",
+                                trace.push_diagnostic(json!({
+                                    "component": "validate_evidence",
                                     "ok": false,
                                     "error": err
                                 }));
@@ -584,8 +778,8 @@ Use only allowed evidence ids from the context. Never claim payment guarantees."
                             }
                         },
                         Err(err) => {
-                            tool_trace.push(json!({
-                                "tool":"parse_agent_output",
+                            trace.push_diagnostic(json!({
+                                "component": "parse_agent_output",
                                 "ok": false,
                                 "error": err.to_string()
                             }));
@@ -594,8 +788,8 @@ Use only allowed evidence ids from the context. Never claim payment guarantees."
                     }
                 }
                 Err(err) => {
-                    tool_trace.push(json!({
-                        "tool":"openai_chat_completions",
+                    trace.push_diagnostic(json!({
+                        "component": "openai_chat_completions",
                         "attempt": attempt + 1,
                         "ok": false,
                         "error": err.to_string()
@@ -611,16 +805,32 @@ Use only allowed evidence ids from the context. Never claim payment guarantees."
             }
         }
 
+        let message = format!(
+            "Model output invalid after bounded repair: {}",
+            last_err.unwrap_or_else(|| "unknown".into())
+        );
+        let output = AgentOutput::Clarification {
+            message: message.clone(),
+        };
+        trace.push(tool_call(
+            TOOL_REQUEST_CLARIFICATION,
+            &json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "message": message,
+                "reason": "other"
+            }),
+            true,
+            None,
+            elapsed_us(started),
+            Some("s4"),
+            Some("accepted"),
+        ));
         Ok(build_result(
             task,
             snapshot,
-            AgentOutput::Clarification {
-                message: format!(
-                    "Model output invalid after bounded repair: {}",
-                    last_err.unwrap_or_else(|| "unknown".into())
-                ),
-            },
-            Value::Array(tool_trace),
+            output,
+            trace,
             PROMPT_VERSION_OPENAI,
             &self.model,
         ))
@@ -693,6 +903,21 @@ mod tests {
         let result = agent.run_bv(&task, &snap).expect("run");
         assert!(matches!(result.output, AgentOutput::PendingQuestion(_)));
         assert_eq!(result.record.model_id, "scripted");
+        let trace =
+            crate::lab::tools::parse_tool_trace(&result.record.tool_calls_json).expect("trace");
+        assert_eq!(
+            trace
+                .calls
+                .iter()
+                .map(|c| c.tool.as_str())
+                .collect::<Vec<_>>(),
+            vec![TOOL_READ_ASSIGNED_CONTEXT, TOOL_ASK_PAYER]
+        );
+        assert!(trace
+            .calls
+            .iter()
+            .all(|c| c.ok && c.args_digest.starts_with("sha256:")));
+        assert_eq!(trace.calls[1].result_status.as_deref(), Some("pending"));
     }
 
     #[test]
@@ -747,5 +972,48 @@ mod tests {
             Some(value) => std::env::set_var("MINT_LAB_AGENT", value),
             None => std::env::remove_var("MINT_LAB_AGENT"),
         }
+    }
+
+    #[test]
+    fn scripted_observation_trace_uses_only_allowed_tools() {
+        let mut snap = empty_snapshot();
+        snap.conversation.push(ConversationMessage {
+            id: Uuid::new_v4(),
+            case_id: snap.case.id,
+            role: Role::Payer,
+            text: "Member is active. Prior authorization is required for CPT 72148.".into(),
+            created_at: Utc::now(),
+        });
+        let task = Task {
+            id: Uuid::new_v4(),
+            case_id: snap.case.id,
+            purpose: TaskPurpose::BenefitsVerification,
+            status: TaskStatus::Open,
+            owner: Role::Operator,
+            context_json: "{}".into(),
+            created_at: Utc::now(),
+            completed_at: None,
+        };
+        let result = ScriptedAgentRunner.run_bv(&task, &snap).expect("run");
+        assert!(matches!(result.output, AgentOutput::Observations { .. }));
+        let trace =
+            crate::lab::tools::parse_tool_trace(&result.record.tool_calls_json).expect("trace");
+        assert_eq!(trace.calls[0].tool, TOOL_READ_ASSIGNED_CONTEXT);
+        assert!(trace
+            .calls
+            .iter()
+            .any(|c| c.tool == TOOL_READ_PERMITTED_EVIDENCE));
+        assert_eq!(
+            trace.calls.last().map(|c| c.tool.as_str()),
+            Some(TOOL_REPORT_OBSERVATIONS)
+        );
+        assert!(trace
+            .calls
+            .iter()
+            .all(|c| crate::lab::tools::is_allowed_tool(&c.tool)));
+        assert!(!trace
+            .calls
+            .iter()
+            .any(|c| crate::lab::tools::is_forbidden_tool(&c.tool)));
     }
 }

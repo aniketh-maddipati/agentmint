@@ -12,6 +12,7 @@ pub mod inspect;
 pub mod payer;
 pub mod scenarios;
 pub mod store;
+pub mod tools;
 pub mod workflow;
 
 pub use domain::WORKFLOW_VERSION;
