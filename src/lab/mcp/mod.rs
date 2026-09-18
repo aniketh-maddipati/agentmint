@@ -146,7 +146,7 @@ pub fn handle_rpc(state: &McpState, req: JsonRpcRequest, ctx: &McpCallContext) -
             id,
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": { "tools": {} },
+                "capabilities": { "tools": {}, "resources": {} },
                 "serverInfo": {
                     "name": SERVER_NAME,
                     "version": env!("CARGO_PKG_VERSION")
@@ -176,7 +176,20 @@ pub fn handle_rpc(state: &McpState, req: JsonRpcRequest, ctx: &McpCallContext) -
                 }
             }
         },
-        "resources/list" => success(id, json!({ "resources": [] })),
+        "resources/list" => match list_resources(state) {
+            Ok(result) => success(id, result),
+            Err(err) => error_response(id, -32603, &err.to_string(), None),
+        },
+        "resources/read" => match read_resource(state, &req.params) {
+            Ok(result) => success(id, result),
+            Err(err) => {
+                let (code, message, _data) = map_tool_error(&err);
+                success(
+                    id,
+                    tool_result(json!({"error": code, "message": message}), true),
+                )
+            }
+        },
         other => error_response(
             id,
             -32601,
@@ -323,6 +336,70 @@ fn scan_for_real_identifiers(value: &Value) -> LabResult<()> {
         }
         _ => Ok(()),
     }
+}
+
+fn list_resources(state: &McpState) -> LabResult<Value> {
+    let snap = state.engine.snapshot(state.run_id)?;
+    let mut resources = vec![json!({
+        "uri": format!("mint-lab://run/{}/bv-task/{}/context", state.run_id, state.task_id),
+        "name": "assigned BV context",
+        "mimeType": "application/json"
+    })];
+    let mut ids: Vec<String> = allowed_evidence_ids(&snap).into_iter().collect();
+    ids.sort();
+    for evidence_id in ids {
+        resources.push(json!({
+            "uri": format!("mint-lab://run/{}/evidence/{}", state.run_id, evidence_id),
+            "name": format!("evidence {evidence_id}"),
+            "mimeType": "application/json"
+        }));
+    }
+    Ok(json!({ "resources": resources }))
+}
+
+fn read_resource(state: &McpState, params: &Value) -> LabResult<Value> {
+    let uri = params
+        .get("uri")
+        .and_then(Value::as_str)
+        .ok_or_else(|| LabError::Invalid("missing resource uri".into()))?;
+    let snap = state.engine.snapshot(state.run_id)?;
+    let task = snap
+        .tasks
+        .iter()
+        .find(|t| t.id == state.task_id)
+        .ok_or_else(|| LabError::NotFound(format!("task {}", state.task_id)))?;
+    let context_prefix = format!(
+        "mint-lab://run/{}/bv-task/{}/context",
+        state.run_id, state.task_id
+    );
+    if uri == context_prefix {
+        let body = assigned_context_value(task, &snap);
+        return Ok(json!({
+            "contents": [{
+                "uri": uri,
+                "mimeType": "application/json",
+                "text": body.to_string()
+            }]
+        }));
+    }
+    let evidence_prefix = format!("mint-lab://run/{}/evidence/", state.run_id);
+    if let Some(evidence_id) = uri.strip_prefix(&evidence_prefix) {
+        let allowed = allowed_evidence_ids(&snap);
+        if !allowed.contains(evidence_id) {
+            return Err(LabError::Invalid(format!(
+                "unknown evidence id {evidence_id}"
+            )));
+        }
+        let body = read_evidence_blob(&snap, evidence_id);
+        return Ok(json!({
+            "contents": [{
+                "uri": uri,
+                "mimeType": "application/json",
+                "text": body.to_string()
+            }]
+        }));
+    }
+    Err(LabError::NotFound(format!("resource {uri}")))
 }
 
 fn bound_ids(state: &McpState, args: &Value) -> LabResult<(Uuid, Uuid)> {
@@ -826,5 +903,46 @@ mod tests {
         let asked_body = body(&asked);
         assert_eq!(asked_body["status"], "pending");
         assert_eq!(asked_body["mode"], "human_or_scripted");
+    }
+
+    #[test]
+    fn resources_list_and_read_assigned_context() {
+        let (_dir, state) = state_for("approval", false, false);
+        let listed = handle_rpc(
+            &state,
+            JsonRpcRequest {
+                jsonrpc: "2.0".into(),
+                id: Some(json!(1)),
+                method: "resources/list".into(),
+                params: json!({}),
+            },
+            &McpCallContext { authorized: true },
+        );
+        let resources = listed.result.unwrap()["resources"]
+            .as_array()
+            .unwrap()
+            .clone();
+        assert!(resources
+            .iter()
+            .any(|r| r["uri"].as_str().unwrap().ends_with("/context")));
+        let uri = format!(
+            "mint-lab://run/{}/bv-task/{}/context",
+            state.run_id, state.task_id
+        );
+        let read = handle_rpc(
+            &state,
+            JsonRpcRequest {
+                jsonrpc: "2.0".into(),
+                id: Some(json!(2)),
+                method: "resources/read".into(),
+                params: json!({ "uri": uri }),
+            },
+            &McpCallContext { authorized: true },
+        );
+        let text = read.result.unwrap()["contents"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(text.contains("72148"));
     }
 }

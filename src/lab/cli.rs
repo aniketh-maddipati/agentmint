@@ -310,8 +310,9 @@ fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error
 
 fn cmd_mcp_stdio(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
     let state = prepare_mcp_state(args)?;
-    let handle = tokio::runtime::Handle::current();
-    handle.block_on(crate::lab::mcp::stdio::serve_stdio(state))?;
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(crate::lab::mcp::stdio::serve_stdio(state))
+    })?;
     Ok(ExitCode::SUCCESS)
 }
 
@@ -321,8 +322,9 @@ fn cmd_mcp_http(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>>
         .parse()
         .map_err(|err| format!("invalid --bind: {err}"))?;
     let state = prepare_mcp_state(args)?;
-    let handle = tokio::runtime::Handle::current();
-    handle.block_on(crate::lab::mcp::http::serve_http(state, addr))?;
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(crate::lab::mcp::http::serve_http(state, addr))
+    })?;
     Ok(ExitCode::SUCCESS)
 }
 

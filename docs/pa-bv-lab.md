@@ -74,6 +74,7 @@ cargo test
 | ----- | ---- | ----- |
 | BV task (`ScriptedAgentRunner`) | Default (`MINT_LAB_AGENT=scripted` or unset) | `scripted` |
 | BV task (`OpenAiAgentRunner`) | `MINT_LAB_AGENT=openai` + `OPENAI_API_KEY` | `gpt-4.1-mini` (override `MINT_LAB_MODEL`) |
+| BV task (`McpAgentRunner`) | `MINT_LAB_AGENT=mcp` + `MINT_LAB_MCP_TOKEN` + `MINT_LAB_MCP_URL` | `mcp` |
 
 Review, appeal initiation, document supply, and payer speech are **not** LLM agents — they stay human console roles or fixture-driven.
 
@@ -81,9 +82,32 @@ Review, appeal initiation, document supply, and payer speech are **not** LLM age
 # Deterministic BV scoring (offline)
 cargo run --quiet -- lab eval-model --scenario unclear_bv --json
 
+# In-process MCP vs scripted (still synthetic; not required for CI)
+cargo run --quiet -- lab eval-model --scenario unclear_bv --runner mcp --json
+
 # Optional live OpenAI eval (not CI)
 MINT_LAB_MODEL_EVAL=1 OPENAI_API_KEY=... cargo run --quiet -- lab eval-model --scenario approval --live --json
 ```
+
+## MCP (lab mock)
+
+Mint exposes **five BV tools only** as an MCP server: `read_assigned_context`, `ask_payer`, `read_permitted_evidence`, `report_observations`, `request_clarification_or_review`. Stage mutation, packet approve/submit, appeal, EHR, IVR, and clinical-justification tools are not listed.
+
+```bash
+# Loopback HTTP + FakePayer auto-answer (no real PHI or keys)
+./scripts/demo-pa-bv-mcp.sh
+
+# Same handlers over stdio (MCP inspector)
+MINT_LAB_MCP_TOKEN=lab-token cargo run --quiet -- lab mcp-stdio --scenario unclear_bv --dir /tmp/lab-mcp
+```
+
+| Env | Effect |
+| --- | ------ |
+| `MINT_LAB_MCP_TOKEN` | Required bearer for every HTTP `tools/call`. Fail-closed if unset. |
+| `MINT_LAB_AUTO_PAYER=1` | `ask_payer` may return a FakePayer/fixture answer (`mode=auto_payer`). Default waits for human/scripted speech. |
+| `MINT_LAB_REASONING_COLUMNS=1` | Also persist `plan_json` / `reasoning_json` on agent runs; plan always embeds in `tool_calls_json`. |
+
+HTTP binds `127.0.0.1` only. Read-only resources: `mint-lab://run/{run_id}/bv-task/{task_id}/context` and `mint-lab://run/{run_id}/evidence/{evidence_id}`.
 
 ## Limitations
 

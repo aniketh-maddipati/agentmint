@@ -1,6 +1,6 @@
 # PA/BV Lab — MCP & Advanced Reasoning Mock Plan
 
-**Status:** planning only (no implementation in this change)  
+**Status:** implemented through plan §9 PR7 (stdio + loopback HTTP MCP, verifiers, bv-plan-v1, eval parity)  
 **Scope:** Mock Hippocratic AI–style and comparable prior-auth / benefits-verification **agent systems** against the Mint `medical-mri-pa-v1` lab.  
 **Worktree:** `/workspace/.wt-pa-bv` on `cursor/pa-bv-case-console-0c0c`  
 **Review date:** 2026-09-17  
