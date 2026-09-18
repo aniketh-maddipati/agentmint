@@ -16,24 +16,6 @@ pub struct VerifierReport {
     pub detail: String,
 }
 
-pub fn verify_all(
-    output_json: &str,
-    output: &AgentOutput,
-    allowed_evidence: &HashSet<String>,
-    source_blobs: &[String],
-    payer_text: &str,
-    tool_calls_json: &str,
-) -> Vec<VerifierReport> {
-    vec![
-        verify_schema(output_json),
-        verify_evidence(output, allowed_evidence),
-        verify_injection(source_blobs, output),
-        verify_uncertainty(output, payer_text),
-        verify_tool_authority(tool_calls_json, output, allowed_evidence),
-    ]
-}
-
-/// SchemaVerifier — `AgentOutput` deserializes and statements pass lint.
 pub fn verify_schema(raw: &str) -> VerifierReport {
     match serde_json::from_str::<AgentOutput>(raw) {
         Ok(output) => match lint_output(&output) {

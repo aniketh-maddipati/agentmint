@@ -2,14 +2,14 @@
 //! Used by: binary main routing.
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
 
 use uuid::Uuid;
 
+use crate::lab::clock::parse_duration;
 use crate::lab::console;
-use crate::lab::error::{LabError, LabResult};
+use crate::lab::error::LabResult;
 use crate::lab::inspect::{events_json, inspect_run, inspect_text};
 use crate::lab::scenarios::{fixtures_dir, list_scenarios_from, load_scenario_from};
 use crate::lab::workflow::LabEngine;
@@ -114,23 +114,23 @@ fn cmd_start(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_console(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
+fn parse_run_id(args: &[String]) -> Result<Uuid, Box<dyn std::error::Error>> {
+    Ok(args
         .first()
         .ok_or("missing run-id")?
         .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+        .map_err(|e| format!("invalid run-id: {e}"))?)
+}
+
+fn cmd_console(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let run_id = parse_run_id(args)?;
     let engine = open_engine(args)?;
     console::run_console(&engine, run_id)?;
     Ok(ExitCode::SUCCESS)
 }
 
 fn cmd_inspect(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
-        .first()
-        .ok_or("missing run-id")?
-        .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let run_id = parse_run_id(args)?;
     let engine = open_engine(args)?;
     let report = inspect_run(&engine, run_id)?;
     if wants_json(args) {
@@ -142,11 +142,7 @@ fn cmd_inspect(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> 
 }
 
 fn cmd_events(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
-        .first()
-        .ok_or("missing run-id")?
-        .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let run_id = parse_run_id(args)?;
     let engine = open_engine(args)?;
     let events = events_json(&engine, run_id)?;
     if wants_json(args) {
@@ -168,11 +164,7 @@ fn cmd_events(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
 }
 
 fn cmd_advance(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
-        .first()
-        .ok_or("missing run-id")?
-        .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let run_id = parse_run_id(args)?;
     let by = flag(args, "--by").ok_or("missing --by")?;
     let engine = open_engine(args)?;
     engine.advance_clock(parse_duration(by)?)?;
@@ -182,11 +174,7 @@ fn cmd_advance(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> 
 }
 
 fn cmd_fault(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
-        .first()
-        .ok_or("missing run-id")?
-        .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let run_id = parse_run_id(args)?;
     let fault = args.get(1).ok_or("missing fault name")?;
     let engine = open_engine(args)?;
     let _ = engine.require_case(run_id)?;
@@ -196,11 +184,7 @@ fn cmd_fault(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
 }
 
 fn cmd_check(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    let run_id = args
-        .first()
-        .ok_or("missing run-id")?
-        .parse::<Uuid>()
-        .map_err(|e| format!("invalid run-id: {e}"))?;
+    let run_id = parse_run_id(args)?;
     let engine = open_engine(args)?;
     let failures = engine.check_run(run_id)?;
     if failures.is_empty() {
@@ -354,36 +338,4 @@ fn prepare_mcp_state(
         auto_payer: crate::lab::mcp::auto_payer_enabled(),
         trace: std::sync::Mutex::new(crate::lab::tools::ToolTrace::new()),
     })
-}
-
-fn parse_duration(raw: &str) -> LabResult<Duration> {
-    let raw = raw.trim();
-    if let Some(num) = raw.strip_suffix('s') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(Duration::from_secs(n));
-    }
-    if let Some(num) = raw.strip_suffix('m') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(Duration::from_secs(n * 60));
-    }
-    if let Some(num) = raw.strip_suffix('h') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(Duration::from_secs(n * 3600));
-    }
-    let n: u64 = raw
-        .parse()
-        .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-    Ok(Duration::from_secs(n))
-}
-
-#[allow(dead_code)]
-fn ensure_dir(path: &Path) -> LabResult<()> {
-    std::fs::create_dir_all(path)?;
-    Ok(())
 }

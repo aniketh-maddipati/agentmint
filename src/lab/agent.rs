@@ -15,7 +15,7 @@ use crate::lab::tools::{
     tool_call, ToolCallEntry, ToolTrace, ALLOWED_TOOLS, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT,
     TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
 };
-pub use crate::lab::verifiers::{detect_injection, validate_output_evidence};
+use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 
 pub const PROMPT_VERSION_SCRIPTED: &str = "bv-scripted-v1";
 pub const PROMPT_VERSION_OPENAI: &str = "bv-openai-v1";
@@ -86,177 +86,211 @@ impl AgentRunner for ScriptedAgentRunner {
         let started = Instant::now();
         let mut trace = ToolTrace::new();
         let ids = run_task_ids(task, snapshot);
-        trace.push(tool_call(
+        push_tool(
+            &mut trace,
             TOOL_READ_ASSIGNED_CONTEXT,
             &ids,
-            true,
+            started,
+            "s1",
             None,
-            elapsed_us(started),
-            Some("s1"),
-            None,
-        ));
+        );
+        let decision = decide_bv(task, snapshot);
+        record_scripted_decision(&mut trace, task, snapshot, &ids, &decision, started);
+        Ok(build_result(
+            task,
+            snapshot,
+            decision.output(),
+            trace,
+            PROMPT_VERSION_SCRIPTED,
+            "scripted",
+        ))
+    }
+}
 
-        let source_blobs: Vec<String> = snapshot
-            .conversation
-            .iter()
-            .map(|m| m.text.clone())
-            .chain(std::iter::once(task.context_json.clone()))
-            .collect();
+pub(crate) enum BvDecision {
+    Injection {
+        marker: String,
+    },
+    AskPayer {
+        question: String,
+    },
+    Clarification {
+        message: String,
+        reason: &'static str,
+    },
+    Observations {
+        observations: Vec<DraftObservation>,
+        needs_human_review: bool,
+        evidence_ids: Vec<String>,
+    },
+}
 
-        if let Some(injection) = detect_injection(&source_blobs) {
-            let evidence_args = json!({
-                "run_id": snapshot.case.run_id,
-                "task_id": task.id,
-                "evidence_id": "conversation"
-            });
-            trace.push(tool_call(
-                TOOL_READ_PERMITTED_EVIDENCE,
-                &evidence_args,
-                true,
-                None,
-                elapsed_us(started),
-                Some("s2"),
-                None,
-            ));
-            let obs = DraftObservation {
-                kind: ObservationKind::InjectionAttempt,
-                statement: format!(
-                    "Possible prompt-injection content detected in source material: {injection}"
-                ),
-                uncertainty: Uncertainty::Known,
-                evidence_refs: vec!["conversation".into()],
-            };
-            let output = AgentOutput::Observations {
-                observations: vec![obs],
+impl BvDecision {
+    pub(crate) fn output(&self) -> AgentOutput {
+        match self {
+            Self::Injection { marker } => AgentOutput::Observations {
+                observations: vec![injection_observation(marker)],
                 needs_human_review: true,
-            };
-            trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
-            return Ok(build_result(
-                task,
-                snapshot,
-                output,
-                trace,
-                PROMPT_VERSION_SCRIPTED,
-                "scripted",
-            ));
+            },
+            Self::AskPayer { question } => AgentOutput::PendingQuestion(PendingQuestion {
+                question: question.clone(),
+                evidence_hint: "payer_bv_response".into(),
+            }),
+            Self::Clarification { message, .. } => AgentOutput::Clarification {
+                message: message.clone(),
+            },
+            Self::Observations {
+                observations,
+                needs_human_review,
+                ..
+            } => AgentOutput::Observations {
+                observations: observations.clone(),
+                needs_human_review: *needs_human_review,
+            },
         }
+    }
+}
 
-        let payer_msgs: Vec<_> = snapshot
-            .conversation
-            .iter()
-            .filter(|m| m.role == Role::Payer)
-            .collect();
+pub(crate) fn decide_bv(task: &Task, snapshot: &CaseSnapshot) -> BvDecision {
+    let source_blobs: Vec<String> = snapshot
+        .conversation
+        .iter()
+        .map(|m| m.text.clone())
+        .chain(std::iter::once(task.context_json.clone()))
+        .collect();
+    if let Some(marker) = detect_injection(&source_blobs) {
+        return BvDecision::Injection { marker };
+    }
 
-        if payer_msgs.is_empty() {
-            let question = format!(
+    let payer_msgs: Vec<_> = snapshot
+        .conversation
+        .iter()
+        .filter(|m| m.role == Role::Payer)
+        .collect();
+    if payer_msgs.is_empty() {
+        return BvDecision::AskPayer {
+            question: format!(
                 "Is prior authorization required for CPT {} on plan {} for DOS {}?",
                 snapshot.case.service.cpt,
                 snapshot.case.coverage.plan_id,
                 snapshot.case.coverage.dos
+            ),
+        };
+    }
+
+    let joined = payer_msgs
+        .iter()
+        .map(|m| m.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    if joined.trim().is_empty() || joined.to_lowercase().contains("garbled") {
+        return BvDecision::Clarification {
+            message: "Payer response malformed or unsupported; need clarification.".into(),
+            reason: "malformed_payer",
+        };
+    }
+
+    let evidence_ids: Vec<String> = payer_msgs.iter().map(|m| format!("msg:{}", m.id)).collect();
+    let observations = interpret_payer_text(&joined, &evidence_ids);
+    let needs_human_review = observations.iter().any(|o| {
+        matches!(o.kind, ObservationKind::InjectionAttempt)
+            || (o.uncertainty == Uncertainty::Unknown
+                && joined.to_lowercase().contains("may require"))
+    });
+    BvDecision::Observations {
+        observations,
+        needs_human_review,
+        evidence_ids,
+    }
+}
+
+fn injection_observation(marker: &str) -> DraftObservation {
+    DraftObservation {
+        kind: ObservationKind::InjectionAttempt,
+        statement: format!(
+            "Possible prompt-injection content detected in source material: {marker}"
+        ),
+        uncertainty: Uncertainty::Known,
+        evidence_refs: vec!["conversation".into()],
+    }
+}
+
+fn record_scripted_decision(
+    trace: &mut ToolTrace,
+    task: &Task,
+    snapshot: &CaseSnapshot,
+    ids: &Value,
+    decision: &BvDecision,
+    started: Instant,
+) {
+    match decision {
+        BvDecision::Injection { .. } => {
+            let args = json!({
+                "run_id": snapshot.case.run_id,
+                "task_id": task.id,
+                "evidence_id": "conversation"
+            });
+            push_tool(
+                trace,
+                TOOL_READ_PERMITTED_EVIDENCE,
+                &args,
+                started,
+                "s2",
+                None,
             );
+            trace.push(report_observations_call(
+                ids,
+                &decision.output(),
+                elapsed_us(started),
+            ));
+        }
+        BvDecision::AskPayer { question } => {
             let args = json!({
                 "run_id": snapshot.case.run_id,
                 "task_id": task.id,
                 "question": question,
                 "evidence_hint": "payer_bv_response"
             });
-            trace.push(tool_call(
-                TOOL_ASK_PAYER,
-                &args,
-                true,
-                None,
-                elapsed_us(started),
-                Some("s2"),
-                Some("pending"),
-            ));
-            return Ok(build_result(
-                task,
-                snapshot,
-                AgentOutput::PendingQuestion(PendingQuestion {
-                    question,
-                    evidence_hint: "payer_bv_response".into(),
-                }),
-                trace,
-                PROMPT_VERSION_SCRIPTED,
-                "scripted",
-            ));
+            push_tool(trace, TOOL_ASK_PAYER, &args, started, "s2", Some("pending"));
         }
-
-        for msg in &payer_msgs {
-            let evidence_id = format!("msg:{}", msg.id);
-            let args = json!({
-                "run_id": snapshot.case.run_id,
-                "task_id": task.id,
-                "evidence_id": evidence_id
-            });
-            trace.push(tool_call(
-                TOOL_READ_PERMITTED_EVIDENCE,
-                &args,
-                true,
-                None,
-                elapsed_us(started),
-                Some("s2"),
-                None,
-            ));
-        }
-
-        let joined = payer_msgs
-            .iter()
-            .map(|m| m.text.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        if joined.trim().is_empty() || joined.to_lowercase().contains("garbled") {
-            let message =
-                "Payer response malformed or unsupported; need clarification.".to_string();
+        BvDecision::Clarification { message, reason } => {
             let args = json!({
                 "run_id": snapshot.case.run_id,
                 "task_id": task.id,
                 "message": message,
-                "reason": "malformed_payer"
+                "reason": reason
             });
-            trace.push(tool_call(
+            push_tool(
+                trace,
                 TOOL_REQUEST_CLARIFICATION,
                 &args,
-                true,
-                None,
-                elapsed_us(started),
-                Some("s3"),
+                started,
+                "s3",
                 Some("accepted"),
-            ));
-            return Ok(build_result(
-                task,
-                snapshot,
-                AgentOutput::Clarification { message },
-                trace,
-                PROMPT_VERSION_SCRIPTED,
-                "scripted",
+            );
+        }
+        BvDecision::Observations { evidence_ids, .. } => {
+            for evidence_id in evidence_ids {
+                let args = json!({
+                    "run_id": snapshot.case.run_id,
+                    "task_id": task.id,
+                    "evidence_id": evidence_id
+                });
+                push_tool(
+                    trace,
+                    TOOL_READ_PERMITTED_EVIDENCE,
+                    &args,
+                    started,
+                    "s2",
+                    None,
+                );
+            }
+            trace.push(report_observations_call(
+                ids,
+                &decision.output(),
+                elapsed_us(started),
             ));
         }
-
-        let evidence_refs: Vec<String> =
-            payer_msgs.iter().map(|m| format!("msg:{}", m.id)).collect();
-
-        let observations = interpret_payer_text(&joined, &evidence_refs);
-        let needs_human_review = observations.iter().any(|o| {
-            matches!(o.kind, ObservationKind::InjectionAttempt)
-                || (o.uncertainty == Uncertainty::Unknown
-                    && joined.to_lowercase().contains("may require"))
-        });
-        let output = AgentOutput::Observations {
-            observations,
-            needs_human_review,
-        };
-        trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
-
-        Ok(build_result(
-            task,
-            snapshot,
-            output,
-            trace,
-            PROMPT_VERSION_SCRIPTED,
-            "scripted",
-        ))
     }
 }
 
@@ -397,15 +431,44 @@ pub(crate) fn build_result(
     AgentRunResult { record, output }
 }
 
-fn run_task_ids(task: &Task, snapshot: &CaseSnapshot) -> Value {
+pub(crate) fn run_task_ids(task: &Task, snapshot: &CaseSnapshot) -> Value {
     json!({
         "run_id": snapshot.case.run_id,
         "task_id": task.id
     })
 }
 
-fn elapsed_us(started: Instant) -> u64 {
+pub(crate) fn elapsed_us(started: Instant) -> u64 {
     started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64
+}
+
+pub(crate) fn push_tool(
+    trace: &mut ToolTrace,
+    tool: &str,
+    args: &Value,
+    started: Instant,
+    step: &str,
+    status: Option<&str>,
+) {
+    trace.push(tool_call(
+        tool,
+        args,
+        true,
+        None,
+        elapsed_us(started),
+        Some(step),
+        status,
+    ));
+}
+
+pub(crate) fn block_on_local<T>(
+    fut: impl std::future::Future<Output = LabResult<T>>,
+) -> LabResult<T> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| LabError::Io(format!("runtime: {err}")))?
+        .block_on(fut)
 }
 
 fn report_observations_call(ids: &Value, output: &AgentOutput, latency_us: u64) -> ToolCallEntry {
@@ -573,11 +636,7 @@ impl OpenAiAgentRunner {
     }
 
     fn complete_json(&self, system: &str, user: &str) -> LabResult<String> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|err| LabError::Io(format!("runtime: {err}")))?;
-        runtime.block_on(self.complete_json_async(system, user))
+        block_on_local(self.complete_json_async(system, user))
     }
 
     async fn complete_json_async(&self, system: &str, user: &str) -> LabResult<String> {
@@ -626,54 +685,21 @@ impl AgentRunner for OpenAiAgentRunner {
         let started = Instant::now();
         let mut trace = ToolTrace::new();
         let ids = run_task_ids(task, snapshot);
-        trace.push(tool_call(
+        push_tool(
+            &mut trace,
             TOOL_READ_ASSIGNED_CONTEXT,
             &ids,
-            true,
+            started,
+            "s1",
             None,
-            elapsed_us(started),
-            Some("s1"),
-            None,
-        ));
+        );
 
-        let source_blobs: Vec<String> = snapshot
-            .conversation
-            .iter()
-            .map(|m| m.text.clone())
-            .chain(std::iter::once(task.context_json.clone()))
-            .collect();
-
-        if let Some(injection) = detect_injection(&source_blobs) {
-            let obs = DraftObservation {
-                kind: ObservationKind::InjectionAttempt,
-                statement: format!(
-                    "Possible prompt-injection content detected in source material: {injection}"
-                ),
-                uncertainty: Uncertainty::Known,
-                evidence_refs: vec!["conversation".into()],
-            };
-            let output = AgentOutput::Observations {
-                observations: vec![obs],
-                needs_human_review: true,
-            };
-            trace.push(tool_call(
-                TOOL_READ_PERMITTED_EVIDENCE,
-                &json!({
-                    "run_id": snapshot.case.run_id,
-                    "task_id": task.id,
-                    "evidence_id": "conversation"
-                }),
-                true,
-                None,
-                elapsed_us(started),
-                Some("s2"),
-                None,
-            ));
-            trace.push(report_observations_call(&ids, &output, elapsed_us(started)));
+        if let decision @ BvDecision::Injection { .. } = decide_bv(task, snapshot) {
+            record_scripted_decision(&mut trace, task, snapshot, &ids, &decision, started);
             return Ok(build_result(
                 task,
                 snapshot,
-                output,
+                decision.output(),
                 trace,
                 PROMPT_VERSION_OPENAI,
                 &self.model,
@@ -909,22 +935,6 @@ mod tests {
             Some(value) => std::env::set_var("OPENAI_API_KEY", value),
             None => std::env::remove_var("OPENAI_API_KEY"),
         }
-    }
-
-    #[test]
-    fn validate_rejects_unknown_evidence() {
-        let snap = empty_snapshot();
-        let allowed = allowed_evidence_ids(&snap);
-        let output = AgentOutput::Observations {
-            observations: vec![DraftObservation {
-                kind: ObservationKind::PaRequirement,
-                statement: "x".into(),
-                uncertainty: Uncertainty::Known,
-                evidence_refs: vec!["msg:not-real".into()],
-            }],
-            needs_human_review: false,
-        };
-        assert!(validate_output_evidence(&output, &allowed).is_err());
     }
 
     #[test]

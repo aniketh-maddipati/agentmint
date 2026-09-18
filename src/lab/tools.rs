@@ -1,5 +1,5 @@
 //! BV tool contract and standard `tool_calls_json` trace shape.
-//! Used by: scripted/OpenAI runners, verifiers, eval, and (later) MCP.
+//! Used by: scripted/OpenAI/MCP runners, verifiers, and eval.
 //! Five tools only — no stage mutation, IVR, EHR, or clinical-justification tools.
 
 use serde::{Deserialize, Serialize};
@@ -71,13 +71,6 @@ impl ToolTrace {
             repair: Some(crate::lab::plan::RepairMeta::none()),
             calls: Vec::new(),
             diagnostics: Vec::new(),
-        }
-    }
-
-    pub fn with_calls(calls: Vec<ToolCallEntry>) -> Self {
-        Self {
-            calls,
-            ..Self::new()
         }
     }
 

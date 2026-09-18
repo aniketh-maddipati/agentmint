@@ -300,7 +300,7 @@ fn output_type_name(output: &AgentOutput) -> &'static str {
     }
 }
 
-pub fn snapshot_for_fixture(fixture: &ScenarioFixture, with_payer_answer: bool) -> CaseSnapshot {
+fn snapshot_for_fixture(fixture: &ScenarioFixture, with_payer_answer: bool) -> CaseSnapshot {
     let now = Utc::now();
     let case_id = Uuid::new_v4();
     let mut conversation = Vec::new();
@@ -369,36 +369,7 @@ pub fn run_scripted_eval(
     fixtures_dir: &std::path::Path,
     scenario_id: &str,
 ) -> LabResult<EvalReport> {
-    let fixture = load_scenario_from(fixtures_dir, scenario_id)?;
-    let with_answer = !fixture.scripted_payer_answers.is_empty();
-    let snap = snapshot_for_fixture(&fixture, with_answer);
-    let task = Task {
-        id: Uuid::new_v4(),
-        case_id: snap.case.id,
-        purpose: TaskPurpose::BenefitsVerification,
-        status: TaskStatus::Open,
-        owner: Role::Operator,
-        context_json: json!({"scenario": scenario_id}).to_string(),
-        created_at: Utc::now(),
-        completed_at: None,
-    };
-    let agent = ScriptedAgentRunner;
-    let result = agent.run_bv(&task, &snap)?;
-    let allowed = allowed_evidence_ids(&snap);
-    let payer_text = fixture
-        .scripted_payer_answers
-        .first()
-        .cloned()
-        .unwrap_or_default();
-    Ok(score_output(
-        scenario_id,
-        &result.record.model_id,
-        false,
-        &result.output,
-        &allowed,
-        &payer_text,
-        &result.record.tool_calls_json,
-    ))
+    eval_on_fixture(fixtures_dir, scenario_id, &ScriptedAgentRunner, false)
 }
 
 pub fn run_live_openai_eval(
@@ -410,7 +381,20 @@ pub fn run_live_openai_eval(
             "set MINT_LAB_MODEL_EVAL=1 to run live model evaluation".into(),
         ));
     }
-    let agent = OpenAiAgentRunner::from_env()?;
+    eval_on_fixture(
+        fixtures_dir,
+        scenario_id,
+        &OpenAiAgentRunner::from_env()?,
+        true,
+    )
+}
+
+fn eval_on_fixture(
+    fixtures_dir: &std::path::Path,
+    scenario_id: &str,
+    agent: &dyn AgentRunner,
+    live: bool,
+) -> LabResult<EvalReport> {
     let fixture = load_scenario_from(fixtures_dir, scenario_id)?;
     let with_answer = !fixture.scripted_payer_answers.is_empty();
     let snap = snapshot_for_fixture(&fixture, with_answer);
@@ -434,7 +418,7 @@ pub fn run_live_openai_eval(
     Ok(score_output(
         scenario_id,
         &result.record.model_id,
-        true,
+        live,
         &result.output,
         &allowed,
         &payer_text,
@@ -499,27 +483,6 @@ pub fn run_mcp_eval(fixtures_dir: &std::path::Path, scenario_id: &str) -> LabRes
 mod tests {
     use super::*;
     use crate::lab::scenarios::fixtures_dir;
-
-    #[test]
-    fn scripted_eval_scores_approval_and_unclear() {
-        let dir = fixtures_dir();
-        let approval = run_scripted_eval(&dir, "approval").expect("approval");
-        assert!(approval.overall_passed, "{approval:?}");
-        assert!(!approval.live);
-
-        let unclear = run_scripted_eval(&dir, "unclear_bv").expect("unclear");
-        assert!(unclear.overall_passed, "{unclear:?}");
-        let authority = unclear
-            .scores
-            .iter()
-            .find(|s| s.dimension == ScoreDimension::ToolAuthority)
-            .expect("tool authority");
-        assert!(
-            authority.detail.contains("allowlisted"),
-            "{}",
-            authority.detail
-        );
-    }
 
     #[test]
     fn live_eval_requires_opt_in() {

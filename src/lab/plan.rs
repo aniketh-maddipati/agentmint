@@ -2,7 +2,6 @@
 //! Default: embed in `tool_calls_json`. Opt-in columns: `MINT_LAB_REASONING_COLUMNS=1`.
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::lab::domain::AgentRunRecord;
 use crate::lab::tools::ToolTrace;
@@ -84,11 +83,6 @@ pub fn reasoning_columns_enabled() -> bool {
     std::env::var("MINT_LAB_REASONING_COLUMNS").ok().as_deref() == Some("1")
 }
 
-pub fn attach_plan(trace: &mut ToolTrace, plan: BvPlan, repair: RepairMeta) {
-    trace.plan = Some(plan);
-    trace.repair = Some(repair);
-}
-
 pub fn persist_reasoning_columns(record: &mut AgentRunRecord, trace: &ToolTrace) {
     if !reasoning_columns_enabled() {
         record.plan_json = None;
@@ -126,14 +120,6 @@ pub fn repair_from_record(record: &AgentRunRecord) -> Option<RepairMeta> {
         .and_then(|trace| trace.repair)
 }
 
-pub fn reasoning_summary(record: &AgentRunRecord) -> serde_json::Value {
-    json!({
-        "plan": plan_from_record(record),
-        "repair": repair_from_record(record),
-        "columns_present": record.plan_json.is_some() || record.reasoning_json.is_some(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,7 +150,8 @@ mod tests {
         let mut trace = ToolTrace::new();
         let plan = default_bv_plan();
         let repair = RepairMeta::none();
-        attach_plan(&mut trace, plan.clone(), repair.clone());
+        trace.plan = Some(plan.clone());
+        trace.repair = Some(repair.clone());
         let parsed = parse_tool_trace(&trace.to_json_string()).expect("trace");
         assert_eq!(parsed.plan.as_ref(), Some(&plan));
         assert_eq!(parsed.repair.as_ref(), Some(&repair));

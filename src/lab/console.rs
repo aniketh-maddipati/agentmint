@@ -5,6 +5,7 @@ use std::io::{self, BufRead, Write};
 
 use uuid::Uuid;
 
+use crate::lab::clock::parse_duration;
 use crate::lab::domain::{CaseStage, ReviewDecision, Role};
 use crate::lab::error::{LabError, LabResult};
 use crate::lab::inspect::{inspect_run, inspect_text};
@@ -281,30 +282,4 @@ fn sanitize(input: &str) -> String {
             }
         })
         .collect()
-}
-
-fn parse_duration(raw: &str) -> LabResult<std::time::Duration> {
-    let raw = raw.trim();
-    if let Some(num) = raw.strip_suffix('s') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(std::time::Duration::from_secs(n));
-    }
-    if let Some(num) = raw.strip_suffix('m') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(std::time::Duration::from_secs(n * 60));
-    }
-    if let Some(num) = raw.strip_suffix('h') {
-        let n: u64 = num
-            .parse()
-            .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-        return Ok(std::time::Duration::from_secs(n * 3600));
-    }
-    let n: u64 = raw
-        .parse()
-        .map_err(|_| LabError::Invalid(format!("duration {raw}")))?;
-    Ok(std::time::Duration::from_secs(n))
 }

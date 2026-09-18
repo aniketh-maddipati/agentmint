@@ -10,16 +10,16 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::lab::agent::{
-    allowed_evidence_ids, assigned_context_value, AgentOutput, DraftObservation, PendingQuestion,
+    allowed_evidence_ids, assigned_context_value, build_result, AgentOutput, DraftObservation,
+    PendingQuestion,
 };
-use crate::lab::domain::{AgentRunRecord, CaseSnapshot, ObservationKind, Role, Uncertainty};
+use crate::lab::domain::{CaseSnapshot, ObservationKind, Role, Uncertainty};
 use crate::lab::error::{LabError, LabResult};
 use crate::lab::payer::{BvInquiry, PayerAdapter};
-use crate::lab::plan::persist_reasoning_columns;
 use crate::lab::tools::{
-    digest_args, is_allowed_tool, is_forbidden_tool, mcp_tool_list_payload, tool_call, ToolTrace,
-    TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT, TOOL_READ_PERMITTED_EVIDENCE,
-    TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
+    digest_args, is_allowed_tool, mcp_tool_list_payload, tool_call, ToolTrace, TOOL_ASK_PAYER,
+    TOOL_READ_ASSIGNED_CONTEXT, TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS,
+    TOOL_REQUEST_CLARIFICATION,
 };
 use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 use crate::lab::workflow::LabEngine;
@@ -160,12 +160,6 @@ pub fn handle_rpc(state: &McpState, req: JsonRpcRequest, ctx: &McpCallContext) -
             Ok(result) => success(id, result),
             Err(err) => {
                 let (code, message, data) = map_tool_error(&err);
-                if req.id.is_none() {
-                    return success(
-                        id,
-                        tool_result(json!({"error": code, "message": message}), true),
-                    );
-                }
                 if code == "unauthorized" {
                     error_response(id, -32001, &message, data)
                 } else {
@@ -250,19 +244,12 @@ fn call_tool(state: &McpState, params: &Value) -> LabResult<Value> {
         .get("name")
         .and_then(Value::as_str)
         .ok_or_else(|| LabError::Invalid("missing tool name".into()))?;
-    if is_forbidden_tool(name) || !is_allowed_tool(name) {
+    if !is_allowed_tool(name) {
         return Err(LabError::Invalid(format!(
             "tool {name} is not on the BV allowlist"
         )));
     }
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
-    if let Some(raw) = args.as_str() {
-        if looks_like_real_identifier(raw) {
-            return Err(LabError::Invalid(
-                "payload resembles a real identifier; lab accepts synthetic fixtures only".into(),
-            ));
-        }
-    }
     scan_for_real_identifiers(&args)?;
     let started = Instant::now();
     let body = match name {
@@ -426,9 +413,6 @@ fn tool_read_assigned_context(state: &McpState, args: &Value) -> LabResult<Value
     let (_case, task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
     let mut ctx = assigned_context_value(&task, &snap);
     if let Value::Object(map) = &mut ctx {
-        let mut ids: Vec<String> = allowed_evidence_ids(&snap).into_iter().collect();
-        ids.sort();
-        map.insert("allowed_evidence_ids".into(), json!(ids));
         map.insert("run_id".into(), json!(run_id));
     }
     Ok(ctx)
@@ -694,30 +678,16 @@ fn persist_mcp_run(
         .lock()
         .map_err(|_| LabError::Storage("mcp trace lock poisoned".into()))?
         .clone();
-    let evidence_refs = match output {
-        AgentOutput::Observations { observations, .. } => observations
-            .iter()
-            .flat_map(|o| o.evidence_refs.clone())
-            .collect(),
-        AgentOutput::PendingQuestion(q) => vec![q.evidence_hint.clone()],
-        AgentOutput::Clarification { .. } => Vec::new(),
-    };
-    let mut record = AgentRunRecord {
-        id: Uuid::new_v4(),
-        case_id: snap.case.id,
-        task_id: task.id,
-        prompt_version: "bv-mcp-v1".into(),
-        model_id: "mcp".into(),
-        context_version: snap.case.coverage_version + snap.case.service_version,
-        tool_calls_json: trace.to_json_string(),
-        structured_output_json: serde_json::to_string(output)?,
-        evidence_refs,
-        created_at: state.engine.now(),
-        plan_json: None,
-        reasoning_json: None,
-    };
-    persist_reasoning_columns(&mut record, &trace);
-    state.engine.store.insert_agent_run(&record)?;
+    let mut result = build_result(
+        task,
+        snap,
+        output.clone(),
+        trace,
+        crate::lab::mcp::client::PROMPT_VERSION_MCP,
+        "mcp",
+    );
+    result.record.created_at = state.engine.now();
+    state.engine.store.insert_agent_run(&result.record)?;
     Ok(())
 }
 

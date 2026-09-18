@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::lab::agent::{select_agent, AgentOutput, AgentRunner};
-use crate::lab::clock::{Clock, MutableClock};
+use crate::lab::clock::MutableClock;
 use crate::lab::domain::*;
 use crate::lab::error::{LabError, LabResult};
 use crate::lab::payer::{FakePayer, PacketSubmissionRequest, PayerAdapter};
@@ -196,10 +196,6 @@ impl LabEngine {
     pub fn snapshot(&self, run_id: Uuid) -> LabResult<CaseSnapshot> {
         let case = self.require_case(run_id)?;
         self.store.load_snapshot(case.id)
-    }
-
-    pub fn tick(&self, run_id: Uuid) -> LabResult<TickReport> {
-        self.process_pending(run_id)
     }
 
     pub fn process_pending(&self, run_id: Uuid) -> LabResult<TickReport> {
@@ -1421,24 +1417,6 @@ impl LabEngine {
         })
     }
 
-    pub fn pause(&self, run_id: Uuid) -> LabResult<()> {
-        let mut case = self.require_case(run_id)?;
-        case.paused_from = Some(case.stage);
-        self.set_stage(&mut case, CaseStage::Paused, "paused")?;
-        case.updated_at = self.now();
-        self.store.update_case(&case)
-    }
-
-    pub fn resume(&self, run_id: Uuid) -> LabResult<TickReport> {
-        let mut case = self.require_case(run_id)?;
-        let from = case.paused_from.unwrap_or(CaseStage::Intake);
-        case.paused_from = None;
-        self.set_stage(&mut case, from, "resumed")?;
-        case.updated_at = self.now();
-        self.store.update_case(&case)?;
-        self.process_pending(run_id)
-    }
-
     pub fn apply_coverage_change(
         &self,
         run_id: Uuid,
@@ -1847,7 +1825,7 @@ fn infer_next(snap: &CaseSnapshot) -> (Option<Role>, Option<String>, Vec<String>
         ),
         _ => (
             Some(Role::Operator),
-            Some("tick / process_pending".into()),
+            Some("process_pending".into()),
             blockers,
         ),
     }

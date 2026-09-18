@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const WORKFLOW_VERSION: &str = "medical-mri-pa-v1";
-pub const DEFAULT_CPT: &str = "72148";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
