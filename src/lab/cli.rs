@@ -30,6 +30,8 @@ pub fn run(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
         "run" => cmd_run(&args[1..]),
         "list" => cmd_list(&args[1..]),
         "eval-model" => cmd_eval_model(&args[1..]),
+        "mcp-stdio" => cmd_mcp_stdio(&args[1..]),
+        "mcp-http" => cmd_mcp_http(&args[1..]),
         other => {
             eprintln!("unknown lab command: {other}");
             print_help();
@@ -51,10 +53,13 @@ fn print_help() {
          \tmint lab check <run-id> [--dir PATH]\n\
          \tmint lab run <scenario> [--json] [--dir PATH]\n\
          \tmint lab list [--json] [--dir PATH]\n\
-         \tmint lab eval-model [--scenario ID] [--live] [--json]\n\n\
+         \tmint lab eval-model [--scenario ID] [--live] [--json]\n\
+         \tmint lab mcp-stdio [--scenario ID | --run-id UUID] [--dir PATH]\n\
+         \tmint lab mcp-http [--scenario ID | --run-id UUID] [--bind 127.0.0.1:8787] [--dir PATH]\n\n\
          Agents: MINT_LAB_AGENT=scripted|openai (default scripted).\n\
          OpenAI: OPENAI_API_KEY + optional MINT_LAB_MODEL (default gpt-4.1-mini).\n\
          Live eval: MINT_LAB_MODEL_EVAL=1 with --live (never required for CI).\n\
+         MCP: MINT_LAB_MCP_TOKEN required; loopback/stdio only. MINT_LAB_AUTO_PAYER=1 for FakePayer.\n\
          Default data dir: ./lab-data or MINT_LAB_DIR.\n\
          Synthetic CPT 72148 outpatient MRI lumbar spine only. No real patient data.\n\
          No reviewer/appeal/doc/payer LLM agents — those stay human or fixture-driven.\n"
@@ -291,6 +296,52 @@ fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error
     } else {
         Ok(ExitCode::from(1))
     }
+}
+
+fn cmd_mcp_stdio(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let state = prepare_mcp_state(args)?;
+    let handle = tokio::runtime::Handle::current();
+    handle.block_on(crate::lab::mcp::stdio::serve_stdio(state))?;
+    Ok(ExitCode::SUCCESS)
+}
+
+fn cmd_mcp_http(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    let bind = flag(args, "--bind").unwrap_or("127.0.0.1:8787");
+    let addr: std::net::SocketAddr = bind
+        .parse()
+        .map_err(|err| format!("invalid --bind: {err}"))?;
+    let state = prepare_mcp_state(args)?;
+    let handle = tokio::runtime::Handle::current();
+    handle.block_on(crate::lab::mcp::http::serve_http(state, addr))?;
+    Ok(ExitCode::SUCCESS)
+}
+
+fn prepare_mcp_state(
+    args: &[String],
+) -> Result<crate::lab::mcp::McpState, Box<dyn std::error::Error>> {
+    let token = crate::lab::mcp::require_mcp_token()?;
+    let engine = open_engine(args)?;
+    let run_id = if let Some(raw) = flag(args, "--run-id") {
+        raw.parse::<Uuid>()
+            .map_err(|e| format!("invalid --run-id: {e}"))?
+    } else if let Some(scenario) = flag(args, "--scenario") {
+        engine.start_run(scenario)?
+    } else {
+        return Err("mcp requires --scenario or --run-id".into());
+    };
+    let task_id = engine.prepare_bv_task(run_id)?;
+    eprintln!("MCP_RUN_ID={run_id}");
+    eprintln!("MCP_TASK_ID={task_id}");
+    let apply = !args.iter().any(|a| a == "--observe-only");
+    Ok(crate::lab::mcp::McpState {
+        engine: std::sync::Arc::new(engine),
+        run_id,
+        task_id,
+        token,
+        apply,
+        auto_payer: crate::lab::mcp::auto_payer_enabled(),
+        trace: std::sync::Mutex::new(crate::lab::tools::ToolTrace::new()),
+    })
 }
 
 fn parse_duration(raw: &str) -> LabResult<Duration> {

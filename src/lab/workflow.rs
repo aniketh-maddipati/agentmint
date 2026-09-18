@@ -109,7 +109,7 @@ impl LabEngine {
         Ok(())
     }
 
-    fn scenario_for(&self, run_id: Uuid, scenario_id: &str) -> LabResult<ScenarioFixture> {
+    pub fn scenario_for(&self, run_id: Uuid, scenario_id: &str) -> LabResult<ScenarioFixture> {
         {
             let guard = self
                 .scenario_cache
@@ -398,8 +398,19 @@ impl LabEngine {
         let mut record = result.record;
         record.created_at = self.now();
         self.store.insert_agent_run(&record)?;
+        self.apply_bv_output(case, fixture, happened, &task, result.output)?;
+        Ok(())
+    }
 
-        match result.output {
+    pub fn apply_bv_output(
+        &self,
+        case: &mut Case,
+        fixture: &ScenarioFixture,
+        happened: &mut Vec<String>,
+        task: &Task,
+        output: AgentOutput,
+    ) -> LabResult<Option<Uuid>> {
+        match output {
             AgentOutput::PendingQuestion(q) => {
                 let pending = PendingWork {
                     id: Uuid::new_v4(),
@@ -410,6 +421,7 @@ impl LabEngine {
                     due_at: None,
                     created_at: self.now(),
                 };
+                let pending_id = pending.id;
                 self.store.insert_pending(&pending)?;
                 self.store.append_event(
                     case.id,
@@ -418,6 +430,7 @@ impl LabEngine {
                     self.now(),
                 )?;
                 happened.push("agent asked payer question".into());
+                Ok(Some(pending_id))
             }
             AgentOutput::Clarification { message } => {
                 let t = Task {
@@ -432,6 +445,7 @@ impl LabEngine {
                 };
                 self.store.insert_task(&t)?;
                 happened.push("agent requested clarification".into());
+                Ok(None)
             }
             AgentOutput::Observations {
                 observations,
@@ -447,7 +461,7 @@ impl LabEngine {
                         uncertainty: draft.uncertainty,
                         evidence_refs: draft.evidence_refs,
                         stale: false,
-                        source: "scripted_agent".into(),
+                        source: "bv_agent".into(),
                         created_at: self.now(),
                     };
                     obs_ids.push(obs.id);
@@ -461,7 +475,9 @@ impl LabEngine {
                     .observations
                     .iter()
                     .any(|o| o.kind == ObservationKind::InjectionAttempt && !o.stale);
-                let injection_in_chat = snap
+                let injection_in_chat = self
+                    .store
+                    .load_snapshot(case.id)?
                     .conversation
                     .iter()
                     .any(|m| m.text.to_lowercase().contains("ignore previous"));
@@ -482,19 +498,83 @@ impl LabEngine {
                     case.updated_at = self.now();
                     self.store.update_case(case)?;
                     happened.push("injection attempt escalated to human review".into());
-                    self.complete_task(&task)?;
-                    return Ok(());
+                    self.complete_task(task)?;
+                    return Ok(None);
                 }
 
                 let fresh = self.store.load_snapshot(case.id)?;
                 let determination = synthesize_determination(case, &fresh, fixture)?;
                 self.store.insert_determination(&determination)?;
                 happened.push(format!("determination {:?}", determination.kind));
-                self.complete_task(&task)?;
+                self.complete_task(task)?;
                 self.route_after_determination(case, &determination, fixture, happened)?;
+                Ok(None)
             }
         }
-        Ok(())
+    }
+
+    pub fn prepare_bv_task(&self, run_id: Uuid) -> LabResult<Uuid> {
+        let mut case = self.require_case(run_id)?;
+        if case.stage == CaseStage::Intake {
+            let mut happened = Vec::new();
+            let fixture = self.scenario_for(run_id, &case.scenario_id)?;
+            self.drive_intake(&mut case, &fixture, &mut happened)?;
+        }
+        let snap = self.snapshot(run_id)?;
+        snap.tasks
+            .iter()
+            .rev()
+            .find(|t| {
+                t.purpose == TaskPurpose::BenefitsVerification && t.status == TaskStatus::Open
+            })
+            .map(|t| t.id)
+            .ok_or_else(|| LabError::Invalid("no open BV task".into()))
+    }
+
+    pub fn record_payer_speech(&self, run_id: Uuid, text: &str) -> LabResult<Uuid> {
+        let case = self.require_case(run_id)?;
+        let msg = ConversationMessage {
+            id: Uuid::new_v4(),
+            case_id: case.id,
+            role: Role::Payer,
+            text: text.to_string(),
+            created_at: self.now(),
+        };
+        let msg_id = msg.id;
+        self.store.insert_conversation(&msg)?;
+        self.store
+            .clear_pending_kind(case.id, PendingKind::AgentQuestion)?;
+        self.store.append_event(
+            case.id,
+            "payer_answer",
+            &json!({"msg_id": msg.id}),
+            self.now(),
+        )?;
+        Ok(msg_id)
+    }
+
+    pub fn require_open_bv_task(
+        &self,
+        run_id: Uuid,
+        task_id: Uuid,
+    ) -> LabResult<(Case, Task, CaseSnapshot)> {
+        let case = self.require_case(run_id)?;
+        let snap = self.store.load_snapshot(case.id)?;
+        let task = snap
+            .tasks
+            .iter()
+            .find(|t| t.id == task_id)
+            .cloned()
+            .ok_or_else(|| LabError::NotFound(format!("task {task_id}")))?;
+        if task.purpose != TaskPurpose::BenefitsVerification {
+            return Err(LabError::Invalid(
+                "task is not benefits_verification".into(),
+            ));
+        }
+        if task.status != TaskStatus::Open {
+            return Err(LabError::Invalid("task_not_open".into()));
+        }
+        Ok((case, task, snap))
     }
 
     fn complete_task(&self, task: &Task) -> LabResult<()> {
@@ -767,23 +847,7 @@ impl LabEngine {
     }
 
     pub fn submit_payer_answer(&self, run_id: Uuid, text: &str) -> LabResult<TickReport> {
-        let case = self.require_case(run_id)?;
-        let msg = ConversationMessage {
-            id: Uuid::new_v4(),
-            case_id: case.id,
-            role: Role::Payer,
-            text: text.to_string(),
-            created_at: self.now(),
-        };
-        self.store.insert_conversation(&msg)?;
-        self.store
-            .clear_pending_kind(case.id, PendingKind::AgentQuestion)?;
-        self.store.append_event(
-            case.id,
-            "payer_answer",
-            &json!({"msg_id": msg.id}),
-            self.now(),
-        )?;
+        self.record_payer_speech(run_id, text)?;
         self.process_pending(run_id)
     }
 

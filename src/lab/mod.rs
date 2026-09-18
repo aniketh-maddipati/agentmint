@@ -9,6 +9,7 @@ pub mod domain;
 pub mod error;
 pub mod eval;
 pub mod inspect;
+pub mod mcp;
 pub mod payer;
 pub mod plan;
 pub mod scenarios;

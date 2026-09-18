@@ -76,7 +76,7 @@ fn print_help() {
          \tmint serve\n\
          \tmint verify --receipt PATH [--key-file PATH | --keys-url URL]\n\
          \tmint bench [--iterations N]\n\
-         \tmint lab <start|console|inspect|events|advance|fault|check|run|list> ...\n\n\
+         \tmint lab <start|console|inspect|events|advance|fault|check|run|list|eval-model|mcp-stdio|mcp-http> ...\n\n\
          Environment variables use the MINT_ prefix. Local identity and the fake\n\
          provider are development-only. Live Stripe secrets are refused.\n\
          `mint lab` is an experimental synthetic PA/BV case console (no real PHI).\n"
