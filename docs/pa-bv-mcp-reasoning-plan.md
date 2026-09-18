@@ -8,6 +8,8 @@
 Related docs: [`pa-bv-domain.md`](./pa-bv-domain.md), [`pa-bv-lab.md`](./pa-bv-lab.md).  
 Does **not** supersede the agent-roster plan (BV-only LLM eligibility); this plan assumes that roster.
 
+**Successor (planning only):** [`pa-bv-buyer-explainer-plan.md`](./pa-bv-buyer-explainer-plan.md) — one schema / two transports, honest MCP tool-loop eval, buyer explainer scorecard. Do not treat this MCP mock plan as the next implementation queue.
+
 ---
 
 ## 1. Grounding in current lab
