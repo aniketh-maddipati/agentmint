@@ -56,8 +56,8 @@ fn print_help() {
          \tmint lab eval-model [--scenario ID] [--runner scripted|mcp|openai|anthropic] [--live] [--json]\n\
          \tmint lab mcp-stdio [--scenario ID | --run-id UUID] [--dir PATH]\n\
          \tmint lab mcp-http [--scenario ID | --run-id UUID] [--bind 127.0.0.1:8787] [--dir PATH]\n\
-         \t  REST (same process, same bearer): POST /lab/bv/{tool},\n\
-         \t  GET /lab/runs/{run_id}/inspect, GET /lab/runs/{run_id}/trace, GET /lab/openapi.json\n\n\
+         \t  REST (same process, same bearer): POST /lab/bv/{{tool}},\n\
+         \t  GET /lab/runs/{{run_id}}/inspect, GET /lab/runs/{{run_id}}/trace, GET /lab/openapi.json\n\n\
          Agents: MINT_LAB_AGENT=scripted|openai|anthropic|claude|mcp (default scripted).\n\
          OpenAI: OPENAI_API_KEY + optional MINT_LAB_MODEL (default gpt-4.1-mini).\n\
          Anthropic: ANTHROPIC_API_KEY (or ANTHROPIC_KEY) + optional MINT_LAB_CLAUDE_MODEL (default claude-sonnet-4-5).\n\
