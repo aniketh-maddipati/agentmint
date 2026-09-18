@@ -2,7 +2,7 @@
 
 Synthetic medical-benefit prior authorization / benefits verification lab for **outpatient MRI lumbar spine (CPT 72148)**, workflow version `medical-mri-pa-v1`.
 
-This lab is isolated under `src/lab/` and does **not** touch mint refund/runtime APIs. Domain background: [`pa-bv-domain.md`](./pa-bv-domain.md).
+This lab is isolated under `src/lab/` and does **not** touch mint refund/runtime APIs. Domain background: [`pa-bv-domain.md`](./pa-bv-domain.md). MCP mock delivery: [`pa-bv-mcp-reasoning-plan.md`](./pa-bv-mcp-reasoning-plan.md). Next (planning only): [`pa-bv-buyer-explainer-plan.md`](./pa-bv-buyer-explainer-plan.md).
 
 ## Quick start
 
