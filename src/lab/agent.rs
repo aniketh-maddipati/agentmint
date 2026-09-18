@@ -500,11 +500,14 @@ pub(crate) fn push_tool(
 pub(crate) fn block_on_local<T>(
     fut: impl std::future::Future<Output = LabResult<T>>,
 ) -> LabResult<T> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|err| LabError::Io(format!("runtime: {err}")))?
-        .block_on(fut)
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(fut)),
+        Err(_) => tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|err| LabError::Io(format!("runtime: {err}")))?
+            .block_on(fut),
+    }
 }
 
 fn report_observations_call(ids: &Value, output: &AgentOutput, latency_us: u64) -> ToolCallEntry {
@@ -1142,6 +1145,12 @@ mod tests {
         let parsed: AgentOutput =
             serde_json::from_str(json_object_from_model_text(raw)).expect("json");
         assert!(matches!(parsed, AgentOutput::Clarification { .. }));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn block_on_local_inside_multi_thread_runtime() {
+        let got = block_on_local(async { Ok::<_, LabError>(21u8) }).expect("nested runtime");
+        assert_eq!(got, 21);
     }
 
     #[test]
