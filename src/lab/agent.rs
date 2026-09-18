@@ -69,8 +69,11 @@ pub fn select_agent() -> LabResult<Arc<dyn AgentRunner>> {
     match kind.as_str() {
         "" | "scripted" | "deterministic" => Ok(Arc::new(ScriptedAgentRunner)),
         "openai" => Ok(Arc::new(OpenAiAgentRunner::from_env()?)),
+        "mcp" => Ok(Arc::new(
+            crate::lab::mcp::client::McpAgentRunner::from_env()?
+        )),
         other => Err(LabError::Invalid(format!(
-            "unknown MINT_LAB_AGENT={other}; use scripted or openai"
+            "unknown MINT_LAB_AGENT={other}; use scripted, openai, or mcp"
         ))),
     }
 }
@@ -358,7 +361,7 @@ pub(crate) fn interpret_payer_text(text: &str, evidence_refs: &[String]) -> Vec<
     out
 }
 
-fn build_result(
+pub(crate) fn build_result(
     task: &Task,
     snapshot: &CaseSnapshot,
     output: AgentOutput,
@@ -945,6 +948,27 @@ mod tests {
         match previous {
             Some(value) => std::env::set_var("MINT_LAB_AGENT", value),
             None => std::env::remove_var("MINT_LAB_AGENT"),
+        }
+    }
+
+    #[test]
+    fn select_agent_mcp_fails_closed_without_token() {
+        let previous_agent = std::env::var("MINT_LAB_AGENT").ok();
+        let previous_token = std::env::var("MINT_LAB_MCP_TOKEN").ok();
+        std::env::set_var("MINT_LAB_AGENT", "mcp");
+        std::env::remove_var("MINT_LAB_MCP_TOKEN");
+        let err = match select_agent() {
+            Err(err) => err,
+            Ok(_) => panic!("mcp requires token"),
+        };
+        assert!(matches!(err, LabError::Unverified(_)));
+        match previous_agent {
+            Some(value) => std::env::set_var("MINT_LAB_AGENT", value),
+            None => std::env::remove_var("MINT_LAB_AGENT"),
+        }
+        match previous_token {
+            Some(value) => std::env::set_var("MINT_LAB_MCP_TOKEN", value),
+            None => std::env::remove_var("MINT_LAB_MCP_TOKEN"),
         }
     }
 

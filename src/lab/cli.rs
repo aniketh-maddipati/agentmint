@@ -56,8 +56,9 @@ fn print_help() {
          \tmint lab eval-model [--scenario ID] [--live] [--json]\n\
          \tmint lab mcp-stdio [--scenario ID | --run-id UUID] [--dir PATH]\n\
          \tmint lab mcp-http [--scenario ID | --run-id UUID] [--bind 127.0.0.1:8787] [--dir PATH]\n\n\
-         Agents: MINT_LAB_AGENT=scripted|openai (default scripted).\n\
+         Agents: MINT_LAB_AGENT=scripted|openai|mcp (default scripted).\n\
          OpenAI: OPENAI_API_KEY + optional MINT_LAB_MODEL (default gpt-4.1-mini).\n\
+         MCP agent: MINT_LAB_MCP_TOKEN + MINT_LAB_MCP_URL (fail-closed if missing).\n\
          Live eval: MINT_LAB_MODEL_EVAL=1 with --live (never required for CI).\n\
          MCP: MINT_LAB_MCP_TOKEN required; loopback/stdio only. MINT_LAB_AUTO_PAYER=1 for FakePayer.\n\
          Default data dir: ./lab-data or MINT_LAB_DIR.\n\

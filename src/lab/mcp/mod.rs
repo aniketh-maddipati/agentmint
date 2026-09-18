@@ -24,6 +24,7 @@ use crate::lab::tools::{
 use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 use crate::lab::workflow::LabEngine;
 
+pub mod client;
 pub mod http;
 pub mod stdio;
 
