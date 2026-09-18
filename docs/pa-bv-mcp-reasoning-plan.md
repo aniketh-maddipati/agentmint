@@ -14,7 +14,7 @@ Does **not** supersede the agent-roster plan (BV-only LLM eligibility); this pla
 
 | Surface | Current behavior relevant to this plan |
 | ------- | -------------------------------------- |
-| `AgentRunner` | BV-only; `ScriptedAgentRunner` + optional `OpenAiAgentRunner`. Outputs: `PendingQuestion` \| `Observations` \| `Clarification`. Never mutates case status. |
+| `AgentRunner` | BV-only; `ScriptedAgentRunner` + optional `OpenAiAgentRunner` / `AnthropicAgentRunner`. Outputs: `PendingQuestion` \| `Observations` \| `Clarification`. Never mutates case status. |
 | Allowed tools (prompt/context) | Already declared: `read_assigned_context`, `ask_payer`, `read_permitted_evidence`, `report_observations`, `request_clarification_or_review`. Scripted path fakes a short `tool_calls_json` trace. |
 | Workflow | Owns stage transitions; synthesizes `Determination` from observations (+ fixture `hidden_facts` in guided mode). |
 | Human console | Roles `payer` / `customer` / `reviewer` / `operator`; payer speech, doc supply, packet review, appeal initiation. |

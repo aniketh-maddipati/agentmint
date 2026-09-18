@@ -53,13 +53,15 @@ fn print_help() {
          \tmint lab check <run-id> [--dir PATH]\n\
          \tmint lab run <scenario> [--json] [--dir PATH]\n\
          \tmint lab list [--json] [--dir PATH]\n\
-         \tmint lab eval-model [--scenario ID] [--runner scripted|mcp] [--live] [--json]\n\
+         \tmint lab eval-model [--scenario ID] [--runner scripted|mcp|openai|anthropic] [--live] [--json]\n\
          \tmint lab mcp-stdio [--scenario ID | --run-id UUID] [--dir PATH]\n\
          \tmint lab mcp-http [--scenario ID | --run-id UUID] [--bind 127.0.0.1:8787] [--dir PATH]\n\n\
-         Agents: MINT_LAB_AGENT=scripted|openai|mcp (default scripted).\n\
+         Agents: MINT_LAB_AGENT=scripted|openai|anthropic|claude|mcp (default scripted).\n\
          OpenAI: OPENAI_API_KEY + optional MINT_LAB_MODEL (default gpt-4.1-mini).\n\
+         Anthropic: ANTHROPIC_API_KEY (or ANTHROPIC_KEY) + optional MINT_LAB_CLAUDE_MODEL (default claude-sonnet-4-5).\n\
          MCP agent: MINT_LAB_MCP_TOKEN + MINT_LAB_MCP_URL (fail-closed if missing).\n\
          Live eval: MINT_LAB_MODEL_EVAL=1 with --live (never required for CI).\n\
+         --live implies --runner openai unless --runner anthropic|claude is set.\n\
          MCP: MINT_LAB_MCP_TOKEN required; loopback/stdio only. MINT_LAB_AUTO_PAYER=1 for FakePayer.\n\
          Default data dir: ./lab-data or MINT_LAB_DIR.\n\
          Synthetic CPT 72148 outpatient MRI lumbar spine only. No real patient data.\n\
@@ -251,15 +253,25 @@ fn cmd_list(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
 }
 
 fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    use crate::lab::eval::{run_live_openai_eval, run_mcp_eval, run_scripted_eval};
+    use crate::lab::eval::{
+        run_live_anthropic_eval, run_live_openai_eval, run_mcp_eval, run_scripted_eval,
+    };
 
     let live = args.iter().any(|a| a == "--live");
     let scenario = flag(args, "--scenario").unwrap_or("approval");
-    let runner = flag(args, "--runner").unwrap_or("scripted");
+    let runner = flag(args, "--runner");
     let fixtures = fixtures_dir();
     let report = if live {
-        run_live_openai_eval(&fixtures, scenario)?
-    } else if runner == "mcp" {
+        match runner.unwrap_or("openai") {
+            "openai" => run_live_openai_eval(&fixtures, scenario)?,
+            "anthropic" | "claude" => run_live_anthropic_eval(&fixtures, scenario)?,
+            other => {
+                return Err(
+                    format!("live --runner must be openai or anthropic, got {other}").into(),
+                );
+            }
+        }
+    } else if runner.unwrap_or("scripted") == "mcp" {
         run_mcp_eval(&fixtures, scenario)?
     } else {
         run_scripted_eval(&fixtures, scenario)?

@@ -74,6 +74,7 @@ cargo test
 | ----- | ---- | ----- |
 | BV task (`ScriptedAgentRunner`) | Default (`MINT_LAB_AGENT=scripted` or unset) | `scripted` |
 | BV task (`OpenAiAgentRunner`) | `MINT_LAB_AGENT=openai` + `OPENAI_API_KEY` | `gpt-4.1-mini` (override `MINT_LAB_MODEL`) |
+| BV task (`AnthropicAgentRunner`) | `MINT_LAB_AGENT=anthropic` or `claude` + `ANTHROPIC_API_KEY` (alias `ANTHROPIC_KEY`) | `claude-sonnet-4-5` (override `MINT_LAB_CLAUDE_MODEL`) |
 | BV task (`McpAgentRunner`) | `MINT_LAB_AGENT=mcp` + `MINT_LAB_MCP_TOKEN` + `MINT_LAB_MCP_URL` | `mcp` |
 
 Review, appeal initiation, document supply, and payer speech are **not** LLM agents — they stay human console roles or fixture-driven.
@@ -87,6 +88,9 @@ cargo run --quiet -- lab eval-model --scenario unclear_bv --runner mcp --json
 
 # Optional live OpenAI eval (not CI)
 MINT_LAB_MODEL_EVAL=1 OPENAI_API_KEY=... cargo run --quiet -- lab eval-model --scenario approval --live --json
+
+# Optional live Anthropic eval (not CI). `--live` without `--runner` stays OpenAI.
+MINT_LAB_MODEL_EVAL=1 ANTHROPIC_API_KEY=... cargo run --quiet -- lab eval-model --scenario approval --live --runner anthropic --json
 ```
 
 ## MCP (lab mock)
@@ -114,7 +118,7 @@ HTTP binds `127.0.0.1` only. Read-only resources: `mint-lab://run/{run_id}/bv-ta
 - Synthetic payer ledger and documents only.
 - Not FHIR CRD/DTR/PAS wire formats.
 - Not clinical guidance or a payment guarantee.
-- Live OpenAI path is optional and fail-closed without `OPENAI_API_KEY`; never fabricates success.
+- Live OpenAI/Anthropic paths are optional and fail-closed without `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; never fabricate success.
 - One appeal round; further denial → manual disposition.
 - Concurrency claim is in-process SQLite ownership generation — not a distributed lock service.
 - No reviewer / appeal-writer / documentation / payer LLM agents.
