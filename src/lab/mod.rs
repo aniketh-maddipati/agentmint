@@ -13,6 +13,7 @@ pub mod mcp;
 pub mod payer;
 pub mod plan;
 pub mod scenarios;
+pub mod schema;
 pub mod store;
 pub mod tools;
 pub mod verifiers;

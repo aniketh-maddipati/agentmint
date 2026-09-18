@@ -113,6 +113,8 @@ MINT_LAB_MCP_TOKEN=lab-token cargo run --quiet -- lab mcp-stdio --scenario uncle
 
 HTTP binds `127.0.0.1` only. Read-only resources: `mint-lab://run/{run_id}/bv-task/{task_id}/context` and `mint-lab://run/{run_id}/evidence/{evidence_id}`.
 
+Canonical JSON Schema 2020-12 (and OpenAPI 3.1) for the five tools, `AgentOutput`, `InspectReport`, and `EvalReport` live in [`schemas/lab/`](../schemas/lab/). Rust types are the source of truth; `cargo test` checks the snapshots. `hidden_facts` is never in those schemas.
+
 ## Limitations
 
 - Synthetic payer ledger and documents only.

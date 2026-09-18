@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "decisions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "disposition": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "items": {
+        "properties": {
+          "class": {
+            "enum": [
+              "recorded_fact",
+              "agent_claim",
+              "inference",
+              "unknown",
+              "hypothetical"
+            ],
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "class",
+          "kind",
+          "id",
+          "summary",
+          "evidence_refs"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "outstanding_work": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "packet_versions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "reviews": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "run_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "stage": {
+      "enum": [
+        "intake",
+        "bv",
+        "documentation",
+        "review",
+        "submission",
+        "follow_up",
+        "decision",
+        "appeal",
+        "handoff",
+        "manual_disposition",
+        "cancelled",
+        "paused"
+      ],
+      "type": "string"
+    },
+    "submissions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id",
+    "stage",
+    "outstanding_work",
+    "items",
+    "packet_versions",
+    "reviews",
+    "submissions",
+    "decisions"
+  ],
+  "title": "InspectReport",
+  "type": "object"
+}

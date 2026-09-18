@@ -2,12 +2,13 @@
 //! Used by: store, workflow, agent, inspect, console.
 
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const WORKFLOW_VERSION: &str = "medical-mri-pa-v1";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CaseStage {
     Intake,
@@ -24,7 +25,7 @@ pub enum CaseStage {
     Paused,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ObservationKind {
     Eligibility,
@@ -67,7 +68,7 @@ pub enum DecisionOutcome {
     MoreInfo,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Customer,
@@ -76,7 +77,7 @@ pub enum Role {
     Operator,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskPurpose {
     CollectMissingInfo,
@@ -101,12 +102,22 @@ pub enum AttemptOutcome {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Uncertainty {
     Known,
     Unknown,
     NotApplicable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DraftObservation {
+    pub kind: ObservationKind,
+    #[schemars(length(min = 1))]
+    pub statement: String,
+    pub uncertainty: Uncertainty,
+    #[schemars(length(min = 1))]
+    pub evidence_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

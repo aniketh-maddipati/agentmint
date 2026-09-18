@@ -2,6 +2,7 @@
 //! Used by: `mint lab eval-model` and ignored live eval tests.
 //! Does not add reviewer/appeal/doc/payer LLM agents.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -21,7 +22,7 @@ use crate::lab::verifiers::{
 use chrono::Utc;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScoreDimension {
     FactExtraction,
@@ -30,14 +31,14 @@ pub enum ScoreDimension {
     WorkflowDispositionHint,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DimensionScore {
     pub dimension: ScoreDimension,
     pub passed: bool,
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct EvalReport {
     pub scenario_id: String,
     pub model_id: String,

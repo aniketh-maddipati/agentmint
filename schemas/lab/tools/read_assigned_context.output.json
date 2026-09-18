@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "allowed_evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "allowed_tools": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "conversation": {
+      "items": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "customer",
+              "payer",
+              "reviewer",
+              "operator"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "text"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "coverage": {
+      "properties": {
+        "dos": {
+          "type": "string"
+        },
+        "member_id": {
+          "type": "string"
+        },
+        "payer_name": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "payer_name",
+        "member_id",
+        "plan_id",
+        "dos",
+        "version"
+      ],
+      "type": "object"
+    },
+    "documents": {
+      "items": {
+        "properties": {
+          "content_hash": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "content_hash"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "rules": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "run_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "service": {
+      "properties": {
+        "cpt": {
+          "type": "string"
+        },
+        "diagnosis": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpt",
+        "diagnosis",
+        "site",
+        "version"
+      ],
+      "type": "object"
+    },
+    "task_context": {
+      "description": "Arbitrary JSON value"
+    },
+    "task_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "task_purpose": {
+      "enum": [
+        "collect_missing_info",
+        "benefits_verification",
+        "clarify_bv",
+        "collect_documentation",
+        "review_packet",
+        "submit_pa",
+        "follow_up_status",
+        "deliver_handoff",
+        "appeal_preparation",
+        "human_review",
+        "manual_disposition"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "task_id",
+    "task_purpose",
+    "task_context",
+    "service",
+    "coverage",
+    "conversation",
+    "documents",
+    "allowed_evidence_ids",
+    "allowed_tools",
+    "rules"
+  ],
+  "title": "AssignedContext",
+  "type": "object"
+}

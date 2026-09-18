@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "needs_human_review": {
+      "type": "boolean"
+    },
+    "observations": {
+      "items": {
+        "properties": {
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "eligibility",
+              "coverage",
+              "pa_requirement",
+              "network",
+              "documentation_need",
+              "injection_attempt",
+              "clarification",
+              "other"
+            ],
+            "type": "string"
+          },
+          "statement": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "uncertainty": {
+            "enum": [
+              "known",
+              "unknown",
+              "not_applicable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "statement",
+          "uncertainty",
+          "evidence_refs"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "run_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "task_id": {
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "task_id",
+    "observations",
+    "needs_human_review"
+  ],
+  "title": "ReportObservationsRequest",
+  "type": "object"
+}

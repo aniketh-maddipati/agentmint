@@ -2,9 +2,14 @@
 //! Used by: scripted/OpenAI/Anthropic/MCP runners, verifiers, and eval.
 //! Five tools only — no stage mutation, IVR, EHR, or clinical-justification tools.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
+
+use crate::lab::domain::{DraftObservation, Role, TaskPurpose};
+use crate::lab::error::{LabError, LabResult};
 
 pub const TRACE_VERSION: &str = "bv-tools-v1";
 
@@ -35,8 +40,205 @@ pub const FORBIDDEN_TOOLS: [&str; 10] = [
     "configure_hidden_facts",
 ];
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceHint {
+    PayerBvResponse,
+}
+
+impl EvidenceHint {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::PayerBvResponse => "payer_bv_response",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ClarificationReason {
+    Unclear,
+    Conflict,
+    Injection,
+    MalformedPayer,
+    Other,
+}
+
+impl ClarificationReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unclear => "unclear",
+            Self::Conflict => "conflict",
+            Self::Injection => "injection",
+            Self::MalformedPayer => "malformed_payer",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AskPayerStatus {
+    Pending,
+    Answered,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AskPayerMode {
+    HumanOrScripted,
+    AutoPayer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadAssignedContextRequest {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssignedService {
+    pub cpt: String,
+    pub diagnosis: String,
+    pub site: String,
+    pub version: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssignedCoverage {
+    pub payer_name: String,
+    pub member_id: String,
+    pub plan_id: String,
+    pub dos: String,
+    pub version: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssignedMessage {
+    pub id: String,
+    pub role: Role,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssignedDocument {
+    pub id: String,
+    pub name: String,
+    pub content_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AssignedContext {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+    pub task_purpose: TaskPurpose,
+    #[schemars(schema_with = "any_json_schema")]
+    pub task_context: Value,
+    pub service: AssignedService,
+    pub coverage: AssignedCoverage,
+    pub conversation: Vec<AssignedMessage>,
+    pub documents: Vec<AssignedDocument>,
+    pub allowed_evidence_ids: Vec<String>,
+    pub allowed_tools: Vec<String>,
+    pub rules: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AskPayerRequest {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+    #[schemars(length(min = 1))]
+    pub question: String,
+    pub evidence_hint: EvidenceHint,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AskPayerResponse {
+    pub status: AskPayerStatus,
+    pub mode: AskPayerMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub msg_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub configured_kind: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadPermittedEvidenceRequest {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+    #[schemars(length(min = 1))]
+    pub evidence_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EvidenceBlob {
+    pub evidence_id: String,
+    pub kind: String,
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReportObservationsRequest {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+    #[schemars(length(min = 1))]
+    pub observations: Vec<DraftObservation>,
+    pub needs_human_review: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ReportObservationsResponse {
+    pub accepted: bool,
+    pub observation_draft_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RequestClarificationRequest {
+    pub run_id: Uuid,
+    pub task_id: Uuid,
+    #[schemars(length(min = 1))]
+    pub message: String,
+    pub reason: ClarificationReason,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct RequestClarificationResponse {
+    pub accepted: bool,
+}
+
+fn any_json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "description": "Arbitrary JSON value"
+    })
+}
+
+pub fn json_schema_for<T: JsonSchema>() -> Value {
+    let mut settings = schemars::generate::SchemaSettings::draft2020_12();
+    settings.inline_subschemas = true;
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<T>();
+    Value::from(schema)
+}
+
+pub fn parse_tool_args<T: serde::de::DeserializeOwned>(args: &Value) -> LabResult<T> {
+    serde_json::from_value(args.clone())
+        .map_err(|err| LabError::Invalid(format!("invalid_schema: {err}")))
+}
+
 /// Compact per-call audit entry stored in `tool_calls_json`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ToolCallEntry {
     pub tool: String,
     pub args_digest: String,
@@ -51,7 +253,7 @@ pub struct ToolCallEntry {
 }
 
 /// Standard agent trace. Public tools live in `calls`; runner internals in `diagnostics`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct ToolTrace {
     pub trace_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,7 +262,15 @@ pub struct ToolTrace {
     pub repair: Option<crate::lab::plan::RepairMeta>,
     pub calls: Vec<ToolCallEntry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(schema_with = "any_json_array_schema")]
     pub diagnostics: Vec<Value>,
+}
+
+fn any_json_array_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "array",
+        "items": { "description": "Arbitrary JSON value" }
+    })
 }
 
 impl ToolTrace {
@@ -163,33 +373,8 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             description:
                 "Read assigned BV context for an open benefits-verification task (no hidden_facts)."
                     .into(),
-            input_schema: json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["run_id", "task_id"],
-                "properties": {
-                    "run_id": { "type": "string", "format": "uuid" },
-                    "task_id": { "type": "string", "format": "uuid" }
-                }
-            }),
-            output_schema: json!({
-                "type": "object",
-                "required": ["task_id", "allowed_tools", "allowed_evidence_ids", "rules"],
-                "properties": {
-                    "task_id": { "type": "string" },
-                    "task_purpose": { "type": "string" },
-                    "service": { "type": "object" },
-                    "coverage": { "type": "object" },
-                    "conversation": { "type": "array" },
-                    "documents": { "type": "array" },
-                    "allowed_evidence_ids": { "type": "array", "items": { "type": "string" } },
-                    "allowed_tools": {
-                        "type": "array",
-                        "items": { "type": "string", "enum": ALLOWED_TOOLS }
-                    },
-                    "rules": { "type": "array", "items": { "type": "string" } }
-                }
-            }),
+            input_schema: json_schema_for::<ReadAssignedContextRequest>(),
+            output_schema: json_schema_for::<AssignedContext>(),
         },
         ToolDefinition {
             name: TOOL_ASK_PAYER.into(),
@@ -197,135 +382,28 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 "Request a synthetic payer BV answer. Default waits for human/scripted speech; \
                  MINT_LAB_AUTO_PAYER=1 may return a FakePayer fixture answer."
                     .into(),
-            input_schema: json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["run_id", "task_id", "question", "evidence_hint"],
-                "properties": {
-                    "run_id": { "type": "string", "format": "uuid" },
-                    "task_id": { "type": "string", "format": "uuid" },
-                    "question": { "type": "string", "minLength": 1 },
-                    "evidence_hint": { "type": "string", "const": "payer_bv_response" }
-                }
-            }),
-            output_schema: json!({
-                "type": "object",
-                "required": ["status", "mode"],
-                "properties": {
-                    "status": { "type": "string", "enum": ["pending", "answered"] },
-                    "pending_id": { "type": "string", "format": "uuid" },
-                    "text": { "type": "string" },
-                    "mode": { "type": "string", "enum": ["human_or_scripted", "auto_payer"] }
-                }
-            }),
+            input_schema: json_schema_for::<AskPayerRequest>(),
+            output_schema: json_schema_for::<AskPayerResponse>(),
         },
         ToolDefinition {
             name: TOOL_READ_PERMITTED_EVIDENCE.into(),
             description: "Read one allowlisted evidence id (message, document, or conversation)."
                 .into(),
-            input_schema: json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["run_id", "task_id", "evidence_id"],
-                "properties": {
-                    "run_id": { "type": "string", "format": "uuid" },
-                    "task_id": { "type": "string", "format": "uuid" },
-                    "evidence_id": { "type": "string", "minLength": 1 }
-                }
-            }),
-            output_schema: json!({
-                "type": "object",
-                "required": ["evidence_id", "kind", "truncated"],
-                "properties": {
-                    "evidence_id": { "type": "string" },
-                    "kind": { "type": "string" },
-                    "text": { "type": "string" },
-                    "content_hash": { "type": "string" },
-                    "truncated": { "type": "boolean" }
-                }
-            }),
+            input_schema: json_schema_for::<ReadPermittedEvidenceRequest>(),
+            output_schema: json_schema_for::<EvidenceBlob>(),
         },
         ToolDefinition {
             name: TOOL_REPORT_OBSERVATIONS.into(),
             description: "Submit typed BV observations. Does not set case stage.".into(),
-            input_schema: json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["run_id", "task_id", "observations", "needs_human_review"],
-                "properties": {
-                    "run_id": { "type": "string", "format": "uuid" },
-                    "task_id": { "type": "string", "format": "uuid" },
-                    "needs_human_review": { "type": "boolean" },
-                    "observations": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": ["kind", "statement", "uncertainty", "evidence_refs"],
-                            "properties": {
-                                "kind": {
-                                    "type": "string",
-                                    "enum": [
-                                        "eligibility",
-                                        "coverage",
-                                        "pa_requirement",
-                                        "network",
-                                        "documentation_need",
-                                        "injection_attempt",
-                                        "clarification",
-                                        "other"
-                                    ]
-                                },
-                                "statement": { "type": "string", "minLength": 1 },
-                                "uncertainty": {
-                                    "type": "string",
-                                    "enum": ["known", "unknown", "not_applicable"]
-                                },
-                                "evidence_refs": {
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "items": { "type": "string" }
-                                }
-                            }
-                        }
-                    }
-                }
-            }),
-            output_schema: json!({
-                "type": "object",
-                "required": ["accepted", "observation_draft_count"],
-                "properties": {
-                    "accepted": { "type": "boolean" },
-                    "observation_draft_count": { "type": "integer", "minimum": 0 }
-                }
-            }),
+            input_schema: json_schema_for::<ReportObservationsRequest>(),
+            output_schema: json_schema_for::<ReportObservationsResponse>(),
         },
         ToolDefinition {
             name: TOOL_REQUEST_CLARIFICATION.into(),
             description:
                 "Escalate to human clarification or review; does not mutate stage directly.".into(),
-            input_schema: json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["run_id", "task_id", "message", "reason"],
-                "properties": {
-                    "run_id": { "type": "string", "format": "uuid" },
-                    "task_id": { "type": "string", "format": "uuid" },
-                    "message": { "type": "string", "minLength": 1 },
-                    "reason": {
-                        "type": "string",
-                        "enum": ["unclear", "conflict", "injection", "malformed_payer", "other"]
-                    }
-                }
-            }),
-            output_schema: json!({
-                "type": "object",
-                "required": ["accepted"],
-                "properties": {
-                    "accepted": { "type": "boolean", "const": true }
-                }
-            }),
+            input_schema: json_schema_for::<RequestClarificationRequest>(),
+            output_schema: json_schema_for::<RequestClarificationResponse>(),
         },
     ]
 }
@@ -352,10 +430,20 @@ mod tests {
         let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(names, ALLOWED_TOOLS);
         for def in &defs {
+            assert_eq!(
+                def.input_schema["$schema"],
+                "https://json-schema.org/draft/2020-12/schema"
+            );
             assert_eq!(def.input_schema["type"], "object");
             assert!(def.input_schema["required"].is_array());
             assert_eq!(def.output_schema["type"], "object");
             assert!(!is_forbidden_tool(&def.name));
+            let dumped = def.input_schema.to_string() + &def.output_schema.to_string();
+            assert!(
+                !dumped.contains("hidden_facts"),
+                "{} schema must not mention hidden_facts",
+                def.name
+            );
         }
     }
 
@@ -415,5 +503,16 @@ mod tests {
             .map(|v| v["name"].as_str().unwrap_or_default())
             .collect::<Vec<_>>();
         assert_eq!(listed, ALLOWED_TOOLS);
+    }
+
+    #[test]
+    fn parse_tool_args_rejects_unknown_fields() {
+        let err = parse_tool_args::<ReadAssignedContextRequest>(&json!({
+            "run_id": "00000000-0000-0000-0000-000000000001",
+            "task_id": "00000000-0000-0000-0000-000000000002",
+            "hidden_facts": { "bv_outcome": "pa_required" }
+        }))
+        .expect_err("unknown fields");
+        assert!(err.to_string().contains("invalid_schema"), "{err}");
     }
 }

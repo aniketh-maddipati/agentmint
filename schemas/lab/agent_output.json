@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "properties": {
+        "evidence_hint": {
+          "type": "string"
+        },
+        "question": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": {
+          "const": "pending_question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "question",
+        "evidence_hint"
+      ],
+      "type": "object"
+    },
+    {
+      "properties": {
+        "needs_human_review": {
+          "type": "boolean"
+        },
+        "observations": {
+          "items": {
+            "properties": {
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "eligibility",
+                  "coverage",
+                  "pa_requirement",
+                  "network",
+                  "documentation_need",
+                  "injection_attempt",
+                  "clarification",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "statement": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uncertainty": {
+                "enum": [
+                  "known",
+                  "unknown",
+                  "not_applicable"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "statement",
+              "uncertainty",
+              "evidence_refs"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "observations",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "observations",
+        "needs_human_review"
+      ],
+      "type": "object"
+    },
+    {
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": {
+          "const": "clarification",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "message"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "AgentOutput"
+}
