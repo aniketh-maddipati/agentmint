@@ -53,7 +53,7 @@ fn print_help() {
          \tmint lab check <run-id> [--dir PATH]\n\
          \tmint lab run <scenario> [--json] [--dir PATH]\n\
          \tmint lab list [--json] [--dir PATH]\n\
-         \tmint lab eval-model [--scenario ID] [--live] [--json]\n\
+         \tmint lab eval-model [--scenario ID] [--runner scripted|mcp] [--live] [--json]\n\
          \tmint lab mcp-stdio [--scenario ID | --run-id UUID] [--dir PATH]\n\
          \tmint lab mcp-http [--scenario ID | --run-id UUID] [--bind 127.0.0.1:8787] [--dir PATH]\n\n\
          Agents: MINT_LAB_AGENT=scripted|openai|mcp (default scripted).\n\
@@ -267,13 +267,16 @@ fn cmd_list(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
 }
 
 fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error>> {
-    use crate::lab::eval::{run_live_openai_eval, run_scripted_eval};
+    use crate::lab::eval::{run_live_openai_eval, run_mcp_eval, run_scripted_eval};
 
     let live = args.iter().any(|a| a == "--live");
     let scenario = flag(args, "--scenario").unwrap_or("approval");
+    let runner = flag(args, "--runner").unwrap_or("scripted");
     let fixtures = fixtures_dir();
     let report = if live {
         run_live_openai_eval(&fixtures, scenario)?
+    } else if runner == "mcp" {
+        run_mcp_eval(&fixtures, scenario)?
     } else {
         run_scripted_eval(&fixtures, scenario)?
     };
@@ -281,8 +284,14 @@ fn cmd_eval_model(args: &[String]) -> Result<ExitCode, Box<dyn std::error::Error
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
-            "scenario={} model={} live={} overall={}",
-            report.scenario_id, report.model_id, report.live, report.overall_passed
+            "scenario={} model={} runner={} live={} overall={} tools={} repairs={}",
+            report.scenario_id,
+            report.model_id,
+            report.runner,
+            report.live,
+            report.overall_passed,
+            report.tool_call_count,
+            report.repair_count
         );
         for score in &report.scores {
             let mark = if score.passed { "PASS" } else { "FAIL" };

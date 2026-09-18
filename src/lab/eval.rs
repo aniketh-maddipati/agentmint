@@ -42,6 +42,12 @@ pub struct EvalReport {
     pub scenario_id: String,
     pub model_id: String,
     pub live: bool,
+    #[serde(default)]
+    pub runner: String,
+    #[serde(default)]
+    pub tool_call_count: usize,
+    #[serde(default)]
+    pub repair_count: u32,
     pub scores: Vec<DimensionScore>,
     pub overall_passed: bool,
     pub output_type: String,
@@ -230,14 +236,28 @@ pub fn score_output(
         notes.push("scenario expects unknown or escalation on ambiguous payer language".into());
     }
     let overall_passed = scores.iter().all(|s| s.passed);
+    let (tool_call_count, repair_count) = metrics_from_trace(tool_calls_json);
     EvalReport {
         scenario_id: scenario_id.to_owned(),
         model_id: model_id.to_owned(),
         live,
+        runner: model_id.to_owned(),
+        tool_call_count,
+        repair_count,
         scores,
         overall_passed,
         output_type: output_type_name(output).into(),
         notes,
+    }
+}
+
+fn metrics_from_trace(raw: &str) -> (usize, u32) {
+    match crate::lab::tools::parse_tool_trace(raw) {
+        Ok(trace) => (
+            trace.calls.len(),
+            trace.repair.map(|r| r.count).unwrap_or(0),
+        ),
+        Err(_) => (0, 0),
     }
 }
 
@@ -422,6 +442,59 @@ pub fn run_live_openai_eval(
     ))
 }
 
+pub fn run_mcp_eval(fixtures_dir: &std::path::Path, scenario_id: &str) -> LabResult<EvalReport> {
+    use crate::lab::mcp::client::McpAgentRunner;
+    use crate::lab::mcp::McpState;
+    use crate::lab::tools::ToolTrace;
+    use crate::lab::workflow::LabEngine;
+    use std::sync::{Arc, Mutex};
+
+    let fixture = load_scenario_from(fixtures_dir, scenario_id)?;
+    let dir = std::env::temp_dir().join(format!("mint-lab-mcp-eval-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&dir)?;
+    let engine = LabEngine::open(&dir, fixtures_dir)?;
+    let run_id = engine.start_run(scenario_id)?;
+    let task_id = engine.prepare_bv_task(run_id)?;
+    if let Some(answer) = fixture.scripted_payer_answers.first() {
+        if fixture.injection_in_source.is_none() {
+            engine.record_payer_speech(run_id, answer)?;
+        }
+    }
+    let snap = engine.snapshot(run_id)?;
+    let task = snap
+        .tasks
+        .iter()
+        .find(|t| t.id == task_id)
+        .cloned()
+        .ok_or_else(|| LabError::Invalid("mcp eval missing BV task".into()))?;
+    let state = Arc::new(McpState {
+        engine: Arc::new(engine),
+        run_id,
+        task_id,
+        token: "eval-token".into(),
+        apply: false,
+        auto_payer: false,
+        trace: Mutex::new(ToolTrace::new()),
+    });
+    let agent = McpAgentRunner::in_process(state);
+    let result = agent.run_bv(&task, &snap)?;
+    let allowed = allowed_evidence_ids(&snap);
+    let payer_text = fixture
+        .scripted_payer_answers
+        .first()
+        .cloned()
+        .unwrap_or_default();
+    Ok(score_output(
+        scenario_id,
+        &result.record.model_id,
+        false,
+        &result.output,
+        &allowed,
+        &payer_text,
+        &result.record.tool_calls_json,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,6 +530,26 @@ mod tests {
         match previous {
             Some(v) => std::env::set_var("MINT_LAB_MODEL_EVAL", v),
             None => std::env::remove_var("MINT_LAB_MODEL_EVAL"),
+        }
+    }
+
+    #[test]
+    fn mcp_eval_matches_scripted_on_core_scenarios() {
+        let dir = fixtures_dir();
+        for id in [
+            "approval",
+            "no_pa",
+            "unclear_bv",
+            "injection_attempt",
+            "conflict_bv",
+        ] {
+            let scripted = run_scripted_eval(&dir, id).unwrap_or_else(|err| panic!("{id}: {err}"));
+            let mcp = run_mcp_eval(&dir, id).unwrap_or_else(|err| panic!("mcp {id}: {err}"));
+            assert!(scripted.overall_passed, "scripted {id}: {scripted:?}");
+            assert!(mcp.overall_passed, "mcp {id}: {mcp:?}");
+            assert_eq!(mcp.runner, "mcp");
+            assert!(!mcp.live);
+            assert_eq!(scripted.output_type, mcp.output_type, "{id}");
         }
     }
 }
