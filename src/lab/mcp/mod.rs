@@ -15,14 +15,15 @@ use crate::lab::agent::{
 };
 use crate::lab::domain::{CaseSnapshot, ObservationKind, Role, Uncertainty};
 use crate::lab::error::{LabError, LabResult};
+use crate::lab::inspect::InspectReport;
 use crate::lab::payer::{BvInquiry, PayerAdapter};
 use crate::lab::tools::{
-    digest_args, is_allowed_tool, mcp_tool_list_payload, parse_tool_args, tool_call, AskPayerMode,
-    AskPayerRequest, AskPayerResponse, AskPayerStatus, ClarificationReason, EvidenceBlob,
-    ReadAssignedContextRequest, ReadPermittedEvidenceRequest, ReportObservationsRequest,
-    ReportObservationsResponse, RequestClarificationRequest, RequestClarificationResponse,
-    ToolTrace, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT, TOOL_READ_PERMITTED_EVIDENCE,
-    TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
+    digest_args, is_allowed_tool, mcp_tool_list_payload, parse_tool_args, parse_tool_trace,
+    tool_call, AskPayerMode, AskPayerRequest, AskPayerResponse, AskPayerStatus,
+    ClarificationReason, EvidenceBlob, ReadAssignedContextRequest, ReadPermittedEvidenceRequest,
+    ReportObservationsRequest, ReportObservationsResponse, RequestClarificationRequest,
+    RequestClarificationResponse, ToolTrace, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT,
+    TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
 };
 use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 use crate::lab::workflow::LabEngine;
@@ -226,7 +227,7 @@ fn tool_result(body: Value, is_error: bool) -> Value {
     })
 }
 
-fn map_tool_error(err: &LabError) -> (&'static str, String, Option<Value>) {
+pub(crate) fn map_tool_error(err: &LabError) -> (&'static str, String, Option<Value>) {
     let message = err.to_string();
     let code = if message.contains("unauthorized") {
         "unauthorized"
@@ -236,6 +237,8 @@ fn map_tool_error(err: &LabError) -> (&'static str, String, Option<Value>) {
         "unknown_evidence"
     } else if message.contains("injection") {
         "injection_detected"
+    } else if matches!(err, LabError::NotFound(_)) {
+        "not_found"
     } else {
         "invalid_schema"
     };
@@ -247,22 +250,40 @@ fn call_tool(state: &McpState, params: &Value) -> LabResult<Value> {
         .get("name")
         .and_then(Value::as_str)
         .ok_or_else(|| LabError::Invalid("missing tool name".into()))?;
+    let args = params.get("arguments").cloned().unwrap_or(json!({}));
+    let body = dispatch_bv_tool(state, name, &args)?;
+    let ok = body.get("error").is_none();
+    Ok(tool_result(body, !ok))
+}
+
+/// Shared BV tool dispatch for MCP JSON-RPC and REST `POST /lab/bv/{tool}`.
+pub fn dispatch_bv_tool(state: &McpState, name: &str, args: &Value) -> LabResult<Value> {
     if !is_allowed_tool(name) {
         return Err(LabError::Invalid(format!(
             "tool {name} is not on the BV allowlist"
         )));
     }
-    let args = params.get("arguments").cloned().unwrap_or(json!({}));
-    scan_for_real_identifiers(&args)?;
+    scan_for_real_identifiers(args)?;
     let started = Instant::now();
     let body = match name {
-        TOOL_READ_ASSIGNED_CONTEXT => tool_read_assigned_context(state, &args)?,
-        TOOL_ASK_PAYER => tool_ask_payer(state, &args)?,
-        TOOL_READ_PERMITTED_EVIDENCE => tool_read_permitted_evidence(state, &args)?,
-        TOOL_REPORT_OBSERVATIONS => tool_report_observations(state, &args)?,
-        TOOL_REQUEST_CLARIFICATION => tool_request_clarification(state, &args)?,
+        TOOL_READ_ASSIGNED_CONTEXT => tool_read_assigned_context(state, args)?,
+        TOOL_ASK_PAYER => tool_ask_payer(state, args)?,
+        TOOL_READ_PERMITTED_EVIDENCE => tool_read_permitted_evidence(state, args)?,
+        TOOL_REPORT_OBSERVATIONS => tool_report_observations(state, args)?,
+        TOOL_REQUEST_CLARIFICATION => tool_request_clarification(state, args)?,
         other => return Err(LabError::Invalid(format!("unknown tool {other}"))),
     };
+    record_dispatch_trace(state, name, args, &body, started)?;
+    Ok(body)
+}
+
+fn record_dispatch_trace(
+    state: &McpState,
+    name: &str,
+    args: &Value,
+    body: &Value,
+    started: Instant,
+) -> LabResult<()> {
     let latency_us = started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
     let ok = body.get("error").is_none();
     let status = body.get("status").and_then(Value::as_str).or_else(|| {
@@ -276,7 +297,7 @@ fn call_tool(state: &McpState, params: &Value) -> LabResult<Value> {
         .trace
         .lock()
         .map_err(|_| LabError::Storage("mcp trace lock poisoned".into()))?;
-    let mut entry = tool_call(name, &args, ok, None, latency_us, None, status);
+    let mut entry = tool_call(name, args, ok, None, latency_us, None, status);
     if name == TOOL_ASK_PAYER {
         entry.result_status = Some(
             if state.auto_payer {
@@ -291,7 +312,7 @@ fn call_tool(state: &McpState, params: &Value) -> LabResult<Value> {
                 "tool": TOOL_ASK_PAYER,
                 "auto_payer": state.auto_payer,
                 "mode": mode,
-                "args_digest": digest_args(&args)
+                "args_digest": digest_args(args)
             }));
         }
     }
@@ -303,8 +324,41 @@ fn call_tool(state: &McpState, params: &Value) -> LabResult<Value> {
         entry.ok = false;
     }
     trace.push(entry);
-    drop(trace);
-    Ok(tool_result(body, !ok))
+    Ok(())
+}
+
+fn require_bound_run(state: &McpState, run_id: Uuid) -> LabResult<()> {
+    if run_id != state.run_id {
+        return Err(LabError::Invalid(
+            "run_id/task_id do not match MCP session binding".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn inspect_bound_run(state: &McpState, run_id: Uuid) -> LabResult<InspectReport> {
+    require_bound_run(state, run_id)?;
+    crate::lab::inspect::inspect_run(&state.engine, run_id)
+}
+
+pub fn trace_bound_run(state: &McpState, run_id: Uuid) -> LabResult<ToolTrace> {
+    require_bound_run(state, run_id)?;
+    let session = state
+        .trace
+        .lock()
+        .map_err(|_| LabError::Storage("mcp trace lock poisoned".into()))?
+        .clone();
+    if !session.calls.is_empty() {
+        return Ok(session);
+    }
+    let snap = state.engine.snapshot(run_id)?;
+    let Some(run) = snap.agent_runs.last() else {
+        return Ok(session);
+    };
+    match parse_tool_trace(&run.tool_calls_json) {
+        Ok(trace) => Ok(trace),
+        Err(_) => Ok(session),
+    }
 }
 
 fn scan_for_real_identifiers(value: &Value) -> LabResult<()> {
@@ -672,28 +726,38 @@ fn persist_mcp_run(
 }
 
 #[cfg(test)]
+pub(crate) fn test_mcp_state(
+    scenario: &str,
+    apply: bool,
+    auto_payer: bool,
+) -> (tempfile::TempDir, McpState) {
+    use crate::lab::scenarios::fixtures_dir;
+    use crate::lab::workflow::LabEngine;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let engine = LabEngine::open(dir.path(), &fixtures_dir()).expect("engine");
+    let run_id = engine.start_run(scenario).expect("start");
+    let task_id = engine.prepare_bv_task(run_id).expect("bv task");
+    let state = McpState {
+        engine: Arc::new(engine),
+        run_id,
+        task_id,
+        token: "lab-token".into(),
+        apply,
+        auto_payer,
+        trace: Mutex::new(ToolTrace::new()),
+    };
+    (dir, state)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::lab::agent::interpret_payer_text;
     use crate::lab::domain::CaseStage;
-    use crate::lab::scenarios::fixtures_dir;
-    use tempfile::tempdir;
 
     fn state_for(scenario: &str, apply: bool, auto_payer: bool) -> (tempfile::TempDir, McpState) {
-        let dir = tempdir().expect("tempdir");
-        let engine = LabEngine::open(dir.path(), &fixtures_dir()).expect("engine");
-        let run_id = engine.start_run(scenario).expect("start");
-        let task_id = engine.prepare_bv_task(run_id).expect("bv task");
-        let state = McpState {
-            engine: Arc::new(engine),
-            run_id,
-            task_id,
-            token: "lab-token".into(),
-            apply,
-            auto_payer,
-            trace: Mutex::new(ToolTrace::new()),
-        };
-        (dir, state)
+        test_mcp_state(scenario, apply, auto_payer)
     }
 
     fn call(state: &McpState, name: &str, arguments: Value) -> JsonRpcResponse {
@@ -894,5 +958,56 @@ mod tests {
             .unwrap()
             .to_owned();
         assert!(text.contains("72148"));
+    }
+
+    #[test]
+    fn rest_dispatch_matches_mcp_read_assigned_context() {
+        let (_dir, state) = state_for("unclear_bv", false, false);
+        let args = json!({ "run_id": state.run_id, "task_id": state.task_id });
+        let mcp_body = body(&call(&state, TOOL_READ_ASSIGNED_CONTEXT, args.clone()));
+        let rest_body = dispatch_bv_tool(&state, TOOL_READ_ASSIGNED_CONTEXT, &args).expect("rest");
+        assert_eq!(mcp_body, rest_body);
+        assert_eq!(rest_body["service"]["cpt"], "72148");
+        assert_eq!(rest_body["run_id"], json!(state.run_id));
+    }
+
+    #[test]
+    fn rest_dispatch_matches_mcp_ask_payer_auto() {
+        let (_dir_mcp, mcp_state) = state_for("unclear_bv", true, true);
+        let (_dir_rest, rest_state) = state_for("unclear_bv", true, true);
+        let mcp_args = json!({
+            "run_id": mcp_state.run_id,
+            "task_id": mcp_state.task_id,
+            "question": "Is prior authorization required for CPT 72148?",
+            "evidence_hint": "payer_bv_response"
+        });
+        let rest_args = json!({
+            "run_id": rest_state.run_id,
+            "task_id": rest_state.task_id,
+            "question": "Is prior authorization required for CPT 72148?",
+            "evidence_hint": "payer_bv_response"
+        });
+        let mcp_body = body(&call(&mcp_state, TOOL_ASK_PAYER, mcp_args));
+        let rest_body = dispatch_bv_tool(&rest_state, TOOL_ASK_PAYER, &rest_args).expect("rest");
+        assert_eq!(mcp_body["status"], rest_body["status"]);
+        assert_eq!(mcp_body["mode"], rest_body["mode"]);
+        assert_eq!(mcp_body["configured_kind"], rest_body["configured_kind"]);
+        assert_eq!(mcp_body["text"], rest_body["text"]);
+        assert_eq!(rest_body["status"], "answered");
+        assert_eq!(rest_body["mode"], "auto_payer");
+    }
+
+    #[test]
+    fn inspect_and_trace_require_bound_run() {
+        let (_dir, state) = state_for("approval", false, false);
+        let other = Uuid::new_v4();
+        let inspect_err = inspect_bound_run(&state, other).expect_err("cross-run");
+        let trace_err = trace_bound_run(&state, other).expect_err("cross-run");
+        assert!(matches!(inspect_err, LabError::Invalid(_)));
+        assert!(matches!(trace_err, LabError::Invalid(_)));
+        let report = inspect_bound_run(&state, state.run_id).expect("inspect");
+        assert_eq!(report.run_id, state.run_id);
+        let trace = trace_bound_run(&state, state.run_id).expect("trace");
+        assert_eq!(trace.trace_version, crate::lab::tools::TRACE_VERSION);
     }
 }

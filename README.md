@@ -136,6 +136,8 @@ Synthetic medical-benefit prior-authorization / benefits-verification case conso
 
 ```bash
 ./scripts/demo-pa-bv.sh
+./scripts/demo-pa-bv-mcp.sh
+./scripts/demo-pa-bv-rest.sh
 cargo test --test pa_bv_acceptance
 mint lab start --scenario approval
 mint lab console <run-id>

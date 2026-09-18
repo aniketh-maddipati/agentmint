@@ -1,5 +1,5 @@
 //! Canonical JSON Schema 2020-12 (and OpenAPI 3.1) for the PA/BV lab contract.
-//! Used by: MCP `tools/list`, snapshot tests under `schemas/lab/`, later REST (PR2).
+//! Used by: MCP `tools/list`, snapshot tests under `schemas/lab/`, REST `GET /lab/openapi.json`.
 //! Rust types remain the source of truth. `hidden_facts` is never in these schemas.
 
 use std::fs;
@@ -169,7 +169,7 @@ pub fn openapi_document() -> Value {
         "info": {
             "title": "mint-lab-pa-bv",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Loopback PA/BV lab contract. MCP for agents, REST for buyers/UI. Not served until the REST dual PR."
+            "description": "Loopback PA/BV lab contract. MCP for agents, REST for buyers/UI. Served at GET /lab/openapi.json on mint lab mcp-http."
         },
         "jsonSchemaDialect": JSON_SCHEMA_2020_12,
         "servers": [{ "url": "http://127.0.0.1:8787" }],

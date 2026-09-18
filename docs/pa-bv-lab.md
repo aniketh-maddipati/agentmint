@@ -101,6 +101,9 @@ Mint exposes **five BV tools only** as an MCP server: `read_assigned_context`, `
 # Loopback HTTP + FakePayer auto-answer (no real PHI or keys)
 ./scripts/demo-pa-bv-mcp.sh
 
+# Same five tools over REST (buyers/UI; not JSON-RPC)
+./scripts/demo-pa-bv-rest.sh
+
 # Same handlers over stdio (MCP inspector)
 MINT_LAB_MCP_TOKEN=lab-token cargo run --quiet -- lab mcp-stdio --scenario unclear_bv --dir /tmp/lab-mcp
 ```
@@ -113,7 +116,22 @@ MINT_LAB_MCP_TOKEN=lab-token cargo run --quiet -- lab mcp-stdio --scenario uncle
 
 HTTP binds `127.0.0.1` only. Read-only resources: `mint-lab://run/{run_id}/bv-task/{task_id}/context` and `mint-lab://run/{run_id}/evidence/{evidence_id}`.
 
-Canonical JSON Schema 2020-12 (and OpenAPI 3.1) for the five tools, `AgentOutput`, `InspectReport`, and `EvalReport` live in [`schemas/lab/`](../schemas/lab/). Rust types are the source of truth; `cargo test` checks the snapshots. `hidden_facts` is never in those schemas.
+REST (same `mint lab mcp-http` process, same bearer; UI never uses JSON-RPC):
+
+| Method | Path |
+| ------ | ---- |
+| `POST` | `/lab/bv/read_assigned_context` |
+| `POST` | `/lab/bv/ask_payer` |
+| `POST` | `/lab/bv/read_permitted_evidence` |
+| `POST` | `/lab/bv/report_observations` |
+| `POST` | `/lab/bv/request_clarification_or_review` |
+| `GET` | `/lab/runs/{run_id}/inspect` |
+| `GET` | `/lab/runs/{run_id}/trace` |
+| `GET` | `/lab/openapi.json` |
+| `POST` | `/mcp` (agents) |
+| `GET` | `/health` |
+
+Canonical JSON Schema 2020-12 (and OpenAPI 3.1) for the five tools, `AgentOutput`, `InspectReport`, and `EvalReport` live in [`schemas/lab/`](../schemas/lab/) and are served at `GET /lab/openapi.json`. Rust types are the source of truth; `cargo test` checks the snapshots. `hidden_facts` is never in those schemas.
 
 ## Limitations
 
