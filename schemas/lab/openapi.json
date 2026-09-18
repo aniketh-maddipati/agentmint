@@ -1130,7 +1130,7 @@
     }
   },
   "info": {
-    "description": "Loopback PA/BV lab contract. MCP for agents, REST for buyers/UI. Not served until the REST dual PR.",
+    "description": "Loopback PA/BV lab contract. MCP for agents, REST for buyers/UI. Served at GET /lab/openapi.json on mint lab mcp-http.",
     "title": "mint-lab-pa-bv",
     "version": "0.1.0"
   },
