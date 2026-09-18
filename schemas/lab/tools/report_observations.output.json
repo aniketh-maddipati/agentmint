@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "accepted": {
+      "type": "boolean"
+    },
+    "observation_draft_count": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "accepted",
+    "observation_draft_count"
+  ],
+  "title": "ReportObservationsResponse",
+  "type": "object"
+}

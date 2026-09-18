@@ -1,6 +1,7 @@
 //! Structured BV reasoning artifacts (`bv-plan-v1`) and bounded replan metadata.
 //! Default: embed in `tool_calls_json`. Opt-in columns: `MINT_LAB_REASONING_COLUMNS=1`.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::lab::domain::AgentRunRecord;
@@ -9,13 +10,13 @@ use crate::lab::tools::ToolTrace;
 pub const PLAN_VERSION: &str = "bv-plan-v1";
 pub const MAX_REPAIR_LOOPS: u32 = 2;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct BvPlanStep {
     pub id: String,
     pub action: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct BvPlan {
     pub plan_version: String,
     pub goal: String,
@@ -23,7 +24,7 @@ pub struct BvPlan {
     pub stop_conditions: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct RepairMeta {
     pub count: u32,
     pub max: u32,

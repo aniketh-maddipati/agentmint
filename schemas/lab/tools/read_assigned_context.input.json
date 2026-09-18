@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "task_id": {
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "task_id"
+  ],
+  "title": "ReadAssignedContextRequest",
+  "type": "object"
+}

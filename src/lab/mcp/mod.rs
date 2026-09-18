@@ -10,16 +10,19 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::lab::agent::{
-    allowed_evidence_ids, assigned_context_value, build_result, AgentOutput, DraftObservation,
+    allowed_evidence_ids, assigned_context, build_result, AgentOutput, DraftObservation,
     PendingQuestion,
 };
 use crate::lab::domain::{CaseSnapshot, ObservationKind, Role, Uncertainty};
 use crate::lab::error::{LabError, LabResult};
 use crate::lab::payer::{BvInquiry, PayerAdapter};
 use crate::lab::tools::{
-    digest_args, is_allowed_tool, mcp_tool_list_payload, tool_call, ToolTrace, TOOL_ASK_PAYER,
-    TOOL_READ_ASSIGNED_CONTEXT, TOOL_READ_PERMITTED_EVIDENCE, TOOL_REPORT_OBSERVATIONS,
-    TOOL_REQUEST_CLARIFICATION,
+    digest_args, is_allowed_tool, mcp_tool_list_payload, parse_tool_args, tool_call, AskPayerMode,
+    AskPayerRequest, AskPayerResponse, AskPayerStatus, ClarificationReason, EvidenceBlob,
+    ReadAssignedContextRequest, ReadPermittedEvidenceRequest, ReportObservationsRequest,
+    ReportObservationsResponse, RequestClarificationRequest, RequestClarificationResponse,
+    ToolTrace, TOOL_ASK_PAYER, TOOL_READ_ASSIGNED_CONTEXT, TOOL_READ_PERMITTED_EVIDENCE,
+    TOOL_REPORT_OBSERVATIONS, TOOL_REQUEST_CLARIFICATION,
 };
 use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 use crate::lab::workflow::LabEngine;
@@ -360,12 +363,13 @@ fn read_resource(state: &McpState, params: &Value) -> LabResult<Value> {
         state.run_id, state.task_id
     );
     if uri == context_prefix {
-        let body = assigned_context_value(task, &snap);
+        let body = assigned_context(task, &snap);
+        let text = serde_json::to_string(&body).unwrap_or_else(|_| "{}".into());
         return Ok(json!({
             "contents": [{
                 "uri": uri,
                 "mimeType": "application/json",
-                "text": body.to_string()
+                "text": text
             }]
         }));
     }
@@ -389,9 +393,7 @@ fn read_resource(state: &McpState, params: &Value) -> LabResult<Value> {
     Err(LabError::NotFound(format!("resource {uri}")))
 }
 
-fn bound_ids(state: &McpState, args: &Value) -> LabResult<(Uuid, Uuid)> {
-    let run_id = parse_uuid(args, "run_id")?;
-    let task_id = parse_uuid(args, "task_id")?;
+fn bound_ids(state: &McpState, run_id: Uuid, task_id: Uuid) -> LabResult<(Uuid, Uuid)> {
     if run_id != state.run_id || task_id != state.task_id {
         return Err(LabError::Invalid(
             "run_id/task_id do not match MCP session binding".into(),
@@ -400,37 +402,25 @@ fn bound_ids(state: &McpState, args: &Value) -> LabResult<(Uuid, Uuid)> {
     Ok((run_id, task_id))
 }
 
-fn parse_uuid(args: &Value, field: &str) -> LabResult<Uuid> {
-    let raw = args
-        .get(field)
-        .and_then(Value::as_str)
-        .ok_or_else(|| LabError::Invalid(format!("missing {field}")))?;
-    Uuid::parse_str(raw).map_err(|_| LabError::Invalid(format!("invalid {field}")))
+fn to_json<T: serde::Serialize>(value: T) -> LabResult<Value> {
+    serde_json::to_value(value).map_err(|err| LabError::Serialization(err.to_string()))
 }
 
 fn tool_read_assigned_context(state: &McpState, args: &Value) -> LabResult<Value> {
-    let (run_id, task_id) = bound_ids(state, args)?;
+    let req: ReadAssignedContextRequest = parse_tool_args(args)?;
+    let (run_id, task_id) = bound_ids(state, req.run_id, req.task_id)?;
     let (_case, task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
-    let mut ctx = assigned_context_value(&task, &snap);
-    if let Value::Object(map) = &mut ctx {
-        map.insert("run_id".into(), json!(run_id));
-    }
-    Ok(ctx)
+    to_json(assigned_context(&task, &snap))
 }
 
 fn tool_ask_payer(state: &McpState, args: &Value) -> LabResult<Value> {
-    let (run_id, task_id) = bound_ids(state, args)?;
-    let question = args
-        .get("question")
-        .and_then(Value::as_str)
-        .ok_or_else(|| LabError::Invalid("missing question".into()))?;
-    if question.trim().is_empty() {
+    let req: AskPayerRequest = parse_tool_args(args)?;
+    let (run_id, task_id) = bound_ids(state, req.run_id, req.task_id)?;
+    let question = req.question.trim();
+    if question.is_empty() {
         return Err(LabError::Invalid("question empty".into()));
     }
-    let evidence_hint = args
-        .get("evidence_hint")
-        .and_then(Value::as_str)
-        .unwrap_or("payer_bv_response");
+    let evidence_hint = req.evidence_hint.as_str();
     let (case, task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
 
     if state.auto_payer {
@@ -442,13 +432,14 @@ fn tool_ask_payer(state: &McpState, args: &Value) -> LabResult<Value> {
         };
         let response = state.engine.payer.inquire_bv(&inquiry)?;
         let msg_id = state.engine.record_payer_speech(run_id, &response.text)?;
-        return Ok(json!({
-            "status": "answered",
-            "mode": "auto_payer",
-            "text": response.text,
-            "msg_id": msg_id,
-            "configured_kind": response.configured_kind
-        }));
+        return to_json(AskPayerResponse {
+            status: AskPayerStatus::Answered,
+            mode: AskPayerMode::AutoPayer,
+            pending_id: None,
+            text: Some(response.text),
+            msg_id: Some(msg_id),
+            configured_kind: response.configured_kind,
+        });
     }
 
     let mut case = case;
@@ -467,27 +458,28 @@ fn tool_ask_payer(state: &McpState, args: &Value) -> LabResult<Value> {
     } else {
         None
     };
-    Ok(json!({
-        "status": "pending",
-        "mode": "human_or_scripted",
-        "pending_id": pending_id
-    }))
+    to_json(AskPayerResponse {
+        status: AskPayerStatus::Pending,
+        mode: AskPayerMode::HumanOrScripted,
+        pending_id,
+        text: None,
+        msg_id: None,
+        configured_kind: None,
+    })
 }
 
 fn tool_read_permitted_evidence(state: &McpState, args: &Value) -> LabResult<Value> {
-    let (run_id, task_id) = bound_ids(state, args)?;
-    let evidence_id = args
-        .get("evidence_id")
-        .and_then(Value::as_str)
-        .ok_or_else(|| LabError::Invalid("missing evidence_id".into()))?;
+    let req: ReadPermittedEvidenceRequest = parse_tool_args(args)?;
+    let (run_id, task_id) = bound_ids(state, req.run_id, req.task_id)?;
+    let evidence_id = req.evidence_id;
     let (_case, _task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
     let allowed = allowed_evidence_ids(&snap);
-    if !allowed.contains(evidence_id) {
+    if !allowed.contains(&evidence_id) {
         return Err(LabError::Invalid(format!(
             "unknown evidence id {evidence_id}"
         )));
     }
-    Ok(read_evidence_blob(&snap, evidence_id))
+    Ok(read_evidence_blob(&snap, &evidence_id))
 }
 
 fn read_evidence_blob(snap: &CaseSnapshot, evidence_id: &str) -> Value {
@@ -567,28 +559,22 @@ fn truncate_blob(
     } else {
         text.to_owned()
     };
-    json!({
-        "evidence_id": evidence_id,
-        "kind": kind,
-        "text": text,
-        "content_hash": content_hash,
-        "truncated": truncated
-    })
+    let blob = EvidenceBlob {
+        evidence_id: evidence_id.to_owned(),
+        kind: kind.to_owned(),
+        text,
+        content_hash: content_hash.map(str::to_owned),
+        truncated,
+    };
+    serde_json::to_value(blob).unwrap_or(Value::Null)
 }
 
 fn tool_report_observations(state: &McpState, args: &Value) -> LabResult<Value> {
-    let (run_id, task_id) = bound_ids(state, args)?;
+    let req: ReportObservationsRequest = parse_tool_args(args)?;
+    let (run_id, task_id) = bound_ids(state, req.run_id, req.task_id)?;
     let (mut case, task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
-    let mut observations: Vec<DraftObservation> = serde_json::from_value(
-        args.get("observations")
-            .cloned()
-            .ok_or_else(|| LabError::Invalid("missing observations".into()))?,
-    )
-    .map_err(|err| LabError::Invalid(format!("invalid_schema: {err}")))?;
-    let mut needs_human_review = args
-        .get("needs_human_review")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
+    let mut observations = req.observations;
+    let mut needs_human_review = req.needs_human_review;
     let blobs: Vec<String> = snap.conversation.iter().map(|m| m.text.clone()).collect();
     if detect_injection(&blobs).is_some()
         || observations
@@ -622,28 +608,22 @@ fn tool_report_observations(state: &McpState, args: &Value) -> LabResult<Value> 
             .engine
             .apply_bv_output(&mut case, &fixture, &mut happened, &task, output)?;
     }
-    Ok(json!({
-        "accepted": true,
-        "observation_draft_count": observations.len()
-    }))
+    to_json(ReportObservationsResponse {
+        accepted: true,
+        observation_draft_count: u32::try_from(observations.len()).unwrap_or(u32::MAX),
+    })
 }
 
 fn tool_request_clarification(state: &McpState, args: &Value) -> LabResult<Value> {
-    let (run_id, task_id) = bound_ids(state, args)?;
+    let req: RequestClarificationRequest = parse_tool_args(args)?;
+    let (run_id, task_id) = bound_ids(state, req.run_id, req.task_id)?;
     let (mut case, task, snap) = state.engine.require_open_bv_task(run_id, task_id)?;
-    let message = args
-        .get("message")
-        .and_then(Value::as_str)
-        .ok_or_else(|| LabError::Invalid("missing message".into()))?;
-    if message.trim().is_empty() {
+    let message = req.message.trim();
+    if message.is_empty() {
         return Err(LabError::Invalid("clarification message empty".into()));
     }
-    let reason = args
-        .get("reason")
-        .and_then(Value::as_str)
-        .unwrap_or("other");
-    let output = match reason {
-        "injection" => AgentOutput::Observations {
+    let output = match req.reason {
+        ClarificationReason::Injection => AgentOutput::Observations {
             observations: vec![DraftObservation {
                 kind: ObservationKind::InjectionAttempt,
                 statement: message.to_owned(),
@@ -664,7 +644,7 @@ fn tool_request_clarification(state: &McpState, args: &Value) -> LabResult<Value
             .engine
             .apply_bv_output(&mut case, &fixture, &mut happened, &task, output)?;
     }
-    Ok(json!({ "accepted": true }))
+    to_json(RequestClarificationResponse { accepted: true })
 }
 
 fn persist_mcp_run(

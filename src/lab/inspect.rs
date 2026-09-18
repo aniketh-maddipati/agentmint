@@ -1,7 +1,8 @@
 //! Structured inspect view distinguishing fact / claim / inference / unknown.
 //! Used by: `mint lab inspect` and console /evidence.
 
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -9,7 +10,7 @@ use crate::lab::domain::*;
 use crate::lab::error::LabResult;
 use crate::lab::workflow::LabEngine;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EpistemicClass {
     RecordedFact,
@@ -19,7 +20,7 @@ pub enum EpistemicClass {
     Hypothetical,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InspectItem {
     pub class: EpistemicClass,
     pub kind: String,
@@ -28,7 +29,7 @@ pub struct InspectItem {
     pub evidence_refs: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct InspectReport {
     pub run_id: Uuid,
     pub stage: CaseStage,

@@ -1,0 +1,1391 @@
+{
+  "components": {
+    "schemas": {
+      "AgentOutput": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "properties": {
+              "evidence_hint": {
+                "type": "string"
+              },
+              "question": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "const": "pending_question",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "question",
+              "evidence_hint"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "needs_human_review": {
+                "type": "boolean"
+              },
+              "observations": {
+                "items": {
+                  "properties": {
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "eligibility",
+                        "coverage",
+                        "pa_requirement",
+                        "network",
+                        "documentation_need",
+                        "injection_attempt",
+                        "clarification",
+                        "other"
+                      ],
+                      "type": "string"
+                    },
+                    "statement": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "uncertainty": {
+                      "enum": [
+                        "known",
+                        "unknown",
+                        "not_applicable"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "statement",
+                    "uncertainty",
+                    "evidence_refs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "observations",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "observations",
+              "needs_human_review"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "message": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "const": "clarification",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ],
+            "type": "object"
+          }
+        ],
+        "title": "AgentOutput"
+      },
+      "AskPayerRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "evidence_hint": {
+            "enum": [
+              "payer_bv_response"
+            ],
+            "type": "string"
+          },
+          "question": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id",
+          "question",
+          "evidence_hint"
+        ],
+        "title": "AskPayerRequest",
+        "type": "object"
+      },
+      "AskPayerResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "configured_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "human_or_scripted",
+              "auto_payer"
+            ],
+            "type": "string"
+          },
+          "msg_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "answered"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "mode"
+        ],
+        "title": "AskPayerResponse",
+        "type": "object"
+      },
+      "AssignedContext": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "allowed_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "conversation": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "customer",
+                    "payer",
+                    "reviewer",
+                    "operator"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "role",
+                "text"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "coverage": {
+            "properties": {
+              "dos": {
+                "type": "string"
+              },
+              "member_id": {
+                "type": "string"
+              },
+              "payer_name": {
+                "type": "string"
+              },
+              "plan_id": {
+                "type": "string"
+              },
+              "version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "payer_name",
+              "member_id",
+              "plan_id",
+              "dos",
+              "version"
+            ],
+            "type": "object"
+          },
+          "documents": {
+            "items": {
+              "properties": {
+                "content_hash": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "content_hash"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "service": {
+            "properties": {
+              "cpt": {
+                "type": "string"
+              },
+              "diagnosis": {
+                "type": "string"
+              },
+              "site": {
+                "type": "string"
+              },
+              "version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "cpt",
+              "diagnosis",
+              "site",
+              "version"
+            ],
+            "type": "object"
+          },
+          "task_context": {
+            "description": "Arbitrary JSON value"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_purpose": {
+            "enum": [
+              "collect_missing_info",
+              "benefits_verification",
+              "clarify_bv",
+              "collect_documentation",
+              "review_packet",
+              "submit_pa",
+              "follow_up_status",
+              "deliver_handoff",
+              "appeal_preparation",
+              "human_review",
+              "manual_disposition"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id",
+          "task_purpose",
+          "task_context",
+          "service",
+          "coverage",
+          "conversation",
+          "documents",
+          "allowed_evidence_ids",
+          "allowed_tools",
+          "rules"
+        ],
+        "title": "AssignedContext",
+        "type": "object"
+      },
+      "EvalReport": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "live": {
+            "type": "boolean"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "output_type": {
+            "type": "string"
+          },
+          "overall_passed": {
+            "type": "boolean"
+          },
+          "repair_count": {
+            "default": 0,
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "runner": {
+            "default": "",
+            "type": "string"
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "scores": {
+            "items": {
+              "properties": {
+                "detail": {
+                  "type": "string"
+                },
+                "dimension": {
+                  "enum": [
+                    "fact_extraction",
+                    "uncertainty",
+                    "tool_authority",
+                    "workflow_disposition_hint"
+                  ],
+                  "type": "string"
+                },
+                "passed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "dimension",
+                "passed",
+                "detail"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "tool_call_count": {
+            "default": 0,
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scenario_id",
+          "model_id",
+          "live",
+          "scores",
+          "overall_passed",
+          "output_type",
+          "notes"
+        ],
+        "title": "EvalReport",
+        "type": "object"
+      },
+      "EvidenceBlob": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "content_hash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "kind",
+          "text",
+          "truncated"
+        ],
+        "title": "EvidenceBlob",
+        "type": "object"
+      },
+      "ExplainReport": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "accepted": {
+            "items": {
+              "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+              "properties": {
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "result_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tool",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "called": {
+            "items": {
+              "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+              "properties": {
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "result_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tool",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "claims": {
+            "items": {
+              "properties": {
+                "class": {
+                  "enum": [
+                    "recorded_fact",
+                    "agent_claim",
+                    "inference",
+                    "unknown",
+                    "hypothetical"
+                  ],
+                  "type": "string"
+                },
+                "evidence_refs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "class",
+                "summary",
+                "evidence_refs"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "rejected": {
+            "items": {
+              "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+              "properties": {
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "result_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tool",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "unknowns": {
+            "items": {
+              "properties": {
+                "class": {
+                  "enum": [
+                    "recorded_fact",
+                    "agent_claim",
+                    "inference",
+                    "unknown",
+                    "hypothetical"
+                  ],
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "class",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "workflow": {
+            "properties": {
+              "disposition": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outstanding_work": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "stage": {
+                "enum": [
+                  "intake",
+                  "bv",
+                  "documentation",
+                  "review",
+                  "submission",
+                  "follow_up",
+                  "decision",
+                  "appeal",
+                  "handoff",
+                  "manual_disposition",
+                  "cancelled",
+                  "paused"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "stage",
+              "outstanding_work"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "run_id",
+          "called",
+          "accepted",
+          "rejected",
+          "unknowns",
+          "workflow",
+          "claims"
+        ],
+        "title": "ExplainReport",
+        "type": "object"
+      },
+      "InspectReport": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "decisions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "disposition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "class": {
+                  "enum": [
+                    "recorded_fact",
+                    "agent_claim",
+                    "inference",
+                    "unknown",
+                    "hypothetical"
+                  ],
+                  "type": "string"
+                },
+                "evidence_refs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "class",
+                "kind",
+                "id",
+                "summary",
+                "evidence_refs"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "outstanding_work": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "packet_versions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reviews": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "intake",
+              "bv",
+              "documentation",
+              "review",
+              "submission",
+              "follow_up",
+              "decision",
+              "appeal",
+              "handoff",
+              "manual_disposition",
+              "cancelled",
+              "paused"
+            ],
+            "type": "string"
+          },
+          "submissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "stage",
+          "outstanding_work",
+          "items",
+          "packet_versions",
+          "reviews",
+          "submissions",
+          "decisions"
+        ],
+        "title": "InspectReport",
+        "type": "object"
+      },
+      "ReadAssignedContextRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id"
+        ],
+        "title": "ReadAssignedContextRequest",
+        "type": "object"
+      },
+      "ReadPermittedEvidenceRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "evidence_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id",
+          "evidence_id"
+        ],
+        "title": "ReadPermittedEvidenceRequest",
+        "type": "object"
+      },
+      "ReportObservationsRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "needs_human_review": {
+            "type": "boolean"
+          },
+          "observations": {
+            "items": {
+              "properties": {
+                "evidence_refs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "kind": {
+                  "enum": [
+                    "eligibility",
+                    "coverage",
+                    "pa_requirement",
+                    "network",
+                    "documentation_need",
+                    "injection_attempt",
+                    "clarification",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                "statement": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "uncertainty": {
+                  "enum": [
+                    "known",
+                    "unknown",
+                    "not_applicable"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "statement",
+                "uncertainty",
+                "evidence_refs"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id",
+          "observations",
+          "needs_human_review"
+        ],
+        "title": "ReportObservationsRequest",
+        "type": "object"
+      },
+      "ReportObservationsResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "observation_draft_count": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "observation_draft_count"
+        ],
+        "title": "ReportObservationsResponse",
+        "type": "object"
+      },
+      "RequestClarificationRequest": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "unclear",
+              "conflict",
+              "injection",
+              "malformed_payer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "task_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task_id",
+          "message",
+          "reason"
+        ],
+        "title": "RequestClarificationRequest",
+        "type": "object"
+      },
+      "RequestClarificationResponse": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "title": "RequestClarificationResponse",
+        "type": "object"
+      },
+      "ToolTrace": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "description": "Standard agent trace. Public tools live in `calls`; runner internals in `diagnostics`.",
+        "properties": {
+          "calls": {
+            "items": {
+              "description": "Compact per-call audit entry stored in `tool_calls_json`.",
+              "properties": {
+                "args_digest": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "latency_us": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "result_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "step_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tool",
+                "args_digest",
+                "ok",
+                "latency_us"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "diagnostics": {
+            "items": {
+              "description": "Arbitrary JSON value"
+            },
+            "type": "array"
+          },
+          "plan": {
+            "properties": {
+              "goal": {
+                "type": "string"
+              },
+              "plan_version": {
+                "type": "string"
+              },
+              "steps": {
+                "items": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "action"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "stop_conditions": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "plan_version",
+              "goal",
+              "steps",
+              "stop_conditions"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "repair": {
+            "properties": {
+              "count": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "max": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "triggers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "count",
+              "max",
+              "triggers"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "trace_version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_version",
+          "calls"
+        ],
+        "title": "ToolTrace",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "labBearer": {
+        "description": "MINT_LAB_MCP_TOKEN",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Loopback PA/BV lab contract. MCP for agents, REST for buyers/UI. Not served until the REST dual PR.",
+    "title": "mint-lab-pa-bv",
+    "version": "0.1.0"
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/lab/bv/ask_payer": {
+      "post": {
+        "operationId": "ask_payer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskPayerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskPayerResponse"
+                }
+              }
+            },
+            "description": "AskPayerResponse"
+          }
+        },
+        "summary": "ask_payer"
+      }
+    },
+    "/lab/bv/read_assigned_context": {
+      "post": {
+        "operationId": "read_assigned_context",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadAssignedContextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignedContext"
+                }
+              }
+            },
+            "description": "AssignedContext"
+          }
+        },
+        "summary": "read_assigned_context"
+      }
+    },
+    "/lab/bv/read_permitted_evidence": {
+      "post": {
+        "operationId": "read_permitted_evidence",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadPermittedEvidenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceBlob"
+                }
+              }
+            },
+            "description": "EvidenceBlob"
+          }
+        },
+        "summary": "read_permitted_evidence"
+      }
+    },
+    "/lab/bv/report_observations": {
+      "post": {
+        "operationId": "report_observations",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportObservationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportObservationsResponse"
+                }
+              }
+            },
+            "description": "ReportObservationsResponse"
+          }
+        },
+        "summary": "report_observations"
+      }
+    },
+    "/lab/bv/request_clarification_or_review": {
+      "post": {
+        "operationId": "request_clarification_or_review",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestClarificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestClarificationResponse"
+                }
+              }
+            },
+            "description": "RequestClarificationResponse"
+          }
+        },
+        "summary": "request_clarification_or_review"
+      }
+    },
+    "/lab/openapi.json": {
+      "get": {
+        "operationId": "openapi",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1"
+          }
+        },
+        "summary": "This OpenAPI 3.1 document"
+      }
+    },
+    "/lab/runs/{run_id}/inspect": {
+      "get": {
+        "operationId": "inspect_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectReport"
+                }
+              }
+            },
+            "description": "InspectReport"
+          }
+        },
+        "summary": "Epistemic inspect report for a run"
+      }
+    },
+    "/lab/runs/{run_id}/trace": {
+      "get": {
+        "operationId": "run_trace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolTrace"
+                }
+              }
+            },
+            "description": "ToolTrace"
+          }
+        },
+        "summary": "bv-tools-v1 tool trace for a run"
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcp_jsonrpc",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response"
+          }
+        },
+        "summary": "JSON-RPC MCP (agents only; UI never uses this)"
+      }
+    }
+  },
+  "security": [
+    {
+      "labBearer": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8787"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Standard agent trace. Public tools live in `calls`; runner internals in `diagnostics`.",
+  "properties": {
+    "calls": {
+      "items": {
+        "description": "Compact per-call audit entry stored in `tool_calls_json`.",
+        "properties": {
+          "args_digest": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latency_us": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "args_digest",
+          "ok",
+          "latency_us"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "description": "Arbitrary JSON value"
+      },
+      "type": "array"
+    },
+    "plan": {
+      "properties": {
+        "goal": {
+          "type": "string"
+        },
+        "plan_version": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "action"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "stop_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "plan_version",
+        "goal",
+        "steps",
+        "stop_conditions"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "repair": {
+      "properties": {
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "triggers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "max",
+        "triggers"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "trace_version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "trace_version",
+    "calls"
+  ],
+  "title": "ToolTrace",
+  "type": "object"
+}

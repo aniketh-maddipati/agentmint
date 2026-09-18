@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "live": {
+      "type": "boolean"
+    },
+    "model_id": {
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "output_type": {
+      "type": "string"
+    },
+    "overall_passed": {
+      "type": "boolean"
+    },
+    "repair_count": {
+      "default": 0,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "runner": {
+      "default": "",
+      "type": "string"
+    },
+    "scenario_id": {
+      "type": "string"
+    },
+    "scores": {
+      "items": {
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "dimension": {
+            "enum": [
+              "fact_extraction",
+              "uncertainty",
+              "tool_authority",
+              "workflow_disposition_hint"
+            ],
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "dimension",
+          "passed",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "tool_call_count": {
+      "default": 0,
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "model_id",
+    "live",
+    "scores",
+    "overall_passed",
+    "output_type",
+    "notes"
+  ],
+  "title": "EvalReport",
+  "type": "object"
+}

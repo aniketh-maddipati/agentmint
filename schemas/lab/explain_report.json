@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "accepted": {
+      "items": {
+        "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "ok"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "called": {
+      "items": {
+        "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "ok"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "properties": {
+          "class": {
+            "enum": [
+              "recorded_fact",
+              "agent_claim",
+              "inference",
+              "unknown",
+              "hypothetical"
+            ],
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "class",
+          "summary",
+          "evidence_refs"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "rejected": {
+      "items": {
+        "description": "Buyer explainer artifact. Runtime `explain_run` lands in a later PR; this type locks the schema.",
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "result_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "ok"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "run_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "unknowns": {
+      "items": {
+        "properties": {
+          "class": {
+            "enum": [
+              "recorded_fact",
+              "agent_claim",
+              "inference",
+              "unknown",
+              "hypothetical"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "class",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "workflow": {
+      "properties": {
+        "disposition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outstanding_work": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stage": {
+          "enum": [
+            "intake",
+            "bv",
+            "documentation",
+            "review",
+            "submission",
+            "follow_up",
+            "decision",
+            "appeal",
+            "handoff",
+            "manual_disposition",
+            "cancelled",
+            "paused"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "outstanding_work"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "run_id",
+    "called",
+    "accepted",
+    "rejected",
+    "unknowns",
+    "workflow",
+    "claims"
+  ],
+  "title": "ExplainReport",
+  "type": "object"
+}
