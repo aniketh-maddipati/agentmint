@@ -1,4 +1,4 @@
-//! Scripted and optional OpenAI BV agent runners.
+//! Scripted and optional OpenAI/Anthropic BV agent runners.
 //! Used by: workflow for BV tasks. Agents never mutate case status.
 
 use std::collections::HashSet;
@@ -19,7 +19,17 @@ use crate::lab::verifiers::{detect_injection, validate_output_evidence};
 
 pub const PROMPT_VERSION_SCRIPTED: &str = "bv-scripted-v1";
 pub const PROMPT_VERSION_OPENAI: &str = "bv-openai-v1";
+pub const PROMPT_VERSION_ANTHROPIC: &str = "bv-anthropic-v1";
 pub const DEFAULT_OPENAI_MODEL: &str = "gpt-4.1-mini";
+pub const DEFAULT_ANTHROPIC_MODEL: &str = "claude-sonnet-4-5";
+
+const BV_JSON_SYSTEM_PROMPT: &str = "You are a narrow benefits-verification task agent for outpatient MRI CPT 72148. \
+Allowed tools: read_assigned_context, ask_payer, read_permitted_evidence, report_observations, request_clarification_or_review. \
+Respond with a single JSON object matching one of: \
+{\"type\":\"pending_question\",\"question\":\"...\",\"evidence_hint\":\"payer_bv_response\"}, \
+{\"type\":\"observations\",\"observations\":[{\"kind\":\"eligibility|coverage|pa_requirement|network|documentation_need|injection_attempt|clarification|other\",\"statement\":\"...\",\"uncertainty\":\"known|unknown|not_applicable\",\"evidence_refs\":[\"...\"]}],\"needs_human_review\":false}, \
+{\"type\":\"clarification\",\"message\":\"...\"}. \
+Use only allowed evidence ids from the context. Never claim payment guarantees. Never call set_stage, approve_packet, submit_pa, write_ehr, or generate_clinical_justification.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingQuestion {
@@ -62,6 +72,10 @@ pub fn default_model_id() -> String {
     std::env::var("MINT_LAB_MODEL").unwrap_or_else(|_| DEFAULT_OPENAI_MODEL.to_owned())
 }
 
+pub fn default_claude_model_id() -> String {
+    std::env::var("MINT_LAB_CLAUDE_MODEL").unwrap_or_else(|_| DEFAULT_ANTHROPIC_MODEL.to_owned())
+}
+
 pub fn select_agent() -> LabResult<Arc<dyn AgentRunner>> {
     let kind = std::env::var("MINT_LAB_AGENT")
         .unwrap_or_else(|_| "scripted".to_owned())
@@ -69,13 +83,35 @@ pub fn select_agent() -> LabResult<Arc<dyn AgentRunner>> {
     match kind.as_str() {
         "" | "scripted" | "deterministic" => Ok(Arc::new(ScriptedAgentRunner)),
         "openai" => Ok(Arc::new(OpenAiAgentRunner::from_env()?)),
+        "anthropic" | "claude" => Ok(Arc::new(AnthropicAgentRunner::from_env()?)),
         "mcp" => Ok(Arc::new(
             crate::lab::mcp::client::McpAgentRunner::from_env()?
         )),
         other => Err(LabError::Invalid(format!(
-            "unknown MINT_LAB_AGENT={other}; use scripted, openai, or mcp"
+            "unknown MINT_LAB_AGENT={other}; use scripted, openai, anthropic, or mcp"
         ))),
     }
+}
+
+fn first_nonempty_env(names: &[&str], runner: &str) -> LabResult<String> {
+    for name in names {
+        if let Ok(value) = std::env::var(name) {
+            if !value.trim().is_empty() {
+                return Ok(value);
+            }
+        }
+    }
+    let primary = match names.first() {
+        Some(name) => *name,
+        None => {
+            return Err(LabError::Unverified(format!(
+                "API_KEY not set; {runner} will not fabricate success"
+            )));
+        }
+    };
+    Err(LabError::Unverified(format!(
+        "{primary} not set; {runner} will not fabricate success"
+    )))
 }
 
 #[derive(Debug, Default)]
@@ -608,30 +644,202 @@ pub struct OpenAiAgentRunner {
     http: reqwest::Client,
 }
 
+fn json_llm_http_client() -> LabResult<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(45))
+        .build()
+        .map_err(|err| LabError::Io(format!("http client: {err}")))
+}
+
+pub(crate) fn json_object_from_model_text(raw: &str) -> &str {
+    let trimmed = raw.trim();
+    let unfenced = if let Some(rest) = trimmed.strip_prefix("```json") {
+        rest
+    } else if let Some(rest) = trimmed.strip_prefix("```") {
+        rest
+    } else {
+        trimmed
+    };
+    let unfenced = unfenced
+        .trim()
+        .strip_suffix("```")
+        .unwrap_or(unfenced)
+        .trim();
+    if serde_json::from_str::<AgentOutput>(unfenced).is_ok() {
+        return unfenced;
+    }
+    match (unfenced.find('{'), unfenced.rfind('}')) {
+        (Some(start), Some(end)) if end > start => &unfenced[start..=end],
+        _ => unfenced,
+    }
+}
+
+struct JsonLlmBv<'a> {
+    task: &'a Task,
+    snapshot: &'a CaseSnapshot,
+    prompt_version: &'a str,
+    model_id: &'a str,
+    complete_component: &'a str,
+    transport_error_trigger: &'a str,
+}
+
+fn run_json_llm_bv(
+    ctx: JsonLlmBv<'_>,
+    complete: impl Fn(&str, &str) -> LabResult<String>,
+) -> LabResult<AgentRunResult> {
+    let started = Instant::now();
+    let mut trace = ToolTrace::new();
+    let ids = run_task_ids(ctx.task, ctx.snapshot);
+    push_tool(
+        &mut trace,
+        TOOL_READ_ASSIGNED_CONTEXT,
+        &ids,
+        started,
+        "s1",
+        None,
+    );
+
+    if let decision @ BvDecision::Injection { .. } = decide_bv(ctx.task, ctx.snapshot) {
+        record_scripted_decision(&mut trace, ctx.task, ctx.snapshot, &ids, &decision, started);
+        return Ok(build_result(
+            ctx.task,
+            ctx.snapshot,
+            decision.output(),
+            trace,
+            ctx.prompt_version,
+            ctx.model_id,
+        ));
+    }
+
+    let allowed = allowed_evidence_ids(ctx.snapshot);
+    let user = assigned_context_value(ctx.task, ctx.snapshot).to_string();
+    let mut last_err = None;
+    let mut repair = crate::lab::plan::RepairMeta::none();
+    for attempt in 0..crate::lab::plan::MAX_REPAIR_LOOPS {
+        match complete(BV_JSON_SYSTEM_PROMPT, &user) {
+            Ok(raw) => {
+                trace.push_diagnostic(json!({
+                    "component": ctx.complete_component,
+                    "attempt": attempt + 1,
+                    "model": ctx.model_id,
+                    "ok": true
+                }));
+                match serde_json::from_str::<AgentOutput>(json_object_from_model_text(&raw)) {
+                    Ok(output) => match validate_output_evidence(&output, &allowed) {
+                        Ok(()) => {
+                            trace.repair = Some(repair);
+                            trace.push(terminal_tool_for_output(
+                                &ids,
+                                &output,
+                                elapsed_us(started),
+                            ));
+                            return Ok(build_result(
+                                ctx.task,
+                                ctx.snapshot,
+                                output,
+                                trace,
+                                ctx.prompt_version,
+                                ctx.model_id,
+                            ));
+                        }
+                        Err(err) => {
+                            trace.push_diagnostic(json!({
+                                "component": "validate_evidence",
+                                "ok": false,
+                                "error": err
+                            }));
+                            last_err = Some(err.clone());
+                            if !repair.record("unknown_evidence") {
+                                break;
+                            }
+                            trace.push(tool_call(
+                                TOOL_READ_PERMITTED_EVIDENCE,
+                                &json!({
+                                    "run_id": ctx.snapshot.case.run_id,
+                                    "task_id": ctx.task.id,
+                                    "evidence_id": "assigned_context"
+                                }),
+                                true,
+                                None,
+                                elapsed_us(started),
+                                Some("s4"),
+                                Some("replan"),
+                            ));
+                        }
+                    },
+                    Err(err) => {
+                        trace.push_diagnostic(json!({
+                            "component": "parse_agent_output",
+                            "ok": false,
+                            "error": err.to_string()
+                        }));
+                        last_err = Some(err.to_string());
+                        if !repair.record("invalid_schema") {
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                trace.push_diagnostic(json!({
+                    "component": ctx.complete_component,
+                    "attempt": attempt + 1,
+                    "ok": false,
+                    "error": err.to_string()
+                }));
+                last_err = Some(err.to_string());
+                if !repair.record(ctx.transport_error_trigger) {
+                    return Err(LabError::Unverified(last_err.unwrap_or_else(|| {
+                        format!("{} call failed after retry", ctx.complete_component)
+                    })));
+                }
+            }
+        }
+    }
+
+    let message = format!(
+        "Model output invalid after bounded repair: {}",
+        last_err.unwrap_or_else(|| "unknown".into())
+    );
+    let output = AgentOutput::Clarification {
+        message: message.clone(),
+    };
+    trace.repair = Some(repair);
+    trace.push(tool_call(
+        TOOL_REQUEST_CLARIFICATION,
+        &json!({
+            "run_id": ctx.snapshot.case.run_id,
+            "task_id": ctx.task.id,
+            "message": message,
+            "reason": "other"
+        }),
+        true,
+        None,
+        elapsed_us(started),
+        Some("s4"),
+        Some("accepted"),
+    ));
+    Ok(build_result(
+        ctx.task,
+        ctx.snapshot,
+        output,
+        trace,
+        ctx.prompt_version,
+        ctx.model_id,
+    ))
+}
+
 impl OpenAiAgentRunner {
     pub fn from_env() -> LabResult<Self> {
-        let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
-            LabError::Unverified(
-                "OPENAI_API_KEY not set; OpenAiAgentRunner will not fabricate success".into(),
-            )
-        })?;
-        if api_key.trim().is_empty() {
-            return Err(LabError::Unverified(
-                "OPENAI_API_KEY empty; OpenAiAgentRunner will not fabricate success".into(),
-            ));
-        }
+        let api_key = first_nonempty_env(&["OPENAI_API_KEY"], "OpenAiAgentRunner")?;
         let model = default_model_id();
         let base_url = std::env::var("MINT_LAB_OPENAI_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_owned());
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(45))
-            .build()
-            .map_err(|err| LabError::Io(format!("http client: {err}")))?;
         Ok(Self {
             api_key,
             model,
             base_url,
-            http,
+            http: json_llm_http_client()?,
         })
     }
 
@@ -682,155 +890,126 @@ impl OpenAiAgentRunner {
 
 impl AgentRunner for OpenAiAgentRunner {
     fn run_bv(&self, task: &Task, snapshot: &CaseSnapshot) -> LabResult<AgentRunResult> {
-        let started = Instant::now();
-        let mut trace = ToolTrace::new();
-        let ids = run_task_ids(task, snapshot);
-        push_tool(
-            &mut trace,
-            TOOL_READ_ASSIGNED_CONTEXT,
-            &ids,
-            started,
-            "s1",
-            None,
-        );
-
-        if let decision @ BvDecision::Injection { .. } = decide_bv(task, snapshot) {
-            record_scripted_decision(&mut trace, task, snapshot, &ids, &decision, started);
-            return Ok(build_result(
+        run_json_llm_bv(
+            JsonLlmBv {
                 task,
                 snapshot,
-                decision.output(),
-                trace,
-                PROMPT_VERSION_OPENAI,
-                &self.model,
-            ));
+                prompt_version: PROMPT_VERSION_OPENAI,
+                model_id: &self.model,
+                complete_component: "openai_chat_completions",
+                transport_error_trigger: "openai_error",
+            },
+            |system, user| self.complete_json(system, user),
+        )
+    }
+}
+
+pub struct AnthropicAgentRunner {
+    api_key: String,
+    model: String,
+    base_url: String,
+    http: reqwest::Client,
+}
+
+impl AnthropicAgentRunner {
+    pub fn from_env() -> LabResult<Self> {
+        let api_key = first_nonempty_env(
+            &["ANTHROPIC_API_KEY", "ANTHROPIC_KEY"],
+            "AnthropicAgentRunner",
+        )?;
+        let model = default_claude_model_id();
+        let base_url = std::env::var("MINT_LAB_ANTHROPIC_BASE_URL")
+            .unwrap_or_else(|_| "https://api.anthropic.com/v1".to_owned());
+        Ok(Self {
+            api_key,
+            model,
+            base_url,
+            http: json_llm_http_client()?,
+        })
+    }
+
+    fn complete_json(&self, system: &str, user: &str) -> LabResult<String> {
+        block_on_local(self.complete_json_async(system, user))
+    }
+
+    async fn complete_json_async(&self, system: &str, user: &str) -> LabResult<String> {
+        let url = format!("{}/messages", self.base_url.trim_end_matches('/'));
+        let body = json!({
+            "model": self.model,
+            "max_tokens": 2048,
+            "temperature": 0,
+            "system": system,
+            "messages": [
+                { "role": "user", "content": user }
+            ]
+        });
+        let response = self
+            .http
+            .post(url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|err| LabError::Io(format!("anthropic request failed: {err}")))?;
+        let status = response.status();
+        let payload: Value = response
+            .json()
+            .await
+            .map_err(|err| LabError::Io(format!("anthropic response json: {err}")))?;
+        if !status.is_success() {
+            let message = payload
+                .pointer("/error/message")
+                .and_then(Value::as_str)
+                .unwrap_or("anthropic request rejected");
+            return Err(LabError::Unverified(format!(
+                "anthropic HTTP {status}: {message}"
+            )));
         }
+        anthropic_text_content(&payload)
+    }
+}
 
-        let allowed = allowed_evidence_ids(snapshot);
-        let context = assigned_context_value(task, snapshot);
-        let system = "You are a narrow benefits-verification task agent for outpatient MRI CPT 72148. \
-Allowed tools: read_assigned_context, ask_payer, read_permitted_evidence, report_observations, request_clarification_or_review. \
-Respond with a single JSON object matching one of: \
-{\"type\":\"pending_question\",\"question\":\"...\",\"evidence_hint\":\"payer_bv_response\"}, \
-{\"type\":\"observations\",\"observations\":[{\"kind\":\"eligibility|coverage|pa_requirement|network|documentation_need|injection_attempt|clarification|other\",\"statement\":\"...\",\"uncertainty\":\"known|unknown|not_applicable\",\"evidence_refs\":[\"...\"]}],\"needs_human_review\":false}, \
-{\"type\":\"clarification\",\"message\":\"...\"}. \
-Use only allowed evidence ids from the context. Never claim payment guarantees. Never call set_stage, approve_packet, submit_pa, write_ehr, or generate_clinical_justification.";
-        let user = context.to_string();
-
-        let mut last_err = None;
-        let mut repair = crate::lab::plan::RepairMeta::none();
-        for attempt in 0..crate::lab::plan::MAX_REPAIR_LOOPS {
-            match self.complete_json(system, &user) {
-                Ok(raw) => {
-                    trace.push_diagnostic(json!({
-                        "component": "openai_chat_completions",
-                        "attempt": attempt + 1,
-                        "model": self.model,
-                        "ok": true
-                    }));
-                    match serde_json::from_str::<AgentOutput>(&raw) {
-                        Ok(output) => match validate_output_evidence(&output, &allowed) {
-                            Ok(()) => {
-                                trace.repair = Some(repair);
-                                trace.push(terminal_tool_for_output(
-                                    &ids,
-                                    &output,
-                                    elapsed_us(started),
-                                ));
-                                return Ok(build_result(
-                                    task,
-                                    snapshot,
-                                    output,
-                                    trace,
-                                    PROMPT_VERSION_OPENAI,
-                                    &self.model,
-                                ));
-                            }
-                            Err(err) => {
-                                trace.push_diagnostic(json!({
-                                    "component": "validate_evidence",
-                                    "ok": false,
-                                    "error": err
-                                }));
-                                last_err = Some(err.clone());
-                                if !repair.record("unknown_evidence") {
-                                    break;
-                                }
-                                trace.push(tool_call(
-                                    TOOL_READ_PERMITTED_EVIDENCE,
-                                    &json!({
-                                        "run_id": snapshot.case.run_id,
-                                        "task_id": task.id,
-                                        "evidence_id": "assigned_context"
-                                    }),
-                                    true,
-                                    None,
-                                    elapsed_us(started),
-                                    Some("s4"),
-                                    Some("replan"),
-                                ));
-                            }
-                        },
-                        Err(err) => {
-                            trace.push_diagnostic(json!({
-                                "component": "parse_agent_output",
-                                "ok": false,
-                                "error": err.to_string()
-                            }));
-                            last_err = Some(err.to_string());
-                            if !repair.record("invalid_schema") {
-                                break;
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    trace.push_diagnostic(json!({
-                        "component": "openai_chat_completions",
-                        "attempt": attempt + 1,
-                        "ok": false,
-                        "error": err.to_string()
-                    }));
-                    last_err = Some(err.to_string());
-                    if !repair.record("openai_error") {
-                        return Err(LabError::Unverified(
-                            last_err.unwrap_or_else(|| "openai call failed after retry".into()),
-                        ));
-                    }
-                }
-            }
-        }
-
-        let message = format!(
-            "Model output invalid after bounded repair: {}",
-            last_err.unwrap_or_else(|| "unknown".into())
-        );
-        let output = AgentOutput::Clarification {
-            message: message.clone(),
-        };
-        trace.repair = Some(repair);
-        trace.push(tool_call(
-            TOOL_REQUEST_CLARIFICATION,
-            &json!({
-                "run_id": snapshot.case.run_id,
-                "task_id": task.id,
-                "message": message,
-                "reason": "other"
-            }),
-            true,
-            None,
-            elapsed_us(started),
-            Some("s4"),
-            Some("accepted"),
+fn anthropic_text_content(payload: &Value) -> LabResult<String> {
+    let Some(blocks) = payload.get("content").and_then(Value::as_array) else {
+        return Err(LabError::Unverified(
+            "anthropic response missing content".into(),
         ));
-        Ok(build_result(
-            task,
-            snapshot,
-            output,
-            trace,
-            PROMPT_VERSION_OPENAI,
-            &self.model,
-        ))
+    };
+    let mut text = String::new();
+    for block in blocks {
+        if block.get("type").and_then(Value::as_str) != Some("text") {
+            continue;
+        }
+        let Some(chunk) = block.get("text").and_then(Value::as_str) else {
+            continue;
+        };
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text.push_str(chunk);
+    }
+    if text.trim().is_empty() {
+        return Err(LabError::Unverified(
+            "anthropic response missing text content".into(),
+        ));
+    }
+    Ok(text)
+}
+
+impl AgentRunner for AnthropicAgentRunner {
+    fn run_bv(&self, task: &Task, snapshot: &CaseSnapshot) -> LabResult<AgentRunResult> {
+        run_json_llm_bv(
+            JsonLlmBv {
+                task,
+                snapshot,
+                prompt_version: PROMPT_VERSION_ANTHROPIC,
+                model_id: &self.model,
+                complete_component: "anthropic_messages",
+                transport_error_trigger: "anthropic_error",
+            },
+            |system, user| self.complete_json(system, user),
+        )
     }
 }
 
@@ -934,6 +1113,61 @@ mod tests {
         match previous {
             Some(value) => std::env::set_var("OPENAI_API_KEY", value),
             None => std::env::remove_var("OPENAI_API_KEY"),
+        }
+    }
+
+    #[test]
+    fn anthropic_from_env_fails_closed_without_key() {
+        let previous_api = std::env::var("ANTHROPIC_API_KEY").ok();
+        let previous_alias = std::env::var("ANTHROPIC_KEY").ok();
+        std::env::remove_var("ANTHROPIC_API_KEY");
+        std::env::remove_var("ANTHROPIC_KEY");
+        let err = AnthropicAgentRunner::from_env()
+            .err()
+            .expect("must fail without key");
+        assert!(matches!(err, LabError::Unverified(_)));
+        match previous_api {
+            Some(value) => std::env::set_var("ANTHROPIC_API_KEY", value),
+            None => std::env::remove_var("ANTHROPIC_API_KEY"),
+        }
+        match previous_alias {
+            Some(value) => std::env::set_var("ANTHROPIC_KEY", value),
+            None => std::env::remove_var("ANTHROPIC_KEY"),
+        }
+    }
+
+    #[test]
+    fn json_object_from_model_text_strips_fences() {
+        let raw = "```json\n{\"type\":\"clarification\",\"message\":\"need payer\"}\n```";
+        let parsed: AgentOutput =
+            serde_json::from_str(json_object_from_model_text(raw)).expect("json");
+        assert!(matches!(parsed, AgentOutput::Clarification { .. }));
+    }
+
+    #[test]
+    fn select_agent_anthropic_fails_closed_without_key() {
+        let previous_agent = std::env::var("MINT_LAB_AGENT").ok();
+        let previous_api = std::env::var("ANTHROPIC_API_KEY").ok();
+        let previous_alias = std::env::var("ANTHROPIC_KEY").ok();
+        std::env::set_var("MINT_LAB_AGENT", "claude");
+        std::env::remove_var("ANTHROPIC_API_KEY");
+        std::env::remove_var("ANTHROPIC_KEY");
+        let err = match select_agent() {
+            Err(err) => err,
+            Ok(_) => panic!("anthropic requires key"),
+        };
+        assert!(matches!(err, LabError::Unverified(_)));
+        match previous_agent {
+            Some(value) => std::env::set_var("MINT_LAB_AGENT", value),
+            None => std::env::remove_var("MINT_LAB_AGENT"),
+        }
+        match previous_api {
+            Some(value) => std::env::set_var("ANTHROPIC_API_KEY", value),
+            None => std::env::remove_var("ANTHROPIC_API_KEY"),
+        }
+        match previous_alias {
+            Some(value) => std::env::set_var("ANTHROPIC_KEY", value),
+            None => std::env::remove_var("ANTHROPIC_KEY"),
         }
     }
 

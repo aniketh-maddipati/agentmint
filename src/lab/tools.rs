@@ -1,5 +1,5 @@
 //! BV tool contract and standard `tool_calls_json` trace shape.
-//! Used by: scripted/OpenAI/MCP runners, verifiers, and eval.
+//! Used by: scripted/OpenAI/Anthropic/MCP runners, verifiers, and eval.
 //! Five tools only — no stage mutation, IVR, EHR, or clinical-justification tools.
 
 use serde::{Deserialize, Serialize};
