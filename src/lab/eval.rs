@@ -220,10 +220,22 @@ pub fn score_output(
             });
 
             let hint_ok = disposition_matches(expectation.disposition_hint, observations);
+            let statements = observations
+                .iter()
+                .map(|o| o.statement.as_str())
+                .collect::<Vec<_>>()
+                .join(" | ");
             scores.push(DimensionScore {
                 dimension: ScoreDimension::WorkflowDispositionHint,
                 passed: hint_ok,
-                detail: format!("hint {:?}", expectation.disposition_hint),
+                detail: if hint_ok {
+                    format!("hint {:?}", expectation.disposition_hint)
+                } else {
+                    format!(
+                        "hint {:?}; statements={statements}",
+                        expectation.disposition_hint
+                    )
+                },
             });
 
             if *needs_human_review {
