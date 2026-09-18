@@ -1,0 +1,27 @@
+{
+  "id": "unclear_bv",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-UNCLEAR-001",
+    "plan_id": "PLAN-BRONZE",
+    "dos": "2026-10-03"
+  },
+  "intake_complete": true,
+  "required_docs": [],
+  "scripted_payer_answers": [
+    "Member appears active. Service may require authorization depending on site of service; unable to determine from available rules."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "unclear",
+    "decision_outcome": null,
+    "limitations": []
+  },
+  "expected_disposition": "unclear_clarification",
+  "document_fixtures": {}
+}

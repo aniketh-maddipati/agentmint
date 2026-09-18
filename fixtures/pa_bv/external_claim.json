@@ -1,0 +1,32 @@
+{
+  "id": "external_claim",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-EXT-001",
+    "plan_id": "PLAN-GOLD",
+    "dos": "2026-10-08"
+  },
+  "intake_complete": true,
+  "required_docs": ["clinical_notes", "order"],
+  "scripted_payer_answers": [
+    "Member is active. Prior authorization is required for CPT 72148. Required documentation: clinical notes and signed order."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "pa_required",
+    "decision_outcome": "approved",
+    "limitations": ["outpatient site of service only"]
+  },
+  "expected_disposition": "approved_handoff",
+  "document_fixtures": {
+    "clinical_notes": "Synthetic notes with external claim scenario.",
+    "order": "Synthetic order with external claim scenario."
+  },
+  "auto_review_approve": true,
+  "external_claim": "Customer asserts verbal approval was already given by payer last week; unverified external claim."
+}

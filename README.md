@@ -130,6 +130,19 @@ const result = await mint.actions.execute(action.id);
 ./scripts/launch-check.sh
 ```
 
+## PA/BV lab (experimental)
+
+Synthetic medical-benefit prior-authorization / benefits-verification case console for outpatient MRI lumbar spine (CPT 72148). Isolated under `src/lab/`; does not use real patient data, payers, or Stripe.
+
+```bash
+./scripts/demo-pa-bv.sh
+cargo test --test pa_bv_acceptance
+mint lab start --scenario approval
+mint lab console <run-id>
+```
+
+See `docs/pa-bv-lab.md` and `docs/pa-bv-domain.md`.
+
 ## Status
 
 Experimental proof of concept.

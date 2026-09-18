@@ -1,4 +1,4 @@
-//! mint.run CLI: init, serve, verify, doctor, and local overhead bench.
+//! mint.run CLI: init, serve, verify, doctor, lab, and local overhead bench.
 
 use std::env;
 use std::fs;
@@ -10,6 +10,7 @@ use mint_run::config::Config;
 use mint_run::doctor;
 use mint_run::domain::SignedReceipt;
 use mint_run::keys::KeyRing;
+use mint_run::lab;
 use mint_run::receipt::{verify_receipt, verify_with_public_key, verifying_key_from_jwk_x};
 use mint_run::server::{self, build_state};
 
@@ -57,6 +58,7 @@ async fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
             print!("{}", bench::run_bench(iterations).await?);
             Ok(ExitCode::SUCCESS)
         }
+        "lab" => lab::cli::run(&args[1..]),
         other => {
             eprintln!("unknown command: {other}");
             print_help();
@@ -73,9 +75,11 @@ fn print_help() {
          \tmint doctor\n\
          \tmint serve\n\
          \tmint verify --receipt PATH [--key-file PATH | --keys-url URL]\n\
-         \tmint bench [--iterations N]\n\n\
+         \tmint bench [--iterations N]\n\
+         \tmint lab <start|console|inspect|events|advance|fault|check|run|list|eval-model|mcp-stdio|mcp-http> ...\n\n\
          Environment variables use the MINT_ prefix. Local identity and the fake\n\
-         provider are development-only. Live Stripe secrets are refused.\n"
+         provider are development-only. Live Stripe secrets are refused.\n\
+         `mint lab` is an experimental synthetic PA/BV case console (no real PHI).\n"
     );
 }
 

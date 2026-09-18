@@ -14,6 +14,7 @@ pub mod execution;
 pub mod failpoints;
 pub mod identity;
 pub mod keys;
+pub mod lab;
 pub mod packs;
 pub mod policy;
 pub mod receipt;

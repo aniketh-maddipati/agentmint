@@ -1,0 +1,27 @@
+{
+  "id": "conflict_bv",
+  "workflow_version": "medical-mri-pa-v1",
+  "service": {
+    "cpt": "72148",
+    "diagnosis": "M54.5",
+    "site": "outpatient"
+  },
+  "coverage": {
+    "payer_name": "Synthetic Health Plan",
+    "member_id": "MEM-CONFLICT-001",
+    "plan_id": "PLAN-GOLD",
+    "dos": "2026-10-05"
+  },
+  "intake_complete": true,
+  "required_docs": [],
+  "scripted_payer_answers": [
+    "Portal says PA required for CPT 72148; phone script says PA not required. Conflict in source answers."
+  ],
+  "hidden_facts": {
+    "bv_outcome": "conflict",
+    "decision_outcome": null,
+    "limitations": []
+  },
+  "expected_disposition": "conflict_review",
+  "document_fixtures": {}
+}
