@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::lab::agent::{
-    allowed_evidence_ids, AgentOutput, AgentRunner, DraftObservation, OpenAiAgentRunner,
-    ScriptedAgentRunner,
+    allowed_evidence_ids, AgentOutput, AgentRunner, AnthropicAgentRunner, DraftObservation,
+    OpenAiAgentRunner, ScriptedAgentRunner,
 };
 use crate::lab::domain::{
     Case, CaseSnapshot, CaseStage, CoverageContext, ObservationKind, Role, ServiceContext, Task,
@@ -220,10 +220,22 @@ pub fn score_output(
             });
 
             let hint_ok = disposition_matches(expectation.disposition_hint, observations);
+            let statements = observations
+                .iter()
+                .map(|o| o.statement.as_str())
+                .collect::<Vec<_>>()
+                .join(" | ");
             scores.push(DimensionScore {
                 dimension: ScoreDimension::WorkflowDispositionHint,
                 passed: hint_ok,
-                detail: format!("hint {:?}", expectation.disposition_hint),
+                detail: if hint_ok {
+                    format!("hint {:?}", expectation.disposition_hint)
+                } else {
+                    format!(
+                        "hint {:?}; statements={statements}",
+                        expectation.disposition_hint
+                    )
+                },
             });
 
             if *needs_human_review {
@@ -369,23 +381,49 @@ pub fn run_scripted_eval(
     fixtures_dir: &std::path::Path,
     scenario_id: &str,
 ) -> LabResult<EvalReport> {
-    eval_on_fixture(fixtures_dir, scenario_id, &ScriptedAgentRunner, false)
+    eval_on_fixture(
+        fixtures_dir,
+        scenario_id,
+        &ScriptedAgentRunner,
+        false,
+        "scripted",
+    )
+}
+
+fn require_live_eval_opt_in() -> LabResult<()> {
+    if std::env::var("MINT_LAB_MODEL_EVAL").ok().as_deref() != Some("1") {
+        return Err(LabError::Unverified(
+            "set MINT_LAB_MODEL_EVAL=1 to run live model evaluation".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub fn run_live_openai_eval(
     fixtures_dir: &std::path::Path,
     scenario_id: &str,
 ) -> LabResult<EvalReport> {
-    if std::env::var("MINT_LAB_MODEL_EVAL").ok().as_deref() != Some("1") {
-        return Err(LabError::Unverified(
-            "set MINT_LAB_MODEL_EVAL=1 to run live model evaluation".into(),
-        ));
-    }
+    require_live_eval_opt_in()?;
     eval_on_fixture(
         fixtures_dir,
         scenario_id,
         &OpenAiAgentRunner::from_env()?,
         true,
+        "openai",
+    )
+}
+
+pub fn run_live_anthropic_eval(
+    fixtures_dir: &std::path::Path,
+    scenario_id: &str,
+) -> LabResult<EvalReport> {
+    require_live_eval_opt_in()?;
+    eval_on_fixture(
+        fixtures_dir,
+        scenario_id,
+        &AnthropicAgentRunner::from_env()?,
+        true,
+        "anthropic",
     )
 }
 
@@ -394,6 +432,7 @@ fn eval_on_fixture(
     scenario_id: &str,
     agent: &dyn AgentRunner,
     live: bool,
+    runner: &str,
 ) -> LabResult<EvalReport> {
     let fixture = load_scenario_from(fixtures_dir, scenario_id)?;
     let with_answer = !fixture.scripted_payer_answers.is_empty();
@@ -415,7 +454,7 @@ fn eval_on_fixture(
         .first()
         .cloned()
         .unwrap_or_default();
-    Ok(score_output(
+    let mut report = score_output(
         scenario_id,
         &result.record.model_id,
         live,
@@ -423,7 +462,9 @@ fn eval_on_fixture(
         &allowed,
         &payer_text,
         &result.record.tool_calls_json,
-    ))
+    );
+    report.runner = runner.to_owned();
+    Ok(report)
 }
 
 pub fn run_mcp_eval(fixtures_dir: &std::path::Path, scenario_id: &str) -> LabResult<EvalReport> {
@@ -488,8 +529,10 @@ mod tests {
     fn live_eval_requires_opt_in() {
         let previous = std::env::var("MINT_LAB_MODEL_EVAL").ok();
         std::env::remove_var("MINT_LAB_MODEL_EVAL");
-        let err = run_live_openai_eval(&fixtures_dir(), "approval").expect_err("opt-in");
-        assert!(matches!(err, LabError::Unverified(_)));
+        let openai = run_live_openai_eval(&fixtures_dir(), "approval").expect_err("opt-in");
+        let anthropic = run_live_anthropic_eval(&fixtures_dir(), "approval").expect_err("opt-in");
+        assert!(matches!(openai, LabError::Unverified(_)));
+        assert!(matches!(anthropic, LabError::Unverified(_)));
         match previous {
             Some(v) => std::env::set_var("MINT_LAB_MODEL_EVAL", v),
             None => std::env::remove_var("MINT_LAB_MODEL_EVAL"),
