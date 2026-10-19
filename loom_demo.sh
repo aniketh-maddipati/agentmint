@@ -45,7 +45,7 @@ pause
 beat 2 "The policy (fixed, in code)"
 run "sed -n '/^def policy/,/^\$/p' demo.py"
 sed -n '/^def policy/,/^$/p' demo.py | sed 's/^/  /'
-echo; echo "  ${D}AgentMint adds 5 lines: 1 import, 1 Notary(), 3 @notarise decorators${N}"
+echo; echo "  ${D}refund() only accepts a signed authorization receipt, verified before Stripe is called${N}"
 pause
 
 # 3 ─ case A
@@ -103,7 +103,7 @@ python3 verify_chain_ordered.py receipts 2>&1 | tail -n 1 | paint
 pause
 
 # 8 ─ tamper
-beat 8 "Change one character and verification fails"
+beat 8 "Change one character and AgentMint blocks the refund"
 TMP=$(mktemp -d); cp "receipts/$AUTH_A.json" "$TMP/"
 python3 - "$TMP/$AUTH_A.json" <<'PY'
 import sys; p = sys.argv[1]; s = open(p).read()
@@ -112,6 +112,9 @@ PY
 run "diff original tampered"
 diff "receipts/$AUTH_A.json" "$TMP/$AUTH_A.json" | sed 's/^/  /'; echo
 run "agentmint verify tampered/${AUTH_A:0:8}…json"
-agentmint --no-color verify "$TMP/$AUTH_A.json" 2>&1 | paint
+agentmint --no-color verify "$TMP/$AUTH_A.json" 2>&1 | paint; echo
+run "refund(tampered/${AUTH_A:0:8}…json)"
+python3 -c "import sys, demo; print('attempt:', demo.fmt(demo.refund(sys.argv[1])))" "$TMP/$AUTH_A.json" 2>&1 \
+  | sed -e "s/BLOCKED by AgentMint/${R}${B}BLOCKED by AgentMint${N}/" -e "s/^/  /"
 rm -rf "$TMP"
 echo; echo "  ${D}github.com/aerf-spec/agentmint-python  ·  docs.parallel.ai${N}"; echo

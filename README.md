@@ -15,15 +15,19 @@ key derived from that binding.
    The authorization receipt signs the binding, the policy inputs and the full Parallel basis.
 3. **Signed, tamper-evident record.** `@notarise` signs each call's args and return value
    (Ed25519, hash-chained per plan). Editing one character of a receipt breaks verification.
-4. **Retry safety.** A retried refund reuses `idempotency_key = agentmint-<binding>`.
+4. **AgentMint is the gate.** `refund()` takes only the path to a signed authorization receipt.
+   It verifies the signature against the project's pinned public key (`.agentmint/keys/public_key.pem`,
+   not a key file next to the receipt), checks the action and `allowed`, and recomputes the binding.
+   Only then does it call Stripe. A tampered or re-signed receipt is blocked before Stripe (`runs/gate_test.txt`).
+5. **Retry safety.** A retried refund reuses `idempotency_key = agentmint-<binding>`.
 
 ## At-most-once comes from Stripe, not AgentMint
 
 The at-most-once guarantee comes from **Stripe idempotency keyed on the binding**, not from
-Mint's execution boundary. AgentMint's `@notarise` here is a notary: it runs the function
-first and signs what happened afterwards. It does not gate, queue or deduplicate the Stripe call.
-If the function raises an exception, no receipt is written (so `refund()` catches Stripe errors
-and returns them, to keep blocked attempts on the record).
+Mint's execution boundary. AgentMint decides *whether* `refund()` may call Stripe (a valid, signed, allowed
+authorization). It does not track receipt use: the same authorization can be presented again, and Stripe's idempotency
+key is what stops a second refund. Single-use receipts (`JtiStore`), expiry and timestamping are not wired in.
+If a decorated function raises, no receipt is written, so `refund()` returns Stripe errors instead of raising.
 
 ## How to run
 
@@ -53,7 +57,7 @@ Press Enter to move to each beat. Say-this-now notes for each beat are in `LOOM_
 
 ## Files
 
-- `demo.py`: the demo. AgentMint-only lines are tagged `# [agentmint]` (5 code lines).
+- `demo.py`: the demo. AgentMint-only lines are tagged `# [agentmint]`. The gate in `refund()` adds about 10 more.
 - `loom_demo.sh`, `LOOM_SCRIPT.md`: Loom walkthrough and talk track.
 - `retry_refund.py`: verifies an authorization receipt, then retries its refund twice.
 - `verify_chain_ordered.py`: works around `agentmint chain verify` sorting receipts by filename.

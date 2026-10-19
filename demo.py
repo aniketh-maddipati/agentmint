@@ -1,8 +1,10 @@
 import hashlib, json, os, sys, time
+from pathlib import Path
 from urllib.parse import urlparse
 import stripe
 from parallel import Parallel
 from agentmint import Notary, notarise  # [agentmint]
+from agentmint import verify as am_verify  # [agentmint]
 
 for line in open(".env") if os.path.exists(".env") else []:
     if "=" in line and not line.startswith("#"):
@@ -17,6 +19,7 @@ notary = Notary()  # [agentmint]
 SHIPPING_FEE = 1299
 TASK_BUDGET = 10
 TASK_COUNT_FILE = "runs/.task_count"
+PUBLIC_KEY = Path(__file__).resolve().parent / ".agentmint" / "keys" / "public_key.pem"
 
 CLAIMS = {
     # Original (try 1, REFUSED: only 1 citation domain, see runs/A_try1_dallas.log):
@@ -137,9 +140,20 @@ def authorize(pi_id, amount, ev):
 
 
 @notarise(notary, action="stripe:partial_refund")  # [agentmint]
-def refund(auth):
-    if not auth["allowed"]:
-        return {"executed": False, "reason": "refused by policy", "why": auth["why"]}
+def refund(auth_receipt_path):
+    """AgentMint is the gate: Stripe is called only for a valid, signed, allowed authorization receipt."""
+    # [agentmint] verify against the project's own key, not a public_key.pem sitting next to the receipt
+    v = am_verify.verify_receipt_path(Path(auth_receipt_path), PUBLIC_KEY)
+    if not v.ok:
+        return {"executed": False, "reason": f"authorization receipt invalid: {v.reason}"}
+    d = json.load(open(auth_receipt_path))
+    auth = d["evidence"]["result"]
+    ref = {"authorization_receipt": d["id"]}
+    if d["action"] != "authorize:refund_shipping" or not auth["allowed"]:
+        return {"executed": False, "reason": "refused by policy", "why": auth.get("why"), **ref}
+    expected = hashlib.sha256(f"{auth['pi']}|{auth['amount']}|{auth['evidence_sha256']}".encode()).hexdigest()
+    if expected != auth["binding"]:
+        return {"executed": False, "reason": "binding mismatch", **ref}
     try:
         r = stripe.Refund.create(payment_intent=auth["pi"], amount=auth["amount"], idempotency_key=f"agentmint-{auth['binding']}")
     except stripe.StripeError as e:
@@ -148,8 +162,8 @@ def refund(auth):
         apreq = next((w.strip(".,") for w in msg.split() if w.startswith("apreq_") or "/approval_requests/apreq_" in w), None)
         return {"executed": False, "reason": "stripe_error", "error_type": type(e).__name__,
                 "http_status": getattr(e, "http_status", None), "request_id": getattr(e, "request_id", None),
-                "approval_request": apreq.rsplit("/", 1)[-1] if apreq else None, "message": msg[:200]}
-    return {"executed": True, "refund_id": r.id, "amount": r.amount}
+                "approval_request": apreq.rsplit("/", 1)[-1] if apreq else None, "message": msg[:200], **ref}
+    return {"executed": True, "refund_id": r.id, "amount": r.amount, **ref}
 
 
 def fmt(a):
@@ -157,7 +171,9 @@ def fmt(a):
         return f"REFUND EXECUTED {a['refund_id']} ${a['amount']/100:.2f}"
     if a.get("reason") == "stripe_error":
         return f"Stripe {a['http_status']} {a['error_type']}: human approval required (approval request {a['approval_request']})"
-    return "not sent to Stripe: refused by policy"
+    if a.get("reason") == "refused by policy":
+        return "not sent to Stripe: refused by policy"
+    return f"BLOCKED by AgentMint, Stripe not called: {a.get('reason')}"
 
 
 def rid(fn):
@@ -174,8 +190,9 @@ def main(case, claim=None):
     auth = authorize(pi.id, SHIPPING_FEE, ev); receipts.append(rid(authorize))
     print(json.dumps(auth["why"], indent=2))
     print("AUTHORIZED" if auth["allowed"] else "REFUSED", "binding", auth["binding"][:12])
-    a1 = refund(auth); receipts.append(rid(refund)); print("attempt 1:", fmt(a1))
-    a2 = refund(auth); receipts.append(rid(refund)); print("attempt 2 (retry):", fmt(a2))
+    auth_path = f"receipts/{authorize.last_receipt.id}.json"
+    a1 = refund(auth_path); receipts.append(rid(refund)); print("attempt 1:", fmt(a1))
+    a2 = refund(auth_path); receipts.append(rid(refund)); print("attempt 2 (retry):", fmt(a2))
     refunds = stripe.Refund.list(payment_intent=pi.id).data
     print(f"refunds on {pi.id}: {len(refunds)} (${sum(r.amount for r in refunds)/100:.2f})")
     print("RECEIPTS:", " ".join(r for r in receipts if r))

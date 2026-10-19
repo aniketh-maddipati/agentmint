@@ -1,0 +1,50 @@
+{
+  "id": "d27da218-2bca-460f-b10e-3bf22789c038",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "47deed2e3f602cdb06dc9d819ec889347927bc04388c643016cd843f1aa81e2b1cb9923c87c981380c08cd23980c89f3f4c07037a2d0b710423496c8449804e8",
+  "evidence": {
+    "args": [
+      "receipts/ce7e7c71-03f3-404a-ac7d-796deacd747c.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "refused by policy",
+      "why": {
+        "disruption": false,
+        "confidence": "medium",
+        "independent_sources": [
+          "developer.fedex.com"
+        ],
+        "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+      },
+      "authorization_receipt": "ce7e7c71-03f3-404a-ac7d-796deacd747c"
+    }
+  },
+  "observed_at": "2026-10-19T22:13:45.487107+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "29a47d01-6316-4c9e-b9e5-b8ec69b36123",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:13:45.487107+00:00"
+    }
+  ],
+  "previous_receipt_hash": "cb1c8b8f10e1de94fc33eded5a51d8fe8524862da7a637b7e48a0ec79127a817",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "f8ed6efabdad6bcc1a61d20f19827bee36a930c722bd9e9540cf3042da67ec518e7cd3c85c48f3e8d6df2daee5b8d462519adf9aa2c146c84d6cda1784acfd06"
+}

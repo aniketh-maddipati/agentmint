@@ -29,7 +29,7 @@ On screen: the `policy()` function.
 - "Confidence has to be medium or high."
 - "The citations have to come from at least two different domains."
 - "If any of those fail, there's no refund."
-- "AgentMint is five lines: one import, one Notary, three decorators."
+- "AgentMint signs every step, and the refund function won't run without a valid signed authorization."
 
 ## 3 / 8 · Case A: Hurricane Ian
 
@@ -49,7 +49,7 @@ On screen: Parallel's live progress (plan, searches, sources considered), then t
 On screen: the prompt to approve. Switch to the browser.
 
 - "I'll approve it in Stripe." (Approve it, switch back, press Enter.)
-- "Now the agent retries from its signed authorization."
+- "Now the agent retries. All it passes in is the signed authorization receipt, and AgentMint checks it before Stripe is called."
 - On `refunds: 1 ($12.99)`: "One refund, $12.99. The retries use the same idempotency key, so it can't happen twice."
 - "To be clear, the once-only part comes from Stripe's idempotency key, not from AgentMint. AgentMint is the record."
 
@@ -81,12 +81,14 @@ On screen: `agentmint verify` and the chain check.
 
 ## 8 / 8 · Tamper
 
-On screen: a diff changing 1299 to 9299, then the verify failure.
+On screen: a diff changing 1299 to 9299, the verify failure, then `refund()` on the tampered copy.
 
-- "Now I'll change one character in a copy: $12.99 becomes $92.99."
+- "Now I'll change one character in a copy of the authorization: $12.99 becomes $92.99."
 - "Verification fails with a signature mismatch."
-- "So if someone edits the record after the fact, you can tell."
-- Close: "That's it: Parallel for the research, a policy you can read, Stripe for the money, and AgentMint for the proof."
+- "And this is the part that matters: I hand that receipt to the refund function."
+- On `BLOCKED by AgentMint`: "AgentMint rejects it before Stripe is ever called."
+- "The refund function only takes a signed authorization. It checks the signature against our key, checks it was allowed, and recomputes the binding. Only then does it touch Stripe."
+- Close: "That's it: Parallel for the research, a policy you can read, AgentMint as the gate and the proof, and Stripe for the money."
 
 ---
 

@@ -1,0 +1,47 @@
+{
+  "id": "cb16c227-c885-44f6-ae2c-0b01faae988b",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "341b7ce4d857c66d48506bdbde38dc26c4430cd88919cd1d7a117ac42327aeca035f381e442946c6a10b2cf5203e8516a349d06937e162e118d994fbb266d70f",
+  "evidence": {
+    "args": [
+      "receipts/b70ab96b-da8a-4754-8d5b-d7b8134257ce.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "stripe_error",
+      "error_type": "PermissionError",
+      "http_status": 403,
+      "request_id": "req_MaMbd6KaBEaKAn",
+      "approval_request": "apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC",
+      "message": "This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a",
+      "authorization_receipt": "b70ab96b-da8a-4754-8d5b-d7b8134257ce"
+    }
+  },
+  "observed_at": "2026-10-19T22:13:46.081764+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "b5e39cc3-510d-49b6-8489-d710abfbdd06",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:13:46.081764+00:00"
+    }
+  ],
+  "previous_receipt_hash": "0356a43bed788041204d2bf9c98dd372affb422e5550f229738bfd9c1c2835ca",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "65d82722691b48e14f31f0ccdfaa940fc1ffd28bbc3cf903d6e12e63c540de62067bf01d176ad552a3c0b3d5bc33846fe69d31ae45dfc3ce1d142d0e32339802"
+}
