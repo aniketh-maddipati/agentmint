@@ -45,3 +45,10 @@ $ python3 verify_chain_ordered.py receipts   # same check, in link order
 linked 12/12 receipts; unlinked: []
 CHAIN VALID root 67a7965ca3d471ba
 exit=0
+
+# Rerun after Stripe approval (14 receipts)
+$ agentmint verify receipts/
+14
+exit=0
+linked 14/14 receipts; unlinked: []
+CHAIN VALID root 2acb125883689382

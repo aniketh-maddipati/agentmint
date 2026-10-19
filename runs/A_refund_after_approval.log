@@ -1,0 +1,9 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+authorization receipt b70ab96b-da8a-4754-8d5b-d7b8134257ce verified; allowed=True binding 71472a0c2f77
+attempt 1: {'executed': False, 'reason': 'stripe_error', 'error_type': 'PermissionError', 'http_status': 403, 'request_id': 'req_jaNuX0DiQTkthd', 'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 'message': 'This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a'}
+attempt 2 (retry): {'executed': False, 'reason': 'stripe_error', 'error_type': 'PermissionError', 'http_status': 403, 'request_id': 'req_AA0YDHr90VO0Sg', 'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 'message': 'This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a'}
+refunds on pi_3USOI9RilGVAxTyU08z2KNDu: 1 ($12.99)
+RECEIPTS: 92acb044-b72a-4bf5-a364-c0be8673b13e 17b1c3fa-70c6-4b59-a7fd-2956657d46dc
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+refund re_3USOI9RilGVAxTyU0VTzIMgf 1299 succeeded 2026-10-19T22:00:02+00:00 metadata {}

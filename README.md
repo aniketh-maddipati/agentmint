@@ -54,10 +54,10 @@ python3 bench_overhead.py <scratch_dir> config   # @notarise overhead, no API ca
 
 ## Limits
 
-- **The authorized refund never executed.** This Stripe restricted key requires human approval
-  for refunds. Stripe returned 403 `PermissionError` and opened an approval request that "will
-  automatically execute" if approved. All three attempts mapped to one approval request.
-  So exactly-once execution through Stripe was **not** observed. Only the deduplication of the pending action was.
+- **Stripe human approval sat in the loop.** This restricted key requires approval for refunds.
+  Before approval, Stripe returned 403 and all attempts mapped to one approval request. After approval, exactly one
+  $12.99 refund executed. Later retries with the same idempotency key still returned the cached 403, not the
+  refund ID, so the refund has to be found with `Refund.list`. AgentMint receipts record the 403s, not the refund ID.
 - The 2-domain rule counts domains, not corroboration. In Run A, one of the two citations
   (NYT) documents the hurricane at Fort Myers, not a FedEx disruption.
 - The same Parallel query returned 2 citation domains once and 1 the next time. Policy outcomes on the same claim can differ between runs.
