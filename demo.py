@@ -58,12 +58,60 @@ def domain(url):
     return host[4:] if host.startswith("www.") else host  # www.x.com and x.com are one source
 
 
+def watch(run_id, t0):
+    """Print Parallel's live progress events for a run (display only; the result is fetched after)."""
+    print(f"parallel task {run_id} started (processor=base)", flush=True)
+    seen, last = set(), None
+    try:
+        for e in client.task_run.events(run_id, timeout=1800):
+            el = f"{time.time() - t0:5.0f}s"
+            if getattr(e, "message", None):
+                print(f"  parallel {el} | {e.type.rsplit('.', 1)[-1]:<11} {e.message[:110]}", flush=True)
+            elif getattr(e, "source_stats", None):
+                st = e.source_stats
+                for u in (st.sources_read_sample or []):
+                    d = domain(u)
+                    if d not in seen:
+                        seen.add(d); print(f"  parallel {el} | read {d}", flush=True)
+                now = (st.num_sources_considered, st.num_sources_read)
+                if now != last:
+                    last = now; print(f"  parallel {el} | {now[0] or 0} sources considered, {now[1] or 0} read", flush=True)
+            elif getattr(e, "run", None) and not e.run.is_active:
+                print(f"  parallel {el} | run {e.run.status}", flush=True)
+                break
+    except Exception as ex:  # streaming is cosmetic; never block the demo on it
+        print(f"  parallel | event stream ended ({type(ex).__name__}); waiting for result", flush=True)
+
+
+def replay_research(claim):
+    """DEMO_REPLAY=1: reuse the newest signed research receipt for this exact claim
+    (signature checked first) instead of a new Parallel Task run."""
+    import glob
+    from agentmint import verify as am_verify
+    found = []
+    for p in glob.glob("receipts/*.json"):
+        d = json.load(open(p))
+        if (d["action"] == "research:carrier_disruption" and d["evidence"].get("args") == [claim]
+                and "replayed_from_receipt" not in (d["evidence"].get("result") or {})):
+            found.append((d["observed_at"], p, d))
+    if not found:
+        sys.exit("no saved research receipt for this claim; run once without DEMO_REPLAY")
+    _, p, d = max(found)
+    assert am_verify.verify(p)[0].ok, f"saved receipt {p} does not verify"
+    print(f"REPLAY: Parallel result {d['evidence']['result']['run_id']} from signed receipt {d['id'][:8]} (no new Task run)")
+    return {**d["evidence"]["result"], "replayed_from_receipt": d["id"]}
+
+
 @notarise(notary, action="research:carrier_disruption")  # [agentmint]
 def research(claim):
+    if os.environ.get("DEMO_REPLAY") == "1":
+        return replay_research(claim)
     q = f"Was there a {claim['carrier']} delivery disruption in {claim['region']} on or around {claim['date']}?"
     take_task_budget()
     t0 = time.time()
-    run = client.task_run.create(input=q, task_spec={"output_schema": SCHEMA}, processor="base")
+    run = client.task_run.create(input=q, task_spec={"output_schema": SCHEMA}, processor="base", enable_events=True)
+    if os.environ.get("LOOM") == "1":
+        watch(run.run_id, t0)
     res = client.task_run.result(run.run_id, api_timeout=1800)
     out = to_plain(res.output)
     content = out["content"] if isinstance(out["content"], dict) else json.loads(out["content"])
@@ -104,6 +152,14 @@ def refund(auth):
     return {"executed": True, "refund_id": r.id, "amount": r.amount}
 
 
+def fmt(a):
+    if a.get("executed"):
+        return f"REFUND EXECUTED {a['refund_id']} ${a['amount']/100:.2f}"
+    if a.get("reason") == "stripe_error":
+        return f"Stripe {a['http_status']} {a['error_type']}: human approval required (approval request {a['approval_request']})"
+    return "not sent to Stripe: refused by policy"
+
+
 def rid(fn):
     return fn.last_receipt.id if getattr(fn, "last_receipt", None) else None
 
@@ -118,8 +174,8 @@ def main(case, claim=None):
     auth = authorize(pi.id, SHIPPING_FEE, ev); receipts.append(rid(authorize))
     print(json.dumps(auth["why"], indent=2))
     print("AUTHORIZED" if auth["allowed"] else "REFUSED", "binding", auth["binding"][:12])
-    a1 = refund(auth); receipts.append(rid(refund)); print("attempt 1:", a1)
-    a2 = refund(auth); receipts.append(rid(refund)); print("attempt 2 (retry):", a2)
+    a1 = refund(auth); receipts.append(rid(refund)); print("attempt 1:", fmt(a1))
+    a2 = refund(auth); receipts.append(rid(refund)); print("attempt 2 (retry):", fmt(a2))
     refunds = stripe.Refund.list(payment_intent=pi.id).data
     print(f"refunds on {pi.id}: {len(refunds)} (${sum(r.amount for r in refunds)/100:.2f})")
     print("RECEIPTS:", " ".join(r for r in receipts if r))
@@ -130,4 +186,6 @@ def main(case, claim=None):
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(sys.argv[1] if len(sys.argv) > 1 else "holds"), indent=2, default=str))
+    summary = main(sys.argv[1] if len(sys.argv) > 1 else "holds")
+    if os.environ.get("LOOM") != "1":
+        print(json.dumps(summary, indent=2, default=str))

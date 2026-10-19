@@ -42,9 +42,19 @@ python3 bench_overhead.py <scratch_dir> config   # @notarise overhead, no API ca
 
 `demo.py` keeps a Parallel Task counter in `runs/.task_count` and stops at 10.
 
+## Recording a Loom
+
+```bash
+./loom_demo.sh --replay   # rehearse: reuses signed Parallel results, 0 Task runs
+./loom_demo.sh            # record: 2 live Parallel runs with progress streamed on screen
+```
+
+Press Enter to move to each beat. Say-this-now notes for each beat are in `LOOM_SCRIPT.md`.
+
 ## Files
 
 - `demo.py`: the demo. AgentMint-only lines are tagged `# [agentmint]` (5 code lines).
+- `loom_demo.sh`, `LOOM_SCRIPT.md`: Loom walkthrough and talk track.
 - `retry_refund.py`: verifies an authorization receipt, then retries its refund twice.
 - `verify_chain_ordered.py`: works around `agentmint chain verify` sorting receipts by filename.
 - `bench_overhead.py`: overhead benchmark.

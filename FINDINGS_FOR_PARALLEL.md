@@ -1,21 +1,45 @@
-# Task API findings (base processor, 4 runs, Python SDK parallel-web 1.3.5)
+# Notes on the Task API
 
-## Worked well
-- `task_run.create` + `task_run.result(run_id, api_timeout=1800)` worked first time. Latency was 65–110 s.
-- With a JSON `output_schema`, `output.content` came back as a parsed dict. Every top-level field had a `basis` entry with `reasoning`, `confidence` and `citations[].url/title/excerpts`.
-- The negative case was precise. For FedEx/Phoenix/2024-05-14 it found a May 14 *test-environment* API notice and a May 18–19 production interruption, and answered `false`.
+I built a small demo where an agent can only refund a Stripe charge if a Parallel Task result backs the claim. The rule is `disruption == true`, confidence medium or high, and 2+ citation domains. I made 4 `base` runs with `parallel-web` 1.3.5.
 
-## Docs vs. actual
-- The Research Basis guide's tables leave out `citation.title`, `output.mcp_tool_calls`, `output.beta_fields` and `output.output_schema`, which were all present (null where not applicable). The API reference does document them.
-- The HTTP query parameter is `timeout`; the SDK calls it `api_timeout`.
-- `output.output_schema` is null for a user-supplied schema. This is documented ("auto schema only") but surprising.
+## What worked
+
+- Create + blocking result worked first try:
+
+  ```python
+  run = client.task_run.create(input=q, task_spec={"output_schema": SCHEMA}, processor="base")
+  res = client.task_run.result(run.run_id, api_timeout=1800)
+  ```
+
+- With a JSON schema, `output.content` comes back as a dict. Every field gets a `basis` entry I can gate on directly.
+- The negative case was sharp. For FedEx / Phoenix / 2024-05-14 it found a test-environment API notice and answered `false` with a citation.
+- Latency was 65 to 110s.
+
+## Docs vs. what I got
+
+- The Research Basis guide doesn't list `citation.title`, `mcp_tool_calls`, `beta_fields` or `output_schema`. They're all in the response, and the API reference has them.
+- The HTTP param is `timeout`, but the SDK calls it `api_timeout`.
 
 ## Confidence and citations
-- The "no disruption" answer was still cited (developer.fedex.com).
-- Confidence was `medium` on all 4 runs and did not track the evidence. The same Dallas query returned 2 citation domains once and 1 the next time, both `medium`.
-- Citations can back different sub-claims. In the Hurricane Ian run, one citation showed FedEx suspensions while the other (NYT) only placed the storm at Fort Myers. One reasoning string cited "Reuters reporting" that was not in `citations`.
 
-## Suggestions
-1. Return a stable `basis_id` or hash for each result's basis (and for each `FieldBasis`), so downstream approvals and receipts can reference exactly what was relied on.
-2. Mark per citation which claim it supports (e.g. `supports: "carrier disruption" | "location/date"`), or flag sources named in `reasoning` that are absent from `citations`.
-3. Document what drives `confidence`, and consider exposing the counts behind it (independent sources, agreement), since `medium` covered both 1-source and 2-source evidence.
+- I got `medium` on all 4 runs, with 1 source or 2.
+- The same Dallas query gave 2 citation domains, then 1 on the rerun. My policy flipped from pass to refuse.
+- The two citations can back different parts of the claim:
+
+  ```
+  supplychaindive.com  -> FedEx suspended service in Florida
+  nytimes.com          -> Ian made landfall near Fort Myers (no FedEx mention)
+  ```
+
+- One `reasoning` string cited "Reuters reporting" that wasn't in `citations`.
+
+## Asks
+
+1. A stable ID or hash for a result's basis, so I can sign exactly what I relied on:
+
+   ```json
+   {"basis_id": "bas_...", "basis_sha256": "..."}
+   ```
+
+2. Per citation, which claim it supports. Or flag sources named in `reasoning` that aren't cited.
+3. Say what drives `confidence`, or expose the source count and agreement behind it.
