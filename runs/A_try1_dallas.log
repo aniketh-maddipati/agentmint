@@ -1,0 +1,67 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+
+CASE holds: My package was days late because of the winter storm. Please refund shipping. (FedEx, Dallas, Texas, 2021-02-16)
+payment pi_3USOGnRilGVAxTyU0IrrmNS7 $100.00
+TASK RUNS USED: 2/10
+parallel run trun_0525cf6e1b84453eb95b7e07dcee62a0 latency 71.9s evidence 408c0e352628
+{
+  "disruption": true,
+  "confidence": "medium",
+  "independent_sources": [
+    "cbsnews.com"
+  ],
+  "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+}
+REFUSED binding 62452bca940e
+attempt 1: {'executed': False, 'reason': 'refused by policy', 'why': {'disruption': True, 'confidence': 'medium', 'independent_sources': ['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas.'}}
+attempt 2 (retry): {'executed': False, 'reason': 'refused by policy', 'why': {'disruption': True, 'confidence': 'medium', 'independent_sources': ['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas.'}}
+refunds on pi_3USOGnRilGVAxTyU0IrrmNS7: 0 ($0.00)
+RECEIPTS: c90e6ad6-7b22-495d-91e3-d6d9f7d55584 c2f46810-c27c-44ad-a3fb-bdd1ba300498 835c96a2-4cd1-4e0d-a94a-5e0355784073 c32a52fb-3d76-45e5-ab76-dfacb3f60eed
+{
+  "case": "holds",
+  "payment_intent": "pi_3USOGnRilGVAxTyU0IrrmNS7",
+  "parallel_run_id": "trun_0525cf6e1b84453eb95b7e07dcee62a0",
+  "allowed": false,
+  "binding": "62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7",
+  "attempt_1": {
+    "executed": false,
+    "reason": "refused by policy",
+    "why": {
+      "disruption": true,
+      "confidence": "medium",
+      "independent_sources": [
+        "cbsnews.com"
+      ],
+      "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+    }
+  },
+  "attempt_2": {
+    "executed": false,
+    "reason": "refused by policy",
+    "why": {
+      "disruption": true,
+      "confidence": "medium",
+      "independent_sources": [
+        "cbsnews.com"
+      ],
+      "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+    }
+  },
+  "refunds": 0,
+  "refunded_cents": 0,
+  "why": {
+    "disruption": true,
+    "confidence": "medium",
+    "independent_sources": [
+      "cbsnews.com"
+    ],
+    "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+  },
+  "latency_s": 71.9,
+  "receipts": [
+    "c90e6ad6-7b22-495d-91e3-d6d9f7d55584",
+    "c2f46810-c27c-44ad-a3fb-bdd1ba300498",
+    "835c96a2-4cd1-4e0d-a94a-5e0355784073",
+    "c32a52fb-3d76-45e5-ab76-dfacb3f60eed"
+  ]
+}

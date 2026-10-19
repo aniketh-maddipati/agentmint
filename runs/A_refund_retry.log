@@ -1,0 +1,6 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+authorization receipt b70ab96b-da8a-4754-8d5b-d7b8134257ce verified; allowed=True binding 71472a0c2f77
+attempt 1: {'executed': False, 'reason': 'stripe_error', 'error_type': 'PermissionError', 'http_status': 403, 'request_id': 'req_4QZmS0IzQYylPT', 'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 'message': 'This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a'}
+attempt 2 (retry): {'executed': False, 'reason': 'stripe_error', 'error_type': 'PermissionError', 'http_status': 403, 'request_id': 'req_ceBBZPoTlj6IEF', 'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 'message': 'This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a'}
+refunds on pi_3USOI9RilGVAxTyU08z2KNDu: 0 ($0.00)
+RECEIPTS: 27c1a216-c815-4899-a013-30421d0166da 71802ae4-3f6a-46ab-88b4-187a6525bd6b

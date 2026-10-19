@@ -1,0 +1,31 @@
+{
+  "parallel_task_runs_used": 4,
+  "parallel_task_budget": 10,
+  "parallel_task_latency_s": [
+    {"run": "step3_raw_dallas", "run_id": "trun_0525cf6e1b84453e9c55b0bdb229f062", "latency_s": 65.1, "disruption": true, "confidence": "medium", "citation_domains": 2},
+    {"run": "A_try1_dallas", "run_id": "trun_0525cf6e1b84453eb95b7e07dcee62a0", "latency_s": 71.9, "disruption": true, "confidence": "medium", "citation_domains": 1},
+    {"run": "A_hurricane_ian", "run_id": "trun_0525cf6e1b84453e9916d64b67f7c6a1", "latency_s": 87.5, "disruption": true, "confidence": "medium", "citation_domains": 2},
+    {"run": "B_phoenix", "run_id": "trun_0525cf6e1b84453e92105847e1325ca7", "latency_s": 109.6, "disruption": false, "confidence": "medium", "citation_domains": 1}
+  ],
+  "parallel_task_latency_median_s": 79.7,
+  "notarise_overhead_authorize_50_iterations": {
+    "as_used_in_demo_config_mode": {"plain_median_us": 6.7, "decorated_median_us": 1710.0, "added_median_us": 1703.3, "decorated_p90_us": 1926.2,
+      "note": "agentmint init config present: per call loads the keystore, signs Ed25519, writes receipt JSON + chain_state.json to disk; timestamper=none"},
+    "ephemeral_notary_no_timestamp": {"plain_median_us": 6.9, "decorated_median_us": 502.9, "added_median_us": 496.0,
+      "note": "in-memory Notary(), explicit plan=, enable_timestamp=False; no disk, no network"},
+    "ephemeral_notary_default_timestamp": {"added_median_us": 628864.8,
+      "note": "decorator default enable_timestamp=True calls freetsa.org per receipt (RFC 3161, digest only). Measured once by mistake; freetsa.org is outside this experiment's allow-list. Not used by the demo."}
+  },
+  "notarise_overhead_headline_us": 1703.3,
+  "agentmint_integration_lines": {
+    "count": 5,
+    "lines": [
+      "from agentmint import Notary, notarise",
+      "notary = Notary()",
+      "@notarise(notary, action=\"research:carrier_disruption\")",
+      "@notarise(notary, action=\"authorize:refund_shipping\")",
+      "@notarise(notary, action=\"stripe:partial_refund\")"
+    ],
+    "optional_reporting_lines": "rid() helper + RECEIPTS print (5 lines) only surface receipt IDs in logs; not needed for signing"
+  }
+}

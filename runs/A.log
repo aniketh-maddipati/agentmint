@@ -1,0 +1,59 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+
+CASE holds: My package was days late because of Hurricane Ian. Please refund shipping. (FedEx, Fort Myers, Florida, 2022-09-28)
+payment pi_3USOI9RilGVAxTyU08z2KNDu $100.00
+TASK RUNS USED: 3/10
+parallel run trun_0525cf6e1b84453e9916d64b67f7c6a1 latency 87.5s evidence 8180f727e7ad
+{
+  "disruption": true,
+  "confidence": "medium",
+  "independent_sources": [
+    "nytimes.com",
+    "supplychaindive.com"
+  ],
+  "summary": "Yes\u2014during Hurricane Ian, FedEx reported temporary service suspensions and warned of delays and disruptions in affected Florida areas, while the storm hit near Fort Myers on September 28, 2022."
+}
+AUTHORIZED binding 71472a0c2f77
+Traceback (most recent call last):
+  File "/home/user/agentmint/agentmint-parallel-demo/demo.py", line 125, in <module>
+    print(json.dumps(main(sys.argv[1] if len(sys.argv) > 1 else "holds"), indent=2, default=str))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/agentmint/agentmint-parallel-demo/demo.py", line 113, in main
+    a1 = refund(auth); receipts.append(rid(refund)); print("attempt 1:", a1)
+  File "/usr/local/lib/python3.13/dist-packages/agentmint/decorator.py", line 83, in wrapper
+    result = func(*args, **kwargs)
+  File "/home/user/agentmint/agentmint-parallel-demo/demo.py", line 95, in refund
+    r = stripe.Refund.create(payment_intent=auth["pi"], amount=auth["amount"], idempotency_key=f"agentmint-{auth['binding']}")
+  File "/usr/local/lib/python3.13/dist-packages/stripe/_refund.py", line 628, in create
+    cls._static_request(
+    ~~~~~~~~~~~~~~~~~~~^
+        "post",
+        ^^^^^^^
+        cls.class_url(),
+        ^^^^^^^^^^^^^^^^
+        params=params,
+        ^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/usr/local/lib/python3.13/dist-packages/stripe/_api_resource.py", line 171, in _static_request
+    return _APIRequestor._global_instance().request(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        method_,
+        ^^^^^^^^
+    ...<3 lines>...
+        base_address=base_address,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/dist-packages/stripe/_api_requestor.py", line 245, in request
+    resp = requestor._interpret_response(rbody, rcode, rheaders, api_mode)
+  File "/usr/local/lib/python3.13/dist-packages/stripe/_api_requestor.py", line 942, in _interpret_response
+    self.handle_error_response(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        rbody, rcode, resp.data, rheaders, api_mode
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/dist-packages/stripe/_api_requestor.py", line 387, in handle_error_response
+    raise err
+stripe._error.PermissionError: Request req_Dqh3PMcJ6NrPJR: This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/approval_requests/apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC. To provide context for the reviewer: POST /v2/core/approval_requests/apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC with a reason parameter. These endpoints require API version 2026-08-26.preview or later.

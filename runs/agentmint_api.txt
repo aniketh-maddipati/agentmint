@@ -1,0 +1,49 @@
+AgentMint API findings (Step 1)
+================================
+
+Package source
+- PyPI `agentmint` installs 0.1.0. It has NO top-level `Notary`/`notarise` export,
+  NO `notarise` decorator (only `require_receipt`, an authorization gate), NO CLI,
+  and `Notary.notarise()` timestamps via https://freetsa.org by default
+  (not on this experiment's network allow-list).
+- Installed instead from GitHub: git+https://github.com/aerf-spec/agentmint-python
+  -> agentmint 0.2.0 (/usr/local/lib/python3.13/dist-packages/agentmint).
+  Exports `Notary`, `notarise`, `verify`, `verify_chain`, CLI `agentmint`.
+
+Decorator signature (agentmint/decorator.py)
+    notarise(notary: Notary, action: str | None = None, plan=None, agent: str | None = None,
+             evidence=None, enable_timestamp: bool = True)
+- `notary` is positional; `action=` is a keyword. Usage `@notarise(notary, action="x")` works as written.
+- The wrapped function runs FIRST, then a receipt is signed (it is a notary, not a gate;
+  an exception inside the function produces no receipt).
+- Evidence: when `evidence=None` it records {"args": [...], "kwargs": {...}, "result": <return>}
+  in full inside the signed receipt (`evidence` field) plus `evidence_hash_sha512`.
+  If not JSON-serialisable it silently falls back to repr() strings -> we model_dump(mode="json") first.
+  `evidence=` may be a callable(*args, **kwargs, result=...) to choose the payload.
+- Config mode: if `.agentmint/config.toml` exists AND action is given AND plan/evidence are None,
+  the decorator IGNORES the passed `notary`, builds `Notary(key=<keystore>)` per call,
+  uses the active plan, and writes the receipt to `<sink>/<receipt_id>.json`.
+  Timestamping follows config (`timestamper.type = "none"` by default -> no network).
+  Passing `evidence=` or `plan=` disables config mode (receipt is NOT written to disk).
+- `functools.wraps` is used, so `fn.__wrapped__` is the undecorated function;
+  `fn.last_receipt` holds the most recent NotarisedReceipt.
+- Signing: Ed25519 over canonical JSON (sorted keys, compact). Receipts chain per plan
+  via `previous_receipt_hash` (SHA-256 of previous signed payload).
+
+CLI (agentmint 0.2.0)
+- Subcommands: actions chain doctor export init notarise plan privacy show verify watch
+- `agentmint init -y .`  -> .agentmint/{config.toml,keys/,plans/,active_plan}, receipts/
+  (it also appends `.agentmint/` and `receipts/` to .gitignore; we narrowed that to the private key only)
+- `agentmint show <receipt.json> [--verify] [--raw]`
+- `agentmint verify <receipt.json | dir | package.zip>` (exit 1 on any failure).
+  Directory verify checks each signature; chain linkage is only checked for .zip packages
+  (or `agentmint chain`).
+- Receipts written to: ./receipts/<receipt_id>.json ; public key: .agentmint/keys/public_key.pem
+
+Observed during the runs
+- If the decorated function raises, no receipt is written (Stripe 403 on the first Run A refund
+  attempt left no receipt). demo.py's refund() now returns Stripe errors so they get signed.
+- `agentmint chain verify` sorts receipts by filename (random UUID), so it reports
+  "first receipt has non-null chain hash" on a valid chain. verify_chain_ordered.py checks in link order: valid.
+- Decorator fallback mode (no config) defaults to enable_timestamp=True -> one freetsa.org request per receipt
+  (~0.63 s each). Hit once during benchmarking (51 digest-only requests, fake data); the demo itself used config mode, timestamper=none.

@@ -1,0 +1,93 @@
+{
+  "id": "ce7e7c71-03f3-404a-ac7d-796deacd747c",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "authorize",
+  "action": "authorize:refund_shipping",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "2686afb9c7dfa26bc101c31abd8df0423bfe066cd9c37a8ad6ed0c95b01d05e0229f7ab935f768d5cfb25eab3e3d8e3cd03e4cdff779b3b48cbf1138d76ff5cb",
+  "evidence": {
+    "args": [
+      "pi_3USOKDRilGVAxTyU103NMJD8",
+      1299,
+      {
+        "run_id": "trun_0525cf6e1b84453e92105847e1325ca7",
+        "query": "Was there a FedEx delivery disruption in Phoenix, Arizona on or around 2024-05-14?",
+        "content": {
+          "disruption": false,
+          "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+        },
+        "basis": [
+          {
+            "field": "disruption",
+            "reasoning": "FedEx\u2019s announcement identifies the May 14 interruption as affecting its test environment. It lists the production-environment interruption separately as May 18\u201319, outside the two-day window. The notice therefore does not document a delivery disruption in Phoenix on the requested date.",
+            "citations": [
+              {
+                "url": "https://developer.fedex.com/api/en-us/announcements/May_2024-Interruption_Announcement.html",
+                "excerpts": [
+                  "|**Test Environment Intermittent Disruption:** | |Start Date and Time: |Tuesday, May 14, 2024, 8:00 a.m. CT | |End Date and Time: |Tuesday, May 14, 2024, 5:00 p.m. CT | |Expected Duration: |9 Hrs _ (Full Outage: 8:00 a.m. CT to 10:00 a.m. CT,_ _Intermittent Disruption:_ _10:01 a.m. CT to 5:00 p.m. CT) _ | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, and LTL Freight API | |**Production Environment Intermittent Disruption:** | |Start Date and Time: |Saturday, May 18, 2024, 8:00 p.m. CT | |End Date and Time: |Sunday, May 19, 2024, 3:00 a.m. CT | |Expected Duration: |7 Hrs | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, LTL Freight API, and FedEx Developer Portal |"
+                ],
+                "title": "May 2024 - Interruption Announcement"
+              }
+            ],
+            "confidence": "medium"
+          },
+          {
+            "field": "summary",
+            "reasoning": "The official notice distinguishes the May 14 test-environment interruption from the production interruption scheduled for May 18\u201319, supporting the summary that the May 14 item was not a documented Phoenix delivery disruption.",
+            "citations": [
+              {
+                "url": "https://developer.fedex.com/api/en-us/announcements/May_2024-Interruption_Announcement.html",
+                "excerpts": [
+                  "|**Test Environment Intermittent Disruption:** | |Start Date and Time: |Tuesday, May 14, 2024, 8:00 a.m. CT | |End Date and Time: |Tuesday, May 14, 2024, 5:00 p.m. CT | |Expected Duration: |9 Hrs _ (Full Outage: 8:00 a.m. CT to 10:00 a.m. CT,_ _Intermittent Disruption:_ _10:01 a.m. CT to 5:00 p.m. CT) _ | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, and LTL Freight API | |**Production Environment Intermittent Disruption:** | |Start Date and Time: |Saturday, May 18, 2024, 8:00 p.m. CT | |End Date and Time: |Sunday, May 19, 2024, 3:00 a.m. CT | |Expected Duration: |7 Hrs | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, LTL Freight API, and FedEx Developer Portal |"
+                ],
+                "title": "May 2024 - Interruption Announcement"
+              }
+            ],
+            "confidence": "medium"
+          }
+        ],
+        "latency_s": 109.6,
+        "sha256": "f7f3f488ee519ed62cfe41250a5bf4b91c606e10428432a40a9d0426a529ef11"
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "allowed": false,
+      "binding": "b4c959e1167a206965dba92dc17635d97c43b52f95c1f1113740adb3443a3f08",
+      "pi": "pi_3USOKDRilGVAxTyU103NMJD8",
+      "amount": 1299,
+      "evidence_sha256": "f7f3f488ee519ed62cfe41250a5bf4b91c606e10428432a40a9d0426a529ef11",
+      "why": {
+        "disruption": false,
+        "confidence": "medium",
+        "independent_sources": [
+          "developer.fedex.com"
+        ],
+        "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+      }
+    }
+  },
+  "observed_at": "2026-10-19T21:44:23.718870+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "26497929-b50c-4178-916e-7cd34a9ae881",
+  "session_trajectory": [
+    {
+      "action": "authorize:refund_shipping",
+      "agent": "authorize",
+      "in_policy": true,
+      "observed_at": "2026-10-19T21:44:23.718870+00:00"
+    }
+  ],
+  "previous_receipt_hash": "6205703a2cd947dd969610aa34ba28b4f9e73a100aef5ff712ba988953376d10",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "60d244a9b6b5d92ac53c3846e1a1d85c22fee31fa6ce7b923f7573ad7527e39abbc6b666f6a22abb8cfed3f657e35b1e074bcd1169272c731a3f1b58c477c00a"
+}
