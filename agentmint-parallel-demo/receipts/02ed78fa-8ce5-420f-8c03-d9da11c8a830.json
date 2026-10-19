@@ -1,0 +1,50 @@
+{
+  "id": "02ed78fa-8ce5-420f-8c03-d9da11c8a830",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "d4e2afeed1587d92077ac1cab5f9676f7249a826694df3c25843cd07cf7402909831f9968af376182326d8d16b762da94994fcb680007481245861b51d9ef464",
+  "evidence": {
+    "args": [
+      "receipts/20cb3ff3-632c-49d8-a2b9-bed9f9dae4a7.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "refused by policy",
+      "why": {
+        "disruption": false,
+        "confidence": "medium",
+        "independent_sources": [
+          "developer.fedex.com"
+        ],
+        "summary": "No documented FedEx delivery disruption in Phoenix was found for May 14, 2024 or within two days of that date; the May 14 notice described an interruption in the test environment for FedEx APIs, not package delivery service."
+      },
+      "authorization_receipt": "20cb3ff3-632c-49d8-a2b9-bed9f9dae4a7"
+    }
+  },
+  "observed_at": "2026-10-19T22:13:57.287095+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "e4c81ae0-03d8-4c8a-931d-4d80adfa8539",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:13:57.287095+00:00"
+    }
+  ],
+  "previous_receipt_hash": "7bd1f7309e4070a5085f6658f758bb2e5eb5d5b51665da3efd56515e462969ac",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "2b1946c903093e2a6511fce3435a6f56ebea6e2fa499a03850c3b263471d3a29d5b18ce87d8c087a0bf73ebf1871509a5c9ffb39b5518a2134599329ee004b0e"
+}

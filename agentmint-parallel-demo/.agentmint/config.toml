@@ -1,0 +1,19 @@
+[profile]
+id = ""
+
+[keystore]
+path = "/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys"
+
+[sink]
+type = "file"
+path = "/home/user/agentmint/agentmint-parallel-demo/receipts"
+
+[timestamper]
+type = "none"
+url = ""
+
+[policy]
+type = "scope_match"
+
+[plan]
+id = "7c4324af-5bf1-4c73-8897-ec2a81125df5"

@@ -1,0 +1,41 @@
+{
+  "id": "20a8af97-af6b-4cab-a671-de56fcc70a89",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "8d7df57fb91918a76201c04357d3afcbc482efff428c505b85f67bf5afc03bf784ca188495c005a13aa20b5031e55b042da17b4cad340831eaf6d48590ec4e07",
+  "evidence": {
+    "args": [
+      "/tmp/claude-0/-home-user-agentmint/c63083ae-9bdd-5d24-bf41-1388a280ddfc/scratchpad/gate/forged/b70ab96b-da8a-4754-8d5b-d7b8134257ce.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "authorization receipt invalid: signature mismatch"
+    }
+  },
+  "observed_at": "2026-10-19T22:13:45.491107+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "3ec64e7f-d0c5-4a11-b61a-4b01aee99f14",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:13:45.491107+00:00"
+    }
+  ],
+  "previous_receipt_hash": "8c7a0a610432767c2b3010b0a653c33a19ff9923acc4e4522097364c56d352b3",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "ca12a6dd47051109519c070a1215d549b7284e39e5d6c28a8bc6cddd08d3d1d38a63125e598e030651f90c1f5d65b5dd6de557d8f9e38bbc3ba13e4f5d02ed0b"
+}

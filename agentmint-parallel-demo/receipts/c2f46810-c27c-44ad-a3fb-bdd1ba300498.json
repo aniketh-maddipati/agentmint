@@ -1,0 +1,95 @@
+{
+  "id": "c2f46810-c27c-44ad-a3fb-bdd1ba300498",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "authorize",
+  "action": "authorize:refund_shipping",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "508b482c4a240a095d81520b22de45923e7f8fac9c06be369126f7fa1d48abe0b77c029d2f798e13a8d379eefbc40f8974b6e7ab76e4001b78fad3275643f275",
+  "evidence": {
+    "args": [
+      "pi_3USOGnRilGVAxTyU0IrrmNS7",
+      1299,
+      {
+        "run_id": "trun_0525cf6e1b84453eb95b7e07dcee62a0",
+        "query": "Was there a FedEx delivery disruption in Dallas, Texas on or around 2021-02-16?",
+        "content": {
+          "disruption": true,
+          "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+        },
+        "basis": [
+          {
+            "field": "disruption",
+            "reasoning": "CBS reports that severe weather affected Texas and delayed Dallas newspaper deliveries. It also reports FedEx warned of delays across the country, including disruptions to inbound and outbound U.S. shipments and packages scheduled for Tuesday delivery. Together, this supports a FedEx delivery disruption affecting Dallas around the specified date.",
+            "citations": [
+              {
+                "url": "https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart",
+                "excerpts": [
+                  "\ud83e\udd76Today's schedule has been cut back, so please check your flight status with your airline and allow yourself lots of time if coming to the airport.\ud83d\udcf8 [@LoneStarYinzer](https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) [pic.twitter.com/WxzEaLoFDj](https://t.co/WxzEaLoFDj)\u2014 DFW Airport (@DFWAirport) [February 16, 2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5Etfw) The unusual weather conditions in Texas disrupted things as mundane as newspaper deliveries, with the Dallas Morning News [advising](https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-flights-again-at-dfw-airport-dallas-love-field/) readers to",
+                  "The arctic blast also caused problems for shipping giants FedEx and United Parcel Service, both of which warned of delays stretching across the country."
+                ],
+                "title": "\n    Winter storm upends travel, deliveries and shopping across U.S. - CBS News"
+              }
+            ],
+            "confidence": "medium"
+          },
+          {
+            "field": "summary",
+            "reasoning": "The cited report connects the severe weather to delivery impacts in Texas and Dallas, and separately documents FedEx's nationwide shipment delays for Tuesday, February 16. The summary describes that evidence and its support for Dallas being affected.",
+            "citations": [
+              {
+                "url": "https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart",
+                "excerpts": [
+                  "\ud83e\udd76Today's schedule has been cut back, so please check your flight status with your airline and allow yourself lots of time if coming to the airport.\ud83d\udcf8 [@LoneStarYinzer](https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) [pic.twitter.com/WxzEaLoFDj](https://t.co/WxzEaLoFDj)\u2014 DFW Airport (@DFWAirport) [February 16, 2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5Etfw) The unusual weather conditions in Texas disrupted things as mundane as newspaper deliveries, with the Dallas Morning News [advising](https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-flights-again-at-dfw-airport-dallas-love-field/) readers to",
+                  "The arctic blast also caused problems for shipping giants FedEx and United Parcel Service, both of which warned of delays stretching across the country."
+                ],
+                "title": "\n    Winter storm upends travel, deliveries and shopping across U.S. - CBS News"
+              }
+            ],
+            "confidence": "medium"
+          }
+        ],
+        "latency_s": 71.9,
+        "sha256": "408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d"
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "allowed": false,
+      "binding": "62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7",
+      "pi": "pi_3USOGnRilGVAxTyU0IrrmNS7",
+      "amount": 1299,
+      "evidence_sha256": "408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d",
+      "why": {
+        "disruption": true,
+        "confidence": "medium",
+        "independent_sources": [
+          "cbsnews.com"
+        ],
+        "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+      }
+    }
+  },
+  "observed_at": "2026-10-19T21:40:14.440654+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "76569292-8e09-44ed-986e-30830ab48ec7",
+  "session_trajectory": [
+    {
+      "action": "authorize:refund_shipping",
+      "agent": "authorize",
+      "in_policy": true,
+      "observed_at": "2026-10-19T21:40:14.440654+00:00"
+    }
+  ],
+  "previous_receipt_hash": "96c6a91989e2928b3c3e6bbbf0840eedf1a094ff3d173682c1e06f2caec9d57e",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "1f8828656e269bfcb59bb26101828905f07ebc49d0557a7733297db987a5df0a1b95579b427c89c6fee228b8522b9046dc497a6e1ade55e886c69eb87988cb07"
+}

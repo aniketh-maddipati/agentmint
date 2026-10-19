@@ -1,0 +1,6 @@
+.env
+.venv
+__pycache__
+# AgentMint: never commit the private signing key or local chain state
+.agentmint/keys/signing_key.bin
+.agentmint/keys/chain_state.json

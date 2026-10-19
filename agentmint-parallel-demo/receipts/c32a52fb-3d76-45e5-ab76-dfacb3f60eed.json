@@ -1,0 +1,63 @@
+{
+  "id": "c32a52fb-3d76-45e5-ab76-dfacb3f60eed",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "6a5fe1f56864bd950e4bc1e3ecf8113ab5f60a94ae9bbec8a54443ce31ad6c9d9718ffa659aaffe1a19b8c2bbf1e009b071efb8291c04eab3b9efba343d7c90c",
+  "evidence": {
+    "args": [
+      {
+        "allowed": false,
+        "binding": "62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7",
+        "pi": "pi_3USOGnRilGVAxTyU0IrrmNS7",
+        "amount": 1299,
+        "evidence_sha256": "408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d",
+        "why": {
+          "disruption": true,
+          "confidence": "medium",
+          "independent_sources": [
+            "cbsnews.com"
+          ],
+          "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+        }
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "refused by policy",
+      "why": {
+        "disruption": true,
+        "confidence": "medium",
+        "independent_sources": [
+          "cbsnews.com"
+        ],
+        "summary": "Yes\u2014on February 16, severe weather disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting packages scheduled for delivery that day, supporting an impact in Dallas."
+      }
+    }
+  },
+  "observed_at": "2026-10-19T21:40:14.446905+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "87698e00-5eb3-4214-bb37-eeda45b07126",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T21:40:14.446905+00:00"
+    }
+  ],
+  "previous_receipt_hash": "7560b6326ed677247428ec55c50d7716f488d17d42ce7842c4e8727afe0d1ed2",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "624fbbfca627b79b2b7e2079c9ae9f55eda7bcbcfceb7e4bfff39fd9f925dba121ddad1a399534a46557887cff8ecd123261b8b70124b6f660f00b813a928108"
+}

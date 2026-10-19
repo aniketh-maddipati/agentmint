@@ -1,0 +1,82 @@
+{
+  "id": "7abed1a9-a7a6-4140-88c2-00a78ce40717",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "research",
+  "action": "research:carrier_disruption",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "774108d5dacfc103b2d575b8b2e7c03650d3d943b2a6b8d2f7a299faa0d2179317cfe2c19feac5645a725fa585b5f5b8458bc9fec6c95e6a3af758929b3a8be5",
+  "evidence": {
+    "args": [
+      {
+        "carrier": "FedEx",
+        "region": "Phoenix, Arizona",
+        "date": "2024-05-14",
+        "text": "My package was late because of a carrier outage. Please refund shipping."
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "run_id": "trun_0525cf6e1b84453e92105847e1325ca7",
+      "query": "Was there a FedEx delivery disruption in Phoenix, Arizona on or around 2024-05-14?",
+      "content": {
+        "disruption": false,
+        "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+      },
+      "basis": [
+        {
+          "field": "disruption",
+          "reasoning": "FedEx\u2019s announcement identifies the May 14 interruption as affecting its test environment. It lists the production-environment interruption separately as May 18\u201319, outside the two-day window. The notice therefore does not document a delivery disruption in Phoenix on the requested date.",
+          "citations": [
+            {
+              "url": "https://developer.fedex.com/api/en-us/announcements/May_2024-Interruption_Announcement.html",
+              "excerpts": [
+                "|**Test Environment Intermittent Disruption:** | |Start Date and Time: |Tuesday, May 14, 2024, 8:00 a.m. CT | |End Date and Time: |Tuesday, May 14, 2024, 5:00 p.m. CT | |Expected Duration: |9 Hrs _ (Full Outage: 8:00 a.m. CT to 10:00 a.m. CT,_ _Intermittent Disruption:_ _10:01 a.m. CT to 5:00 p.m. CT) _ | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, and LTL Freight API | |**Production Environment Intermittent Disruption:** | |Start Date and Time: |Saturday, May 18, 2024, 8:00 p.m. CT | |End Date and Time: |Sunday, May 19, 2024, 3:00 a.m. CT | |Expected Duration: |7 Hrs | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, LTL Freight API, and FedEx Developer Portal |"
+              ],
+              "title": "May 2024 - Interruption Announcement"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "summary",
+          "reasoning": "The official notice distinguishes the May 14 test-environment interruption from the production interruption scheduled for May 18\u201319, supporting the summary that the May 14 item was not a documented Phoenix delivery disruption.",
+          "citations": [
+            {
+              "url": "https://developer.fedex.com/api/en-us/announcements/May_2024-Interruption_Announcement.html",
+              "excerpts": [
+                "|**Test Environment Intermittent Disruption:** | |Start Date and Time: |Tuesday, May 14, 2024, 8:00 a.m. CT | |End Date and Time: |Tuesday, May 14, 2024, 5:00 p.m. CT | |Expected Duration: |9 Hrs _ (Full Outage: 8:00 a.m. CT to 10:00 a.m. CT,_ _Intermittent Disruption:_ _10:01 a.m. CT to 5:00 p.m. CT) _ | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, and LTL Freight API | |**Production Environment Intermittent Disruption:** | |Start Date and Time: |Saturday, May 18, 2024, 8:00 p.m. CT | |End Date and Time: |Sunday, May 19, 2024, 3:00 a.m. CT | |Expected Duration: |7 Hrs | |Affected Functionality: |Rate and Transit Times API, Comprehensive Rate and Transit Times API, Ship API, Open Ship API, Consolidation API, Ship DG Hazmat API, Pickup API, Service Availability API, LTL Freight API, and FedEx Developer Portal |"
+              ],
+              "title": "May 2024 - Interruption Announcement"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "latency_s": 109.6,
+      "sha256": "f7f3f488ee519ed62cfe41250a5bf4b91c606e10428432a40a9d0426a529ef11"
+    }
+  },
+  "observed_at": "2026-10-19T21:44:23.715331+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "32358b59-9430-471c-abf7-e56813652a4f",
+  "session_trajectory": [
+    {
+      "action": "research:carrier_disruption",
+      "agent": "research",
+      "in_policy": true,
+      "observed_at": "2026-10-19T21:44:23.715331+00:00"
+    }
+  ],
+  "previous_receipt_hash": "e57cfec399c26f7f082d8fc72f0a3a2a79219eeda196000b60e20a8d6462de3f",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "43f3a953a7641de759b6ef052a740b24e3ae5c0fe0792d59bb8d3242183a502a932d4b9e7a012e3a01051ec751bfdb2eb069aab75cddc60b9769523e07950a01"
+}

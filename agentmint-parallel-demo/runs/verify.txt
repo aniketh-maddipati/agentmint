@@ -1,0 +1,54 @@
+$ agentmint verify receipts/
+✓ Receipt 27c1a216-c815-4899-a013-30421d0166da valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 5e7b0709-434b-4dd9-85cb-d867f806c04f valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 71802ae4-3f6a-46ab-88b4-187a6525bd6b valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 7abed1a9-a7a6-4140-88c2-00a78ce40717 valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 835c96a2-4cd1-4e0d-a94a-5e0355784073 valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 8a7be800-1376-4c0d-8515-16145a2d8c78 valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt 9f5f71f5-9e4a-488c-9471-bcfed93a312e valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt b70ab96b-da8a-4754-8d5b-d7b8134257ce valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt c2f46810-c27c-44ad-a3fb-bdd1ba300498 valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt c32a52fb-3d76-45e5-ab76-dfacb3f60eed valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt c90e6ad6-7b22-495d-91e3-d6d9f7d55584 valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+✓ Receipt ce7e7c71-03f3-404a-ac7d-796deacd747c valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+exit=0
+
+$ agentmint chain verify
+✗ Chain invalid first receipt has non-null chain hash
+exit=1
+
+$ python3 verify_chain_ordered.py receipts   # same check, in link order
+ 0 c90e6ad6 research:carrier_disruption  prev=None
+ 1 c2f46810 authorize:refund_shipping    prev=96c6a91989e2
+ 2 835c96a2 stripe:partial_refund        prev=f53b27502e44
+ 3 c32a52fb stripe:partial_refund        prev=7560b6326ed6
+ 4 9f5f71f5 research:carrier_disruption  prev=b7bf7f0fe26f
+ 5 b70ab96b authorize:refund_shipping    prev=9a19e4d5b99d
+ 6 27c1a216 stripe:partial_refund        prev=3ab03491ff74
+ 7 71802ae4 stripe:partial_refund        prev=97d52396d53a
+ 8 7abed1a9 research:carrier_disruption  prev=e57cfec399c2
+ 9 ce7e7c71 authorize:refund_shipping    prev=6205703a2cd9
+10 8a7be800 stripe:partial_refund        prev=7b1f4db01aa4
+11 5e7b0709 stripe:partial_refund        prev=1b522484be98
+linked 12/12 receipts; unlinked: []
+CHAIN VALID root 67a7965ca3d471ba
+exit=0
+
+# Rerun after Stripe approval (14 receipts)
+$ agentmint verify receipts/
+14
+exit=0
+linked 14/14 receipts; unlinked: []
+CHAIN VALID root 2acb125883689382

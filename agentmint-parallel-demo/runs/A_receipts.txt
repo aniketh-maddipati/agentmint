@@ -1,0 +1,502 @@
+# Run A (Hurricane Ian claim) receipts: research, authorize, refund attempt (retry 1), refund attempt (retry 2)
+=== 9f5f71f5-9e4a-488c-9471-bcfed93a312e
+Receipt 9f5f71f5
+
+Action: research:carrier_disruption
+Agent: research
+Plan: 7c4324af
+Observed: 2026-10-19 21:41:53 UTC (2026-10-19 21:41:53 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'carrier': 'FedEx', 'region': 'Fort Myers, Florida', 'date': 
+'2022-09-28', 'text': 'My package was days late because of Hurricane Ian. Please
+refund shipping.'}]
+  kwargs  {}
+  result  {'run_id': 'trun_0525cf6e1b84453e9916d64b67f7c6a1', 'query': 'Was 
+there a FedEx delivery disruption in Fort Myers, Florida on or around 
+2022-09-28?', 'content': {'disruption': True, 'summary': 'Yes—during Hurricane 
+Ian, FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}, 'basis': [{'field': 'disruption', 'reasoning': 'The 
+contemporaneous report says FedEx adjusted operations, temporarily suspended 
+Ground service in 383 Florida cities and paused Express service in 151 cities, 
+and warned of delays and disruptions in impacted areas. The other report places 
+the hurricane’s severe impacts near Fort Myers on September 28, supporting that 
+Fort Myers was within the affected region.', 'citations': [{'url': 
+'https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-po
+stal-service/632949', 'excerpts': ['FedEx is also adjusting its operations in 
+response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities 
+in which its Ground segment has temporarily suspended service, including in 
+Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. "Delays 
+and disruptions can be expected for inbound and outbound shipments across 
+portions of impacted areas," FedEx said on its website . "We are committed to 
+providing service to the best of our ability in areas that can be safely 
+accessed." A spokesperson for FedEx said in an email that contingency plans are 
+in place to protect employees and facilities and to reduce the storm’s impact on
+service.'], 'title': 'UPS, FedEx and USPS suspend some services as Hurricane Ian
+hits Florida | Supply Chain Dive'}, {'url': 
+'https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida', 'excerpts': 
+['A storm surge of up to 12 feet submerged cars, knocked over houses and trapped
+residents near where the hurricane came ashore west of Fort Myers. Some places 
+remained too dangerous for water rescues, officials said, adding that they were 
+taking down addresses to deploy resources once it was safe.'], 'title': 
+'Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New 
+York Times'}], 'confidence': 'medium'}, {'field': 'summary', 'reasoning': 
+'FedEx’s reported suspensions and disruption warning, read alongside the report 
+of Hurricane Ian’s impacts near Fort Myers on September 28, supports the summary
+that deliveries in the area were disrupted around the date asked about.', 
+'citations': [{'url': 
+'https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-po
+stal-service/632949', 'excerpts': ['FedEx is also adjusting its operations in 
+response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities 
+in which its Ground segment has temporarily suspended service, including in 
+Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. "Delays 
+and disruptions can be expected for inbound and outbound shipments across 
+portions of impacted areas," FedEx said on its website . "We are committed to 
+providing service to the best of our ability in areas that can be safely 
+accessed." A spokesperson for FedEx said in an email that contingency plans are 
+in place to protect employees and facilities and to reduce the storm’s impact on
+service.'], 'title': 'UPS, FedEx and USPS suspend some services as Hurricane Ian
+hits Florida | Supply Chain Dive'}, {'url': 
+'https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida', 'excerpts': 
+['A storm surge of up to 12 feet submerged cars, knocked over houses and trapped
+residents near where the hurricane came ashore west of Fort Myers. Some places 
+remained too dangerous for water rescues, officials said, adding that they were 
+taking down addresses to deploy resources once it was safe.'], 'title': 
+'Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New 
+York Times'}], 'confidence': 'medium'}], 'latency_s': 87.5, 'sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58'}
+
+Chain:
+Previous: b7bf7f0f...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== b70ab96b-da8a-4754-8d5b-d7b8134257ce
+Receipt b70ab96b
+
+Action: authorize:refund_shipping
+Agent: authorize
+Plan: 7c4324af
+Observed: 2026-10-19 21:41:53 UTC (2026-10-19 21:41:53 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  ['pi_3USOI9RilGVAxTyU08z2KNDu', 1299, {'run_id': 
+'trun_0525cf6e1b84453e9916d64b67f7c6a1', 'query': 'Was there a FedEx delivery 
+disruption in Fort Myers, Florida on or around 2022-09-28?', 'content': 
+{'disruption': True, 'summary': 'Yes—during Hurricane Ian, FedEx reported 
+temporary service suspensions and warned of delays and disruptions in affected 
+Florida areas, while the storm hit near Fort Myers on September 28, 2022.'}, 
+'basis': [{'field': 'disruption', 'reasoning': 'The contemporaneous report says 
+FedEx adjusted operations, temporarily suspended Ground service in 383 Florida 
+cities and paused Express service in 151 cities, and warned of delays and 
+disruptions in impacted areas. The other report places the hurricane’s severe 
+impacts near Fort Myers on September 28, supporting that Fort Myers was within 
+the affected region.', 'citations': [{'url': 
+'https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-po
+stal-service/632949', 'excerpts': ['FedEx is also adjusting its operations in 
+response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities 
+in which its Ground segment has temporarily suspended service, including in 
+Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. "Delays 
+and disruptions can be expected for inbound and outbound shipments across 
+portions of impacted areas," FedEx said on its website . "We are committed to 
+providing service to the best of our ability in areas that can be safely 
+accessed." A spokesperson for FedEx said in an email that contingency plans are 
+in place to protect employees and facilities and to reduce the storm’s impact on
+service.'], 'title': 'UPS, FedEx and USPS suspend some services as Hurricane Ian
+hits Florida | Supply Chain Dive'}, {'url': 
+'https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida', 'excerpts': 
+['A storm surge of up to 12 feet submerged cars, knocked over houses and trapped
+residents near where the hurricane came ashore west of Fort Myers. Some places 
+remained too dangerous for water rescues, officials said, adding that they were 
+taking down addresses to deploy resources once it was safe.'], 'title': 
+'Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New 
+York Times'}], 'confidence': 'medium'}, {'field': 'summary', 'reasoning': 
+'FedEx’s reported suspensions and disruption warning, read alongside the report 
+of Hurricane Ian’s impacts near Fort Myers on September 28, supports the summary
+that deliveries in the area were disrupted around the date asked about.', 
+'citations': [{'url': 
+'https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-po
+stal-service/632949', 'excerpts': ['FedEx is also adjusting its operations in 
+response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities 
+in which its Ground segment has temporarily suspended service, including in 
+Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. "Delays 
+and disruptions can be expected for inbound and outbound shipments across 
+portions of impacted areas," FedEx said on its website . "We are committed to 
+providing service to the best of our ability in areas that can be safely 
+accessed." A spokesperson for FedEx said in an email that contingency plans are 
+in place to protect employees and facilities and to reduce the storm’s impact on
+service.'], 'title': 'UPS, FedEx and USPS suspend some services as Hurricane Ian
+hits Florida | Supply Chain Dive'}, {'url': 
+'https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida', 'excerpts': 
+['A storm surge of up to 12 feet submerged cars, knocked over houses and trapped
+residents near where the hurricane came ashore west of Fort Myers. Some places 
+remained too dangerous for water rescues, officials said, adding that they were 
+taking down addresses to deploy resources once it was safe.'], 'title': 
+'Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New 
+York Times'}], 'confidence': 'medium'}], 'latency_s': 87.5, 'sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58'}]
+  kwargs  {}
+  result  {'allowed': True, 'binding': 
+'71472a0c2f770f48812ac40486cf58236c272a180afa6011e8bc93ca1d084c65', 'pi': 
+'pi_3USOI9RilGVAxTyU08z2KNDu', 'amount': 1299, 'evidence_sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['nytimes.com', 'supplychaindive.com'], 'summary': 'Yes—during Hurricane Ian, 
+FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}}
+
+Chain:
+Previous: 9a19e4d5...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== 27c1a216-c815-4899-a013-30421d0166da
+Receipt 27c1a216
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 21:42:25 UTC (2026-10-19 21:42:25 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': True, 'binding': 
+'71472a0c2f770f48812ac40486cf58236c272a180afa6011e8bc93ca1d084c65', 'pi': 
+'pi_3USOI9RilGVAxTyU08z2KNDu', 'amount': 1299, 'evidence_sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['nytimes.com', 'supplychaindive.com'], 'summary': 'Yes—during Hurricane Ian, 
+FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'stripe_error', 'error_type': 
+'PermissionError', 'http_status': 403, 'request_id': 'req_4QZmS0IzQYylPT', 
+'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 
+'message': 'This action requires human approval before it can be completed. An 
+approval request has been created and is awaiting review. If approved, it will 
+automatically execute. To check status: GET /v2/core/a'}
+
+Chain:
+Previous: 3ab03491...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== 71802ae4-3f6a-46ab-88b4-187a6525bd6b
+Receipt 71802ae4
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 21:42:25 UTC (2026-10-19 21:42:25 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': True, 'binding': 
+'71472a0c2f770f48812ac40486cf58236c272a180afa6011e8bc93ca1d084c65', 'pi': 
+'pi_3USOI9RilGVAxTyU08z2KNDu', 'amount': 1299, 'evidence_sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['nytimes.com', 'supplychaindive.com'], 'summary': 'Yes—during Hurricane Ian, 
+FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'stripe_error', 'error_type': 
+'PermissionError', 'http_status': 403, 'request_id': 'req_ceBBZPoTlj6IEF', 
+'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 
+'message': 'This action requires human approval before it can be completed. An 
+approval request has been created and is awaiting review. If approved, it will 
+automatically execute. To check status: GET /v2/core/a'}
+
+Chain:
+Previous: 97d52396...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+
+# Run A try 1 (Dallas claim, refused) receipts
+=== c90e6ad6-7b22-495d-91e3-d6d9f7d55584
+Receipt c90e6ad6
+
+Action: research:carrier_disruption
+Agent: research
+Plan: 7c4324af
+Observed: 2026-10-19 21:40:14 UTC (2026-10-19 21:40:14 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'carrier': 'FedEx', 'region': 'Dallas, Texas', 'date': '2021-02-16', 
+'text': 'My package was days late because of the winter storm. Please refund 
+shipping.'}]
+  kwargs  {}
+  result  {'run_id': 'trun_0525cf6e1b84453eb95b7e07dcee62a0', 'query': 'Was 
+there a FedEx delivery disruption in Dallas, Texas on or around 2021-02-16?', 
+'content': {'disruption': True, 'summary': 'Yes—on February 16, severe weather 
+disrupted deliveries in Texas, and FedEx warned of U.S.-wide shipment delays 
+affecting packages scheduled for delivery that day, supporting an impact in 
+Dallas.'}, 'basis': [{'field': 'disruption', 'reasoning': 'CBS reports that 
+severe weather affected Texas and delayed Dallas newspaper deliveries. It also 
+reports FedEx warned of delays across the country, including disruptions to 
+inbound and outbound U.S. shipments and packages scheduled for Tuesday delivery.
+Together, this supports a FedEx delivery disruption affecting Dallas around the 
+specified date.', 'citations': [{'url': 
+'https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart', 
+'excerpts': ["🥶Today's schedule has been cut back, so please check your flight 
+status with your airline and allow yourself lots of time if coming to the 
+airport.📸 (https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) 
+(https://t.co/WxzEaLoFDj)— DFW Airport (@DFWAirport) [February 16, 
+2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5E
+tfw) The unusual weather conditions in Texas disrupted things as mundane as 
+newspaper deliveries, with the Dallas Morning News 
+(https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-
+flights-again-at-dfw-airport-dallas-love-field/) readers to", 'The arctic blast 
+also caused problems for shipping giants FedEx and United Parcel Service, both 
+of which warned of delays stretching across the country.'], 'title': '\n    
+Winter storm upends travel, deliveries and shopping across U.S. - CBS News'}], 
+'confidence': 'medium'}, {'field': 'summary', 'reasoning': "The cited report 
+connects the severe weather to delivery impacts in Texas and Dallas, and 
+separately documents FedEx's nationwide shipment delays for Tuesday, February 
+16. The summary describes that evidence and its support for Dallas being 
+affected.", 'citations': [{'url': 
+'https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart', 
+'excerpts': ["🥶Today's schedule has been cut back, so please check your flight 
+status with your airline and allow yourself lots of time if coming to the 
+airport.📸 (https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) 
+(https://t.co/WxzEaLoFDj)— DFW Airport (@DFWAirport) [February 16, 
+2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5E
+tfw) The unusual weather conditions in Texas disrupted things as mundane as 
+newspaper deliveries, with the Dallas Morning News 
+(https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-
+flights-again-at-dfw-airport-dallas-love-field/) readers to", 'The arctic blast 
+also caused problems for shipping giants FedEx and United Parcel Service, both 
+of which warned of delays stretching across the country.'], 'title': '\n    
+Winter storm upends travel, deliveries and shopping across U.S. - CBS News'}], 
+'confidence': 'medium'}], 'latency_s': 71.9, 'sha256': 
+'408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d'}
+
+Chain:
+Previous: none
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== c2f46810-c27c-44ad-a3fb-bdd1ba300498
+Receipt c2f46810
+
+Action: authorize:refund_shipping
+Agent: authorize
+Plan: 7c4324af
+Observed: 2026-10-19 21:40:14 UTC (2026-10-19 21:40:14 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  ['pi_3USOGnRilGVAxTyU0IrrmNS7', 1299, {'run_id': 
+'trun_0525cf6e1b84453eb95b7e07dcee62a0', 'query': 'Was there a FedEx delivery 
+disruption in Dallas, Texas on or around 2021-02-16?', 'content': {'disruption':
+True, 'summary': 'Yes—on February 16, severe weather disrupted deliveries in 
+Texas, and FedEx warned of U.S.-wide shipment delays affecting packages 
+scheduled for delivery that day, supporting an impact in Dallas.'}, 'basis': 
+[{'field': 'disruption', 'reasoning': 'CBS reports that severe weather affected 
+Texas and delayed Dallas newspaper deliveries. It also reports FedEx warned of 
+delays across the country, including disruptions to inbound and outbound U.S. 
+shipments and packages scheduled for Tuesday delivery. Together, this supports a
+FedEx delivery disruption affecting Dallas around the specified date.', 
+'citations': [{'url': 
+'https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart', 
+'excerpts': ["🥶Today's schedule has been cut back, so please check your flight 
+status with your airline and allow yourself lots of time if coming to the 
+airport.📸 (https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) 
+(https://t.co/WxzEaLoFDj)— DFW Airport (@DFWAirport) [February 16, 
+2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5E
+tfw) The unusual weather conditions in Texas disrupted things as mundane as 
+newspaper deliveries, with the Dallas Morning News 
+(https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-
+flights-again-at-dfw-airport-dallas-love-field/) readers to", 'The arctic blast 
+also caused problems for shipping giants FedEx and United Parcel Service, both 
+of which warned of delays stretching across the country.'], 'title': '\n    
+Winter storm upends travel, deliveries and shopping across U.S. - CBS News'}], 
+'confidence': 'medium'}, {'field': 'summary', 'reasoning': "The cited report 
+connects the severe weather to delivery impacts in Texas and Dallas, and 
+separately documents FedEx's nationwide shipment delays for Tuesday, February 
+16. The summary describes that evidence and its support for Dallas being 
+affected.", 'citations': [{'url': 
+'https://www.cbsnews.com/news/severe-weather-travel-deliveries-walmart', 
+'excerpts': ["🥶Today's schedule has been cut back, so please check your flight 
+status with your airline and allow yourself lots of time if coming to the 
+airport.📸 (https://twitter.com/LoneStarYinzer?ref_src=twsrc%5Etfw) 
+(https://t.co/WxzEaLoFDj)— DFW Airport (@DFWAirport) [February 16, 
+2021](https://twitter.com/DFWAirport/status/1361696845085503492?ref_src=twsrc%5E
+tfw) The unusual weather conditions in Texas disrupted things as mundane as 
+newspaper deliveries, with the Dallas Morning News 
+(https://www.dallasnews.com/business/airlines/2021/02/16/near-zero-temps-freeze-
+flights-again-at-dfw-airport-dallas-love-field/) readers to", 'The arctic blast 
+also caused problems for shipping giants FedEx and United Parcel Service, both 
+of which warned of delays stretching across the country.'], 'title': '\n    
+Winter storm upends travel, deliveries and shopping across U.S. - CBS News'}], 
+'confidence': 'medium'}], 'latency_s': 71.9, 'sha256': 
+'408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d'}]
+  kwargs  {}
+  result  {'allowed': False, 'binding': 
+'62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7', 'pi': 
+'pi_3USOGnRilGVAxTyU0IrrmNS7', 'amount': 1299, 'evidence_sha256': 
+'408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted 
+deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting 
+packages scheduled for delivery that day, supporting an impact in Dallas.'}}
+
+Chain:
+Previous: 96c6a919...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== 835c96a2-4cd1-4e0d-a94a-5e0355784073
+Receipt 835c96a2
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 21:40:14 UTC (2026-10-19 21:40:14 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': False, 'binding': 
+'62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7', 'pi': 
+'pi_3USOGnRilGVAxTyU0IrrmNS7', 'amount': 1299, 'evidence_sha256': 
+'408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted 
+deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting 
+packages scheduled for delivery that day, supporting an impact in Dallas.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'refused by policy', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted 
+deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting 
+packages scheduled for delivery that day, supporting an impact in Dallas.'}}
+
+Chain:
+Previous: f53b2750...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== c32a52fb-3d76-45e5-ab76-dfacb3f60eed
+Receipt c32a52fb
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 21:40:14 UTC (2026-10-19 21:40:14 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': False, 'binding': 
+'62452bca940e4e7b716a8cb8a852fdab7b7482591637a573881d19fe7b5a02c7', 'pi': 
+'pi_3USOGnRilGVAxTyU0IrrmNS7', 'amount': 1299, 'evidence_sha256': 
+'408c0e352628682b75d44d5d70d78aa6517d097988da056c8fc1d8cb3e89529d', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted 
+deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting 
+packages scheduled for delivery that day, supporting an impact in Dallas.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'refused by policy', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['cbsnews.com'], 'summary': 'Yes—on February 16, severe weather disrupted 
+deliveries in Texas, and FedEx warned of U.S.-wide shipment delays affecting 
+packages scheduled for delivery that day, supporting an impact in Dallas.'}}
+
+Chain:
+Previous: 7560b632...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+
+# After Stripe approval (retry_refund.py rerun)
+=== 92acb044-b72a-4bf5-a364-c0be8673b13e
+Receipt 92acb044
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 22:00:16 UTC (2026-10-19 22:00:16 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': True, 'binding': 
+'71472a0c2f770f48812ac40486cf58236c272a180afa6011e8bc93ca1d084c65', 'pi': 
+'pi_3USOI9RilGVAxTyU08z2KNDu', 'amount': 1299, 'evidence_sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['nytimes.com', 'supplychaindive.com'], 'summary': 'Yes—during Hurricane Ian, 
+FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'stripe_error', 'error_type': 
+'PermissionError', 'http_status': 403, 'request_id': 'req_jaNuX0DiQTkthd', 
+'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 
+'message': 'This action requires human approval before it can be completed. An 
+approval request has been created and is awaiting review. If approved, it will 
+automatically execute. To check status: GET /v2/core/a'}
+
+Chain:
+Previous: 67a7965c...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked
+=== 17b1c3fa-70c6-4b59-a7fd-2956657d46dc
+Receipt 17b1c3fa
+
+Action: stripe:partial_refund
+Agent: refund
+Plan: 7c4324af
+Observed: 2026-10-19 22:00:16 UTC (2026-10-19 22:00:16 UTC)
+In policy: ✓ yes
+
+Evidence:
+  args  [{'allowed': True, 'binding': 
+'71472a0c2f770f48812ac40486cf58236c272a180afa6011e8bc93ca1d084c65', 'pi': 
+'pi_3USOI9RilGVAxTyU08z2KNDu', 'amount': 1299, 'evidence_sha256': 
+'8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58', 'why': 
+{'disruption': True, 'confidence': 'medium', 'independent_sources': 
+['nytimes.com', 'supplychaindive.com'], 'summary': 'Yes—during Hurricane Ian, 
+FedEx reported temporary service suspensions and warned of delays and 
+disruptions in affected Florida areas, while the storm hit near Fort Myers on 
+September 28, 2022.'}}]
+  kwargs  {}
+  result  {'executed': False, 'reason': 'stripe_error', 'error_type': 
+'PermissionError', 'http_status': 403, 'request_id': 'req_AA0YDHr90VO0Sg', 
+'approval_request': 'apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC', 
+'message': 'This action requires human approval before it can be completed. An 
+approval request has been created and is awaiting review. If approved, it will 
+automatically execute. To check status: GET /v2/core/a'}
+
+Chain:
+Previous: 180ccfd8...
+
+Signature:
+Algorithm: Ed25519
+Key ID: a94c88d5c4ba7371
+Status: unchecked

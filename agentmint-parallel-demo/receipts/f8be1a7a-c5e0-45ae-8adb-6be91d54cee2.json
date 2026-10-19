@@ -1,0 +1,61 @@
+{
+  "id": "f8be1a7a-c5e0-45ae-8adb-6be91d54cee2",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "7fa6c5af0fc03ef7a13b2ad61cb1d280d89977ead5529398609270686fae7962475c58c0dc107720b0700019df2db425be5b0bf315c7240b4a0db331b1d9aa71",
+  "evidence": {
+    "args": [
+      {
+        "allowed": true,
+        "binding": "06ee4960a05fcea3bc040dfec8b660c1b9713fbfbd8d6dc48676e6bbb6dabf93",
+        "pi": "pi_3USOetRilGVAxTyU11ogkXKR",
+        "amount": 1299,
+        "evidence_sha256": "8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58",
+        "why": {
+          "disruption": true,
+          "confidence": "medium",
+          "independent_sources": [
+            "nytimes.com",
+            "supplychaindive.com"
+          ],
+          "summary": "Yes\u2014during Hurricane Ian, FedEx reported temporary service suspensions and warned of delays and disruptions in affected Florida areas, while the storm hit near Fort Myers on September 28, 2022."
+        }
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "stripe_error",
+      "error_type": "PermissionError",
+      "http_status": 403,
+      "request_id": "req_uc6Qf4omwwr4Eq",
+      "approval_request": "apreq_test_61VbmcG58OiZTXKQs16Vbm6XR7SQwNDhWWD7u83IeAg4",
+      "message": "This action requires human approval before it can be completed. An approval request has been created and is awaiting review. If approved, it will automatically execute. To check status: GET /v2/core/a"
+    }
+  },
+  "observed_at": "2026-10-19T22:04:00.761908+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "8d0f85c3-ca6f-4c37-a451-b030d63ff2b3",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:04:00.761908+00:00"
+    }
+  ],
+  "previous_receipt_hash": "4ded2b2263a6e9873f4a75dbbc943e42d8217c8683e97ab0b6587fcb939278a5",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "591003b10b027ec8b6d97035610f090119ac1f93d22aeb29e47e4c804d7bf116b70a82545d78e65e9cb625eb56bb39902113c93469e8e723f0ede13e26ad6d0a"
+}

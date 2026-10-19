@@ -1,0 +1,32 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+
+CASE fails: My package was late because of a carrier outage. Please refund shipping. (FedEx, Phoenix, Arizona, 2024-05-14)
+payment pi_3USOgqRilGVAxTyU0sPDvvvm $100.00
+TASK RUNS USED: 5/10
+parallel task trun_0525cf6e1b84453e8bbb5980bd6314ea started (processor=base)
+  parallel    21s | exec_status Starting research
+  parallel    21s | tool_call   Listing tools for MCP server every.
+  parallel    21s | 0 sources considered, 0 read
+  parallel    25s | search      Objective: Determine whether a FedEx carrier delivery service disruption affected Phoenix, Arizona on or withi
+  parallel    25s | search      Query: FedEx service alerts Phoenix Arizona May 14 2024 delivery disruption
+  parallel    25s | search      Query: FedEx delivery delays Phoenix May 12 2024 May 16 2024
+  parallel    31s | 34 sources considered, 0 read
+  parallel    35s | search      Objective: Find contemporaneous reports or official alerts documenting FedEx package-delivery disruption in Ph
+  parallel    35s | search      Query: Phoenix FedEx delivery disruption May 14 2024 weather delays
+  parallel    35s | search      Query: FedEx Phoenix Arizona service alert May 2024 deliveries
+  parallel    41s | 95 sources considered, 0 read
+  parallel   101s | run completed
+parallel run trun_0525cf6e1b84453e8bbb5980bd6314ea latency 101.3s evidence 991f0c74e888
+{
+  "disruption": false,
+  "confidence": "medium",
+  "independent_sources": [
+    "developer.fedex.com"
+  ],
+  "summary": "No documented FedEx delivery disruption in Phoenix was found for May 14, 2024 or within two days of that date; the May 14 notice described an interruption in the test environment for FedEx APIs, not package delivery service."
+}
+REFUSED binding 37ab32ec45bf
+attempt 1: not sent to Stripe: refused by policy
+attempt 2 (retry): not sent to Stripe: refused by policy
+refunds on pi_3USOgqRilGVAxTyU0sPDvvvm: 0 ($0.00)
+RECEIPTS: db3634ee-3849-40fc-9351-431e3b9303f7 23ea6d9f-1db9-4f59-86ab-dc0d0b4a1145 5e6a86a3-f115-4d01-838a-31a0854ea204 4beda271-502c-47de-89e4-b4de8bdc3ecc

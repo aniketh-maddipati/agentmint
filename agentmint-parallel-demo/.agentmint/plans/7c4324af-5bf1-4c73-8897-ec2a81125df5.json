@@ -1,0 +1,17 @@
+{
+  "name": "default",
+  "plan": {
+    "id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+    "user": "local",
+    "action": "default",
+    "scope": [
+      "*"
+    ],
+    "checkpoints": [],
+    "delegates_to": [],
+    "issued_at": "2026-10-19T21:24:13.391641+00:00",
+    "expires_at": "9999-12-31T23:59:59.999999+00:00",
+    "signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+    "key_id": "a94c88d5c4ba7371"
+  }
+}

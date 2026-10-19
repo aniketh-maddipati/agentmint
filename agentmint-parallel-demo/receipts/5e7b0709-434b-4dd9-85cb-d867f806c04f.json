@@ -1,0 +1,63 @@
+{
+  "id": "5e7b0709-434b-4dd9-85cb-d867f806c04f",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "792454e2072a09ee481dcb292227dac7238b28827be065de32e4eb7deefa3fd692a0ea324bddbf5b08ed0a3b82630705b00160f218a68d9006d1ded303850268",
+  "evidence": {
+    "args": [
+      {
+        "allowed": false,
+        "binding": "b4c959e1167a206965dba92dc17635d97c43b52f95c1f1113740adb3443a3f08",
+        "pi": "pi_3USOKDRilGVAxTyU103NMJD8",
+        "amount": 1299,
+        "evidence_sha256": "f7f3f488ee519ed62cfe41250a5bf4b91c606e10428432a40a9d0426a529ef11",
+        "why": {
+          "disruption": false,
+          "confidence": "medium",
+          "independent_sources": [
+            "developer.fedex.com"
+          ],
+          "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+        }
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "refused by policy",
+      "why": {
+        "disruption": false,
+        "confidence": "medium",
+        "independent_sources": [
+          "developer.fedex.com"
+        ],
+        "summary": "No documented FedEx delivery disruption affecting Phoenix on or within two days of May 14, 2024 was found; FedEx\u2019s May 14 notice concerned a test-environment API interruption, while the listed production interruption was May 18\u201319."
+      }
+    }
+  },
+  "observed_at": "2026-10-19T21:44:23.723384+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "db903ee1-78db-4f3b-b227-1163b59c7766",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T21:44:23.723384+00:00"
+    }
+  ],
+  "previous_receipt_hash": "1b522484be98218fcb4598669af95df857d7c506b3b472d0d96e0cc435ca52de",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "5b22ca5263307242d78cbfedfe13320dcef2a93274b46dac3efa53aa173c483367d8abcdb80352edcf0f064be1b2294c3728c38008a595eff2fae47c5b4cce0c"
+}

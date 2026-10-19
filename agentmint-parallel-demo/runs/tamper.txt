@@ -1,0 +1,16 @@
+Tamper: copied receipts/b70ab96b-...json (Run A authorize:refund_shipping) to runs/tampered/,
+changed one character in signed field evidence.result.amount: 1299 -> 9299 ($12.99 -> $92.99).
+
+74c74
+<       "amount": 1299,
+---
+>       "amount": 9299,
+
+$ agentmint verify runs/tampered/b70ab96b-da8a-4754-8d5b-d7b8134257ce.json
+✗ Receipt b70ab96b-da8a-4754-8d5b-d7b8134257ce invalid signature mismatch
+exit=1
+
+$ agentmint verify receipts/b70ab96b-da8a-4754-8d5b-d7b8134257ce.json   # original, untouched
+✓ Receipt b70ab96b-da8a-4754-8d5b-d7b8134257ce valid 
+/home/user/agentmint/agentmint-parallel-demo/.agentmint/keys/public_key.pem
+exit=0

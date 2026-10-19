@@ -1,0 +1,7 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+1 tampered amount     : BLOCKED by AgentMint, Stripe not called: authorization receipt invalid: signature mismatch
+2 refused by policy   : not sent to Stripe: refused by policy
+3 forged, own key     : default `agentmint verify` says VALID | gate: BLOCKED by AgentMint, Stripe not called: authorization receipt invalid: signature mismatch
+Stripe Refund.create calls in 1-3: 0
+4 genuine, allowed    : Stripe 403 PermissionError: human approval required (approval request apreq_test_61VbmGwii5xdFfcte16Vbm6XR7SQwNDhWWD7u83IeUEC)
+  refunds on pi_3USOI9RilGVAxTyU08z2KNDu: 1 ($12.99)
