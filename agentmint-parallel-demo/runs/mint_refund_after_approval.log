@@ -1,0 +1,5 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+attempt 1: REFUND EXECUTED via mint.run re_3USP5yRilGVAxTyU16grdQ2H $12.99 (Mint action be15d989, Succeeded)
+attempt 2 (retry): REFUND EXECUTED via mint.run re_3USP5yRilGVAxTyU16grdQ2H $12.99 (Mint action be15d989, Succeeded)
+refunds on pi_3USP5yRilGVAxTyU1O0upOQl: 1 ($12.99)
+RECEIPTS: 489265dc-d9ed-4f16-9662-bf9e850c57ed b61ac87b-e77a-4fb6-8b30-8b5d65553154
