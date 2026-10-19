@@ -54,7 +54,7 @@ cat <<EOF
 
   ${D}mode: $([ "$LIVE" = 1 ] && echo "live Parallel Task runs (used ${USED}/10 so far)" || echo "replaying signed Parallel results")${N}
 EOF
-cap "Authorization comes from cited research, not the model. Each stage emits a signed artifact bound by hash to the one before it."
+cap "Refunds authorized by cited evidence, not by the model."
 endbeat
 
 # 2 ─ the policy
@@ -62,7 +62,7 @@ beat 2 "Policy: a pure function over Parallel's FieldBasis"
 run "sed -n '/^def policy/,/^\$/p' demo.py"
 sed -n '/^def policy/,/^$/p' demo.py | sed 's/^/  /'
 echo; echo "  ${D}refund() only accepts a signed authorization receipt, verified before mint.run is called${N}"
-cap "Deterministic predicate over the disruption FieldBasis. No LLM in the decision path. Any failure signs allowed=false and nothing downstream runs."
+cap "Disruption + confidence ≥ medium + 2 sites. Plain code, no LLM."
 endbeat
 
 # 3 ─ case A
@@ -71,9 +71,9 @@ run "python3 demo.py holds"
 LOG_A=$(mktemp); python3 demo.py holds 2>&1 | tee "$LOG_A" | stream
 AUTH_A=$(awk '/^RECEIPTS:/{print $3}' "$LOG_A")
 if grep -q AUTHORIZED "$LOG_A"; then
-  cap "All predicates pass, so the authorization is signed. mint.run claims the single execution slot and calls Stripe. 403 approval_required means the outcome is Unknown, not Failed."
+  cap "Authorized. mint.run sent it. Stripe holds it, so status is Unknown."
 else
-  cap "Same claim, fewer citation hostnames this run. The predicate fails, allowed=false is signed, and no Mint action is proposed."
+  cap "Not enough evidence this run. Signed refusal. No Mint action."
 fi
 endbeat
 
@@ -90,11 +90,11 @@ else
   echo "  ${R}Case A produced no authorization receipt; skipping.${N}"
 fi
 if grep -q "refused by policy" "${LOG_R:-/dev/null}"; then
-  cap "The retry re-verifies the receipt. It says allowed=false, so refund() returns before mint.run. Zero provider requests."
+  cap "allowed=false, so refund() stops before mint.run."
 elif grep -q ": 1 (\$12.99)" "${LOG_R:-/dev/null}"; then
-  cap "Reconcile matched the refund by metadata.mint_action_id: Unknown → Succeeded. The second retry returned the stored terminal result. One refund, \$12.99."
+  cap "Reconciled: Unknown → Succeeded. One \$12.99 refund."
 else
-  cap "Reconcile found no refund for this mint_action_id yet. Stripe is still holding the request, so the action stays Unknown and nothing has moved."
+  cap "Still held at Stripe. Status stays Unknown."
 fi
 endbeat
 
@@ -102,7 +102,7 @@ endbeat
 beat 5 "Case B: Phoenix, 2024-05-14 (no real disruption)"
 run "python3 demo.py fails"
 python3 demo.py fails 2>&1 | stream
-cap "disruption=false, still cited. The only FedEx notice was a test-environment API interruption. allowed=false is signed, and Stripe sees zero requests."
+cap "disruption=false, still cited. Signed refusal. Zero Stripe requests."
 endbeat
 
 # 6 ─ what got signed
@@ -133,7 +133,7 @@ print(f"idempotency_key   {p['provider_idempotency_key']}")
 print(f"reconciled        {p['reconciliation_required']}   (outcome was Unknown until Stripe approval)")
 PY
 fi
-cap "AgentMint: Ed25519 over canonical JSON, chained by previous_receipt_hash. mint.run: intent hash includes agentmint:<receipt id>:<binding>, and the idempotency key comes from the Mint action."
+cap "AgentMint signs the decision. mint.run signs the refund, bound to it."
 endbeat
 
 # 7 ─ verify
@@ -147,7 +147,7 @@ if [ -n "${MR:-}" ] && [ -f "mint_receipts/$MR.json" ]; then
   echo; run "mint verify --receipt mint_receipts/${MR:0:8}…json --keys-url …/v1/keys"
   ../target/debug/mint verify --receipt "mint_receipts/$MR.json" --keys-url "http://127.0.0.1:${MINT_PORT:-8787}/v1/keys" 2>&1 | paint
 fi
-cap "Offline verification with public keys only: every AgentMint signature, one unbroken hash chain, and the mint.run receipt against its /v1/keys JWK."
+cap "Verified offline with public keys."
 endbeat
 
 # 8 ─ tamper
@@ -166,5 +166,5 @@ python3 -c "import sys, demo; print('attempt:', demo.fmt(demo.refund(sys.argv[1]
   | sed -e "s/BLOCKED by AgentMint/${R}${B}BLOCKED by AgentMint${N}/" -e "s/^/  /"
 rm -rf "$TMP"
 echo; echo "  ${D}github.com/aerf-spec/agentmint-python  ·  docs.parallel.ai${N}"; echo
-cap "One byte changed (1299 → 9299 cents). The signature breaks, and the pinned-key gate rejects it before mint.run or Stripe is called."
+cap "One byte changed. Blocked before mint.run or Stripe."
 [ "${SILENT:-0}" = 1 ] && endbeat
