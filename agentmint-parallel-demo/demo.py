@@ -1,4 +1,4 @@
-import hashlib, json, os, sys, time
+import base64, hashlib, json, os, sys, time, urllib.error, urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 import stripe
@@ -154,23 +154,75 @@ def refund(auth_receipt_path):
     expected = hashlib.sha256(f"{auth['pi']}|{auth['amount']}|{auth['evidence_sha256']}".encode()).hexdigest()
     if expected != auth["binding"]:
         return {"executed": False, "reason": "binding mismatch", **ref}
+    # Gate passed. mint.run owns the Stripe call: one execution winner, durable attempt, reconcile.
+    return {**mint_refund(auth, d["id"]), **ref}
+
+
+# ---- mint.run client (stdlib only) ------------------------------------------------------
+MINT_URL = os.environ.get("MINT_URL", "http://127.0.0.1:8787")
+MINT_ACTOR = {"subject": "user_123", "agentId": "support-agent-7", "issuer": "https://identity.example.com"}
+MINT_TOKEN = "dev." + base64.urlsafe_b64encode(json.dumps(
+    {"tenant_id": "acme", "subject": MINT_ACTOR["subject"], "agent_id": MINT_ACTOR["agentId"],
+     "issuer": MINT_ACTOR["issuer"], "delegated_by": None}, separators=(",", ":")).encode()).decode().rstrip("=")
+MINT_ACTIONS = Path(__file__).resolve().parent / "runs" / "mint_actions.json"   # binding -> Mint action id
+MINT_RECEIPTS = Path(__file__).resolve().parent / "mint_receipts"
+
+
+def mint(method, path, body=None):
+    req = urllib.request.Request(MINT_URL + path, method=method,
+                                 data=None if body is None else json.dumps(body).encode(),
+                                 headers={"Authorization": f"Bearer {MINT_TOKEN}", "Content-Type": "application/json"})
     try:
-        r = stripe.Refund.create(payment_intent=auth["pi"], amount=auth["amount"], idempotency_key=f"agentmint-{auth['binding']}")
-    except stripe.StripeError as e:
-        # Return (not raise) so the blocked attempt is still signed into a receipt.
-        msg = str(getattr(e, "user_message", None) or e)
-        apreq = next((w.strip(".,") for w in msg.split() if w.startswith("apreq_") or "/approval_requests/apreq_" in w), None)
-        return {"executed": False, "reason": "stripe_error", "error_type": type(e).__name__,
-                "http_status": getattr(e, "http_status", None), "request_id": getattr(e, "request_id", None),
-                "approval_request": apreq.rsplit("/", 1)[-1] if apreq else None, "message": msg[:200], **ref}
-    return {"executed": True, "refund_id": r.id, "amount": r.amount, **ref}
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status, json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"{}")
+    except urllib.error.URLError:
+        sys.exit(f"mint.run is not reachable at {MINT_URL}. Start it with ./mint_up.sh")
+
+
+def mint_refund(auth, auth_receipt_id):
+    actions = json.loads(MINT_ACTIONS.read_text()) if MINT_ACTIONS.exists() else {}
+    action_id = actions.get(auth["binding"])
+    if action_id is None:
+        # The AgentMint receipt id and binding ride in supportTicketId, which is part of Mint's intent hash.
+        code, view = mint("POST", "/v1/actions", {
+            "tenantId": "acme", "actor": MINT_ACTOR, "provider": "stripe", "operation": "refund.create",
+            "resource": {"type": "payment_intent", "id": auth["pi"]},
+            "arguments": {"amount": auth["amount"], "currency": "usd", "reason": "requested_by_customer"},
+            "context": {"supportTicketId": f"agentmint:{auth_receipt_id}:{auth['binding']}", "reason": "carrier_disruption"},
+            "ttlSeconds": 3600})
+        if code != 200:
+            return {"executed": False, "reason": f"mint.run propose failed: {view.get('error', view)}"}
+        action_id = view["id"]
+        actions[auth["binding"]] = action_id
+        MINT_ACTIONS.write_text(json.dumps(actions, indent=2))
+    _, view = mint("GET", f"/v1/actions/{action_id}")
+    status = view.get("status")
+    if status == "Authorized":
+        mint("POST", f"/v1/actions/{action_id}/execute", {})
+    elif status in ("Unknown", "Executing"):
+        mint("POST", f"/v1/actions/{action_id}/reconcile")
+    _, view = mint("GET", f"/v1/actions/{action_id}")
+    out = {"executed": view.get("status") == "Succeeded", "mint_action_id": action_id, "mint_status": view.get("status"),
+           "intent_hash": view.get("intentHash"), "refund_id": view.get("providerResourceId"), "amount": auth["amount"]}
+    if view.get("status") in ("Succeeded", "Failed"):
+        code, receipt = mint("GET", f"/v1/actions/{action_id}/receipt")
+        if code == 200:
+            MINT_RECEIPTS.mkdir(exist_ok=True)
+            (MINT_RECEIPTS / f"{action_id}.json").write_text(json.dumps(receipt, indent=2))
+            out["mint_receipt"] = f"mint_receipts/{action_id}.json"
+    return out
 
 
 def fmt(a):
+    st = a.get("mint_status")
     if a.get("executed"):
-        return f"REFUND EXECUTED {a['refund_id']} ${a['amount']/100:.2f}"
-    if a.get("reason") == "stripe_error":
-        return f"Stripe {a['http_status']} {a['error_type']}: human approval required (approval request {a['approval_request']})"
+        return f"REFUND EXECUTED via mint.run {a['refund_id']} ${a['amount']/100:.2f} (Mint action {a['mint_action_id'][:8]}, Succeeded)"
+    if st == "Unknown":
+        return f"mint.run: Unknown, Stripe is holding it (human approval required). Mint action {a['mint_action_id'][:8]} will reconcile"
+    if st:
+        return f"mint.run: {st} (Mint action {a['mint_action_id'][:8]})"
     if a.get("reason") == "refused by policy":
         return "not sent to Stripe: refused by policy"
     return f"BLOCKED by AgentMint, Stripe not called: {a.get('reason')}"

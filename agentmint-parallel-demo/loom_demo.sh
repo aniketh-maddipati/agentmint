@@ -17,6 +17,8 @@ fi
 if [ "$LIVE" = 0 ] && ! grep -lq '"research:carrier_disruption"' receipts/*.json 2>/dev/null; then
   echo "Nothing to replay yet on this machine. Run ./loom_demo.sh once live first."; exit 1
 fi
+./mint_up.sh >/dev/null || exit 1
+trap './mint_up.sh stop >/dev/null' EXIT
 export LOOM=1 PYTHONUNBUFFERED=1
 [ "$LIVE" = 1 ] || export DEMO_REPLAY=1
 TOTAL=8
@@ -46,8 +48,9 @@ cat <<EOF
   Customer:   "My package was late. Please refund shipping."
   Research:   Parallel Task API (was there a carrier disruption?)
   Decision:   a fixed policy over Parallel's citations and confidence
-  Action:     Stripe refund of \$12.99, bound to the exact evidence
-  Record:     every step signed into an AgentMint receipt
+  Gate:       refund() only runs on a valid signed AgentMint authorization
+  Execute:    mint.run makes the \$12.99 Stripe refund (one winner, safe to retry)
+  Record:     AgentMint receipts for every step, a mint.run receipt for the refund
 
   ${D}mode: $([ "$LIVE" = 1 ] && echo "live Parallel Task runs (used ${USED}/10 so far)" || echo "replaying signed Parallel results")${N}
 EOF
@@ -58,7 +61,7 @@ endbeat
 beat 2 "The policy (fixed, in code)"
 run "sed -n '/^def policy/,/^\$/p' demo.py"
 sed -n '/^def policy/,/^$/p' demo.py | sed 's/^/  /'
-echo; echo "  ${D}refund() only accepts a signed authorization receipt, verified before Stripe is called${N}"
+echo; echo "  ${D}refund() only accepts a signed authorization receipt, verified before mint.run is called${N}"
 cap "The whole rule is in code: Parallel must find a disruption, with medium or high confidence, from at least two domains. Otherwise, no refund."
 endbeat
 
@@ -68,7 +71,7 @@ run "python3 demo.py holds"
 LOG_A=$(mktemp); python3 demo.py holds 2>&1 | tee "$LOG_A" | stream
 AUTH_A=$(awk '/^RECEIPTS:/{print $3}' "$LOG_A")
 if grep -q AUTHORIZED "$LOG_A"; then
-  cap "Hurricane Ian claim. Parallel researched it live, found two sources and the policy authorized \$12.99. Stripe holds the refund for a human to approve, and the retry hits the same request."
+  cap "Hurricane Ian claim. Parallel researched it live, found two sources and the policy authorized \$12.99. mint.run made the Stripe call. Stripe is holding it for a human, so Mint marks it Unknown, not failed."
 else
   cap "Hurricane Ian claim. This time Parallel came back with too little evidence, so the policy refused. That is the gate working. No refund."
 fi
@@ -89,9 +92,9 @@ fi
 if grep -q "refused by policy" "${LOG_R:-/dev/null}"; then
   cap "The agent tried again with its signed authorization. AgentMint verified it, but the authorization says refused, so Stripe was never called."
 elif grep -q ": 1 (\$12.99)" "${LOG_R:-/dev/null}"; then
-  cap "A human approved it in Stripe. The agent retried with only its signed authorization receipt, and AgentMint verified it first. One refund, \$12.99. The idempotency key stops a second one."
+  cap "A human approved it in Stripe. The agent retried with only its signed authorization receipt. AgentMint verified it, and mint.run reconciled the same action to Succeeded. One refund, \$12.99."
 else
-  cap "The agent retried with only its signed authorization receipt, and AgentMint verified it first. Stripe is still holding the refund for a human, so nothing has moved yet."
+  cap "The agent retried with only its signed authorization receipt. mint.run reconciled, but Stripe is still holding the refund for a human, so it stays Unknown and nothing has moved."
 fi
 endbeat
 
@@ -118,7 +121,19 @@ print(f"sources           {', '.join(r['why']['independent_sources'])}  (confide
 print(f"previous_receipt  {str(d.get('previous_receipt_hash'))[:32]}…   <- hash chain")
 print(f"signature         {d['signature'][:32]}…   (Ed25519)")
 PY
-cap "The receipt signs the decision, the payment, the amount and a hash of the exact Parallel result. It is hash-chained and signed with Ed25519."
+MR=$(python3 -c "import json,sys; m=json.load(open('runs/mint_actions.json')); b=json.load(open(sys.argv[1]))['evidence']['result']['binding']; print(m.get(b,''))" "receipts/$AUTH_A.json" 2>/dev/null)
+if [ -n "$MR" ] && [ -f "mint_receipts/$MR.json" ]; then
+  echo; echo "  ${B}mint.run receipt for the refund${N}"
+  python3 - "mint_receipts/$MR.json" <<'PY' | sed 's/^/  /'
+import json, sys
+p = json.load(open(sys.argv[1]))["payload"]
+print(f"status            {p['status']}   refund {p.get('provider_resource_id')}")
+print(f"intent_hash       {p['intent_hash'][:40]}…   <- includes the AgentMint receipt id + binding")
+print(f"idempotency_key   {p['provider_idempotency_key']}")
+print(f"reconciled        {p['reconciliation_required']}   (outcome was Unknown until Stripe approval)")
+PY
+fi
+cap "The AgentMint receipt signs the decision and a hash of the exact Parallel result. The mint.run receipt signs the refund, with that receipt bound into its intent hash."
 endbeat
 
 # 7 ─ verify
@@ -128,7 +143,11 @@ agentmint --no-color verify receipts/ 2>&1 | grep -E "valid|invalid" | sed 's/ \
 n=$(agentmint --no-color verify receipts/ 2>&1 | grep -c " valid"); echo "  ${D}… ${n} receipts checked${N}"; echo
 run "python3 verify_chain_ordered.py receipts"
 python3 verify_chain_ordered.py receipts 2>&1 | tail -n 1 | paint
-cap "Anyone with the public key can check every receipt and the chain. No account needed."
+if [ -n "${MR:-}" ] && [ -f "mint_receipts/$MR.json" ]; then
+  echo; run "mint verify --receipt mint_receipts/${MR:0:8}…json --keys-url …/v1/keys"
+  ../target/debug/mint verify --receipt "mint_receipts/$MR.json" --keys-url "http://127.0.0.1:${MINT_PORT:-8787}/v1/keys" 2>&1 | paint
+fi
+cap "Anyone with the public keys can check every AgentMint receipt, the chain, and the mint.run refund receipt."
 endbeat
 
 # 8 ─ tamper

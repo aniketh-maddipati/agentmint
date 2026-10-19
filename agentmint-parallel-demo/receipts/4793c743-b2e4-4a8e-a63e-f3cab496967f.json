@@ -1,0 +1,97 @@
+{
+  "id": "4793c743-b2e4-4a8e-a63e-f3cab496967f",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "research",
+  "action": "research:carrier_disruption",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "7b23b11b30a65bbc4aedb7ba3eeb8ce235661426baf98152b78a9f10c3b3ace07dfd0421f2d5f35aeb3725160d561805d9f00faa18c98979583e858d7a4da084",
+  "evidence": {
+    "args": [
+      {
+        "carrier": "FedEx",
+        "region": "Fort Myers, Florida",
+        "date": "2022-09-28",
+        "text": "My package was days late because of Hurricane Ian. Please refund shipping."
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "run_id": "trun_0525cf6e1b84453e9916d64b67f7c6a1",
+      "query": "Was there a FedEx delivery disruption in Fort Myers, Florida on or around 2022-09-28?",
+      "content": {
+        "disruption": true,
+        "summary": "Yes\u2014during Hurricane Ian, FedEx reported temporary service suspensions and warned of delays and disruptions in affected Florida areas, while the storm hit near Fort Myers on September 28, 2022."
+      },
+      "basis": [
+        {
+          "field": "disruption",
+          "reasoning": "The contemporaneous report says FedEx adjusted operations, temporarily suspended Ground service in 383 Florida cities and paused Express service in 151 cities, and warned of delays and disruptions in impacted areas. The other report places the hurricane\u2019s severe impacts near Fort Myers on September 28, supporting that Fort Myers was within the affected region.",
+          "citations": [
+            {
+              "url": "https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-postal-service/632949",
+              "excerpts": [
+                "FedEx is also adjusting its operations in response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities in which its Ground segment has temporarily suspended service, including in Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. \"Delays and disruptions can be expected for inbound and outbound shipments across portions of impacted areas,\" FedEx said on its website . \"We are committed to providing service to the best of our ability in areas that can be safely accessed.\" A spokesperson for FedEx said in an email that contingency plans are in place to protect employees and facilities and to reduce the storm\u2019s impact on service."
+              ],
+              "title": "UPS, FedEx and USPS suspend some services as Hurricane Ian hits Florida | Supply Chain Dive"
+            },
+            {
+              "url": "https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida",
+              "excerpts": [
+                "A storm surge of up to 12 feet submerged cars, knocked over houses and trapped residents near where the hurricane came ashore west of Fort Myers. Some places remained too dangerous for water rescues, officials said, adding that they were taking down addresses to deploy resources once it was safe."
+              ],
+              "title": "Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New York Times"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "summary",
+          "reasoning": "FedEx\u2019s reported suspensions and disruption warning, read alongside the report of Hurricane Ian\u2019s impacts near Fort Myers on September 28, supports the summary that deliveries in the area were disrupted around the date asked about.",
+          "citations": [
+            {
+              "url": "https://www.supplychaindive.com/news/hurricane-ian-ups-fedex-suspend-florida-postal-service/632949",
+              "excerpts": [
+                "FedEx is also adjusting its operations in response to Hurricane Ian. On Wednesday, the company listed 383 Florida cities in which its Ground segment has temporarily suspended service, including in Tampa, Orlando and Miami. FedEx Express paused service in 151 cities. \"Delays and disruptions can be expected for inbound and outbound shipments across portions of impacted areas,\" FedEx said on its website . \"We are committed to providing service to the best of our ability in areas that can be safely accessed.\" A spokesperson for FedEx said in an email that contingency plans are in place to protect employees and facilities and to reduce the storm\u2019s impact on service."
+              ],
+              "title": "UPS, FedEx and USPS suspend some services as Hurricane Ian hits Florida | Supply Chain Dive"
+            },
+            {
+              "url": "https://www.nytimes.com/live/2022/09/28/us/hurricane-ian-florida",
+              "excerpts": [
+                "A storm surge of up to 12 feet submerged cars, knocked over houses and trapped residents near where the hurricane came ashore west of Fort Myers. Some places remained too dangerous for water rescues, officials said, adding that they were taking down addresses to deploy resources once it was safe."
+              ],
+              "title": "Hurricane Ian: Flooding and Power Outages Grow as Ian Moves Inland - The New York Times"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "latency_s": 87.5,
+      "sha256": "8180f727e7adc618652f7f16aebff4cb50504a4b3102442e78fb82604eed7f58",
+      "replayed_from_receipt": "9f5f71f5-9e4a-488c-9471-bcfed93a312e"
+    }
+  },
+  "observed_at": "2026-10-19T22:31:54.978519+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "f636e4c1-3a9f-4685-b971-d968ac41a89f",
+  "session_trajectory": [
+    {
+      "action": "research:carrier_disruption",
+      "agent": "research",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:31:54.978519+00:00"
+    }
+  ],
+  "previous_receipt_hash": "594d5908e83b6f9a09a6e06848855ffbdc9c0944c203ff437aae25a814380c81",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "0dd7f136c63c0fe3a12582dcc98c0c0ec85b4cb36d8594a658c3687757c56be2f279f4af1dd0cf0123a5de34f45c63063bad9d395c863f45e1960b8dae77c205"
+}

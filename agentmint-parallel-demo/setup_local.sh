@@ -14,6 +14,9 @@ if [ ! -x .venv/bin/python ]; then
   .venv/bin/python -m pip install --quiet parallel-web stripe "git+https://github.com/aerf-spec/agentmint-python"
 fi
 
+command -v cargo >/dev/null || { echo "Rust is required for mint.run. Install it from https://rustup.rs, then re-run."; exit 1; }
+echo "Building mint.run…"; ( cd .. && cargo build -q --bin mint )
+
 if [ ! -f .env ]; then
   read -rsp "PARALLEL_API_KEY: " PK; echo
   read -rsp "STRIPE_KEY (rk_test_… or sk_test_…): " SK; echo

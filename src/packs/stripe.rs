@@ -211,6 +211,17 @@ impl StripePack {
                 redacted_payload: self.redact(&payload),
             });
         }
+        if is_pending_approval(status, &payload) {
+            // Stripe held the refund for a human (restricted key with approvals). It runs later if
+            // approved, so the outcome is Unknown, not Failed. Reconcile finds it by mint_action_id.
+            let approval_request_id = payload
+                .pointer("/error/approval_request_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned();
+            tracing::info!(%approval_request_id, "stripe refund awaiting human approval");
+            return Err(Error::UnknownOutcome);
+        }
         if status.is_client_error() {
             tracing::warn!(status = %status, payload = %self.redact(&payload), "stripe rejected refund");
             return Err(Error::ProviderRejected);
@@ -290,6 +301,13 @@ impl StripePack {
             .cloned()
             .collect())
     }
+}
+
+/// Stripe returns 403 `approval_required` when a restricted key needs human approval.
+/// The request is held, not rejected: it executes later if a human approves it.
+pub fn is_pending_approval(status: reqwest::StatusCode, payload: &Value) -> bool {
+    status == reqwest::StatusCode::FORBIDDEN
+        && payload.pointer("/error/code").and_then(Value::as_str) == Some("approval_required")
 }
 
 pub fn validate_charge_for_refund(charge: &Value, action: &CanonicalAction) -> Result<()> {
@@ -419,6 +437,22 @@ mod tests {
                 support_ticket_id: "ticket_982".into(),
             },
         }
+    }
+
+    #[test]
+    fn approval_required_is_pending_not_rejected() {
+        let held =
+            json!({"error": {"code": "approval_required", "approval_request_id": "apreq_test_1"}});
+        assert!(is_pending_approval(reqwest::StatusCode::FORBIDDEN, &held));
+        let denied = json!({"error": {"code": "secret_key_required"}});
+        assert!(!is_pending_approval(
+            reqwest::StatusCode::FORBIDDEN,
+            &denied
+        ));
+        assert!(!is_pending_approval(
+            reqwest::StatusCode::BAD_REQUEST,
+            &held
+        ));
     }
 
     #[test]
