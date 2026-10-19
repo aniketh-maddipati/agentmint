@@ -12,90 +12,90 @@
 
 ---
 
-## 1 / 8 · Title card
+## 1 / 8 · Architecture
 
-On screen: the five-line overview.
+On screen: the pipeline overview.
 
-- "This is a demo of an agent that can only issue a refund when the evidence holds up."
-- "A customer says their package was late and wants shipping refunded."
-- "The agent researches it with Parallel's Task API and checks the result against a fixed policy. Only then does mint.run make the Stripe refund."
-- "Every step gets signed into an AgentMint receipt, and mint.run signs the refund itself."
+- "This is an evidence-gated side effect. An agent wants to issue a Stripe refund, and the authorization comes from cited research, not from the model's judgment."
+- "There are four stages: a Parallel Task run with a JSON output schema, a deterministic policy over the result's basis, an AgentMint-signed authorization, and mint.run as the execution boundary for the Stripe call."
+- "Each stage emits a signed artifact, and each one is bound by hash to the one before it."
 
 ## 2 / 8 · The policy
 
 On screen: the `policy()` function.
 
-- "This is the whole rule, and it's in code, not in a prompt."
-- "Parallel has to say there was a disruption."
-- "Confidence has to be medium or high."
-- "The citations have to come from at least two different domains."
-- "If any of those fail, there's no refund."
-- "AgentMint signs every step, and the refund function won't run without a valid signed authorization."
+- "The policy is a pure function over Parallel's FieldBasis for the `disruption` field. There's no LLM in the decision path."
+- "Three predicates: `content.disruption` is true, the basis confidence is medium or high, and the citations span at least two distinct hostnames."
+- "If any predicate fails, the authorization is signed with `allowed: false` and nothing downstream runs."
+- "`refund()` doesn't take arguments from the agent. It takes a path to a signed authorization receipt and derives everything from that."
 
 ## 3 / 8 · Case A: Hurricane Ian
 
 On screen: Parallel's live progress (plan, searches, sources considered), then the verdict.
 
-- "First claim: FedEx, Fort Myers, September 28, 2022. That's Hurricane Ian."
-- "We charge a hundred dollars to a test card so there's something to refund."
-- While Parallel runs: "This is Parallel working live. You can see the queries it's running and how many sources it's looking at."
-- If it goes quiet for a minute: "It's reading sources now. That part doesn't send events, so give it a minute." (Or cut this in editing.)
-- On the verdict: "Disruption true, medium confidence, two sources: Supply Chain Dive and the New York Times."
-- "So it's authorized. The binding at the bottom is a hash of the payment, the amount and the exact Parallel result."
-- On the Stripe line: "mint.run made the Stripe call. This key needs a human to approve refunds, so Stripe is holding it. Mint marks that Unknown, not failed, because the money could still move."
-- "The retry hits the same approval request, so it doesn't create a second one."
+- "First claim: FedEx, Fort Myers, September 28th, 2022. That's Hurricane Ian's landfall."
+- "I seed a $100 PaymentIntent on a test card so there's a real charge to refund against."
+- While Parallel runs: "This is the Task run's event stream on the base processor: the plan, the search queries, and source counts as it fans out."
+- If it goes quiet for a minute: "This is the read phase. It doesn't emit progress events, so there's a gap here." (Or cut this in editing.)
+- On the verdict: "`disruption: true`, medium confidence, citations from supplychaindive.com and nytimes.com. All three predicates pass."
+- "The binding is SHA-256 over the PaymentIntent, the amount in cents, and a hash of the run ID, content and basis. Change any of those and the binding changes."
+- On the Stripe line: "mint.run proposed the action, its threshold policy authorized it, and it claimed the single execution slot before calling Stripe."
+- "This restricted key requires human approval, so Stripe returns 403 `approval_required`. Mint records that as Unknown, not Failed, because the refund runs later if a human approves it."
+- "The retry hits the same Mint action and the same idempotency key, so Stripe returns the same held request."
 
-## 4 / 8 · Approve in Stripe, then retry
+## 4 / 8 · Approve in Stripe, then reconcile
 
 On screen: the prompt to approve. Switch to the browser.
 
-- "I'll approve it in Stripe." (Approve it, switch back, press Enter.)
-- "Now the agent retries. All it passes in is the signed authorization receipt. AgentMint checks it, and mint.run reconciles the same action."
-- On `REFUND EXECUTED via mint.run`: "Mint found the refund Stripe ran after my approval and moved it from Unknown to Succeeded. One refund, $12.99."
-- "AgentMint decides whether a refund is allowed. mint.run makes sure it happens once."
+- "I'll approve the held request in the Stripe dashboard." (Approve it, switch back, press Enter.)
+- "The agent retries with the same authorization receipt. AgentMint re-verifies it, and mint.run sees the action is Unknown, so it reconciles instead of executing again."
+- On `REFUND EXECUTED via mint.run`: "Reconcile lists refunds on the PaymentIntent and matches on `metadata.mint_action_id`. It finds the refund Stripe ran after approval and moves the action from Unknown to Succeeded."
+- "The second retry returns the stored terminal result. Stripe isn't called again."
+- "So the split is clean. AgentMint answers whether this effect is allowed. mint.run makes sure it happens at most once, and reconciles when the provider's answer is ambiguous."
 
 ## 5 / 8 · Case B: Phoenix
 
 On screen: Parallel's live progress, then REFUSED.
 
-- "Second claim: FedEx, Phoenix, May 14, 2024. There wasn't a real outage."
-- While it runs: "Same thing, Parallel researching live."
-- On the verdict: "Disruption false. It even found the one FedEx notice from that day, which was about their test API environment, not deliveries."
-- "Refused. Stripe never gets called. Zero refunds."
+- "Second claim: FedEx, Phoenix, May 14th, 2024. There was no carrier outage."
+- While it runs: "Same Task spec, same schema, different input."
+- On the verdict: "`disruption: false`, and the basis still cites its source. The only FedEx notice that day was a test-environment API interruption, and Parallel separated that from delivery operations."
+- "The authorization is signed with `allowed: false`. `refund()` stops at the policy check, so no Mint action is proposed and Stripe sees zero requests."
 
 ## 6 / 8 · What got signed
 
-On screen: the fields of the authorization receipt.
+On screen: the AgentMint authorization receipt fields, then the mint.run receipt.
 
-- "This is the receipt for the Ian authorization."
-- "It holds the decision, the payment, the amount and the evidence hash, which ties it to that exact Parallel result."
-- "Below it is mint.run's receipt for the refund. Its intent hash includes the AgentMint receipt, so the refund is tied to the evidence."
-- "Previous receipt is a hash chain, so you can't drop or reorder a step."
-- "And it's signed with Ed25519."
+- "This is the AgentMint authorization receipt. It's Ed25519 over canonical JSON with sorted keys, and it carries the decision, the PaymentIntent, the amount, the evidence hash and the binding."
+- "`previous_receipt_hash` is a SHA-256 of the prior signed receipt, so research, authorize and each refund attempt form a hash chain. You can't drop or reorder a step without breaking it."
+- "Below it is mint.run's receipt. The intent hash is RFC 8785 canonical JSON plus SHA-256, and it includes `agentmint:<receipt id>:<binding>`. So Mint's signed result is bound to the exact Parallel evidence."
+- "The Stripe idempotency key is `mint:<action id>:refund.create:v1`. It's derived from the Mint action, not supplied by the agent."
+- "`reconciliation_required: true` records that this outcome went through Unknown before it was established."
 
 ## 7 / 8 · Verify
 
-On screen: `agentmint verify` and the chain check.
+On screen: `agentmint verify`, the chain check, then `mint verify`.
 
-- "Anyone with the public key can check these. No account needed."
-- "Every receipt is valid, and the chain is intact."
-- On `valid receipt … status=Succeeded`: "And mint.run's refund receipt checks out against Mint's published key."
+- "Verification needs only the public keys. No account, and no call back to either service's state."
+- "Every AgentMint receipt verifies, and walking `previous_receipt_hash` gives one unbroken chain."
+- On `valid receipt … status=Succeeded`: "And the mint.run receipt verifies against the JWK Mint publishes at `/v1/keys`."
 
 ## 8 / 8 · Tamper
 
 On screen: a diff changing 1299 to 9299, the verify failure, then `refund()` on the tampered copy.
 
-- "Now I'll change one character in a copy of the authorization: $12.99 becomes $92.99."
-- "Verification fails with a signature mismatch."
-- "And this is the part that matters: I hand that receipt to the refund function."
-- On `BLOCKED by AgentMint`: "AgentMint rejects it before mint.run or Stripe is ever called."
-- "The refund function only takes a signed authorization. It checks the signature against our key, checks it was allowed, and recomputes the binding. Only then does it hand off to mint.run."
-- Close: "That's it: Parallel for the research, a policy you can read, AgentMint as the gate, mint.run to execute it once, and Stripe for the money."
+- "I'll change one byte in a copy of the authorization. The signed amount goes from 1299 to 9299 cents."
+- "`agentmint verify` reports a signature mismatch."
+- "Now I pass that file to `refund()`."
+- On `BLOCKED by AgentMint`: "It's rejected before mint.run or Stripe is ever called."
+- "The gate verifies against a pinned project key, not whatever `public_key.pem` sits next to the receipt. So re-signing a forged receipt with your own key doesn't get through either."
+- "Then it checks the action and `allowed`, and recomputes the binding from the signed fields. Only then does it propose to mint.run."
+- Close: "Parallel produces cited evidence, the policy turns it into a signed decision, AgentMint enforces that decision at the call site, and mint.run executes the Stripe side effect at most once, reconciling when the outcome is ambiguous."
 
 ---
 
 ## If something goes sideways
 
-- **Case A comes back REFUSED live** (Parallel sometimes returns one source): "And that's the policy working. One source isn't enough." Then re-record with `--replay` for the refund half.
-- **You don't want to approve live:** `SKIP_APPROVAL=1 ./loom_demo.sh`. Beat 4 will show 0 refunds and the pending approval.
+- **Case A comes back REFUSED live** (Parallel sometimes returns one citation domain): "Same claim, one domain this time. The predicate fails, so the gate holds. That's the behavior you want." Then re-record with `--replay` for the refund half.
+- **You don't want to approve live:** `SKIP_APPROVAL=1 ./loom_demo.sh`. Beat 4 shows the action still Unknown with 0 refunds.
 - **Hands-free run:** `AUTO=1 ./loom_demo.sh` moves forward every 2 seconds. Better for a test than for recording.
