@@ -3,6 +3,7 @@
 ## Before you hit record
 
 - Open the Stripe dashboard (test mode) in a browser tab, ready to approve a refund.
+- Rust must be installed. `setup_local.sh` builds mint.run, and `loom_demo.sh` starts and stops it for you.
 - Make the terminal font big and use a dark theme. Use a window around 110 columns wide.
 - `cd agentmint-parallel-demo`
 - Rehearse with `./loom_demo.sh --replay`. It uses no Parallel runs.
@@ -17,8 +18,8 @@ On screen: the five-line overview.
 
 - "This is a demo of an agent that can only issue a refund when the evidence holds up."
 - "A customer says their package was late and wants shipping refunded."
-- "The agent researches it with Parallel's Task API, checks the result against a fixed policy, and only then calls Stripe."
-- "Every step gets signed into an AgentMint receipt."
+- "The agent researches it with Parallel's Task API and checks the result against a fixed policy. Only then does mint.run make the Stripe refund."
+- "Every step gets signed into an AgentMint receipt, and mint.run signs the refund itself."
 
 ## 2 / 8 · The policy
 
@@ -41,7 +42,7 @@ On screen: Parallel's live progress (plan, searches, sources considered), then t
 - If it goes quiet for a minute: "It's reading sources now. That part doesn't send events, so give it a minute." (Or cut this in editing.)
 - On the verdict: "Disruption true, medium confidence, two sources: Supply Chain Dive and the New York Times."
 - "So it's authorized. The binding at the bottom is a hash of the payment, the amount and the exact Parallel result."
-- On the Stripe line: "Stripe says this key needs a human to approve refunds. That's on purpose. The agent is allowed, and a person still has the last word."
+- On the Stripe line: "mint.run made the Stripe call. This key needs a human to approve refunds, so Stripe is holding it. Mint marks that Unknown, not failed, because the money could still move."
 - "The retry hits the same approval request, so it doesn't create a second one."
 
 ## 4 / 8 · Approve in Stripe, then retry
@@ -49,9 +50,9 @@ On screen: Parallel's live progress (plan, searches, sources considered), then t
 On screen: the prompt to approve. Switch to the browser.
 
 - "I'll approve it in Stripe." (Approve it, switch back, press Enter.)
-- "Now the agent retries. All it passes in is the signed authorization receipt, and AgentMint checks it before Stripe is called."
-- On `refunds: 1 ($12.99)`: "One refund, $12.99. The retries use the same idempotency key, so it can't happen twice."
-- "To be clear, the once-only part comes from Stripe's idempotency key, not from AgentMint. AgentMint is the record."
+- "Now the agent retries. All it passes in is the signed authorization receipt. AgentMint checks it, and mint.run reconciles the same action."
+- On `REFUND EXECUTED via mint.run`: "Mint found the refund Stripe ran after my approval and moved it from Unknown to Succeeded. One refund, $12.99."
+- "AgentMint decides whether a refund is allowed. mint.run makes sure it happens once."
 
 ## 5 / 8 · Case B: Phoenix
 
@@ -68,7 +69,7 @@ On screen: the fields of the authorization receipt.
 
 - "This is the receipt for the Ian authorization."
 - "It holds the decision, the payment, the amount and the evidence hash, which ties it to that exact Parallel result."
-- "The binding is the same value used as the Stripe idempotency key."
+- "Below it is mint.run's receipt for the refund. Its intent hash includes the AgentMint receipt, so the refund is tied to the evidence."
 - "Previous receipt is a hash chain, so you can't drop or reorder a step."
 - "And it's signed with Ed25519."
 
@@ -78,6 +79,7 @@ On screen: `agentmint verify` and the chain check.
 
 - "Anyone with the public key can check these. No account needed."
 - "Every receipt is valid, and the chain is intact."
+- On `valid receipt … status=Succeeded`: "And mint.run's refund receipt checks out against Mint's published key."
 
 ## 8 / 8 · Tamper
 
@@ -86,9 +88,9 @@ On screen: a diff changing 1299 to 9299, the verify failure, then `refund()` on 
 - "Now I'll change one character in a copy of the authorization: $12.99 becomes $92.99."
 - "Verification fails with a signature mismatch."
 - "And this is the part that matters: I hand that receipt to the refund function."
-- On `BLOCKED by AgentMint`: "AgentMint rejects it before Stripe is ever called."
-- "The refund function only takes a signed authorization. It checks the signature against our key, checks it was allowed, and recomputes the binding. Only then does it touch Stripe."
-- Close: "That's it: Parallel for the research, a policy you can read, AgentMint as the gate and the proof, and Stripe for the money."
+- On `BLOCKED by AgentMint`: "AgentMint rejects it before mint.run or Stripe is ever called."
+- "The refund function only takes a signed authorization. It checks the signature against our key, checks it was allowed, and recomputes the binding. Only then does it hand off to mint.run."
+- Close: "That's it: Parallel for the research, a policy you can read, AgentMint as the gate, mint.run to execute it once, and Stripe for the money."
 
 ---
 

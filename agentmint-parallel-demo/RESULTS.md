@@ -26,6 +26,13 @@ Refunds on the payment: **1 ($12.99)**. Five refund attempts in total (three bef
 **Run B.** Parallel answered "no documented disruption". The only May 14 FedEx notice was a test-environment API interruption.
 That "no" answer was still cited (developer.fedex.com). Both refund attempts returned `refused by policy`.
 
+**Run A through mint.run** (replayed Parallel result `trun_…e9916d64`, so no new Task run). AgentMint authorized $12.99
+on `pi_3USP5yRilGVAxTyU1O0upOQl` and the gate passed. mint.run proposed action `be15d989…`, which was Authorized by Mint's
+threshold policy, and executed it. Stripe returned 403 `approval_required`, so Mint marked it **Unknown** (reconciliation required).
+After human approval in Stripe, the retry reconciled the same action, found `re_3USP5yRilGVAxTyU16grdQ2H` by
+`metadata.mint_action_id`, and moved **Unknown → Succeeded**. A second retry returned the stored result without calling Stripe.
+Refunds on the payment: **1 ($12.99)**. `mint verify` on the receipt: valid. One changed character in a copy: `invalid signature`.
+
 ## Verification
 
 | Check | Result |

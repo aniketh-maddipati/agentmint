@@ -1,0 +1,47 @@
+{
+  "id": "b61ac87b-e77a-4fb6-8b30-8b5d65553154",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "7ed99a61ade3b61a0292b41d8d1b0301c24d5d338841b259bc9eb93ee896883a2a9ffc7d89b6280ed52f7bce33a21c9fdbe756b9e05df5d547f59e0ea0876896",
+  "evidence": {
+    "args": [
+      "receipts/537c759e-5ace-4114-9d2f-6fa403ebd3d5.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": true,
+      "mint_action_id": "be15d989-f8a1-4b64-9072-39de1ef1263c",
+      "mint_status": "Succeeded",
+      "intent_hash": "sha256:50e1ff5d1c3c4faa9af313504bd9d0651fe13c14e01e7dbe504fa5b70ff40b32",
+      "refund_id": "re_3USP5yRilGVAxTyU16grdQ2H",
+      "amount": 1299,
+      "mint_receipt": "mint_receipts/be15d989-f8a1-4b64-9072-39de1ef1263c.json",
+      "authorization_receipt": "537c759e-5ace-4114-9d2f-6fa403ebd3d5"
+    }
+  },
+  "observed_at": "2026-10-19T22:46:00.330521+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "9a9df3b5-46b2-40d8-bcd3-e4c0dc5e71bf",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-19T22:46:00.330521+00:00"
+    }
+  ],
+  "previous_receipt_hash": "7e09e816d3a7561192d4bb23f17cd70c3946418b8b9045273bcb795f477f22ac",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "72082365c5f56e88f13bfeeb252ecd338db43021c89251a2b5b3eecdddee5a15c347af8d5b5ddbabc180241b5b15119f9ed25b38ff970b390d89d67184c0ee01"
+}

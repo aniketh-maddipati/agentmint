@@ -2,9 +2,9 @@
 
 An agent may refund a $12.99 shipping fee only when Parallel Task API research finds a
 carrier disruption **and** the cited evidence meets a fixed policy. Every step (research,
-authorization, each refund attempt) is signed into an AgentMint receipt. The refund is
-bound to the exact payment, amount and Parallel result, and is sent with an idempotency
-key derived from that binding.
+authorization, each refund attempt) is signed into an AgentMint receipt. The refund itself is
+executed by **mint.run** (the Rust server in this repo), with the AgentMint receipt ID and binding
+inside Mint's intent hash. Mint signs its own receipt for the refund.
 
 ## What it proves
 
@@ -18,20 +18,34 @@ key derived from that binding.
 4. **AgentMint is the gate.** `refund()` takes only the path to a signed authorization receipt.
    It verifies the signature against the project's pinned public key (`.agentmint/keys/public_key.pem`,
    not a key file next to the receipt), checks the action and `allowed`, and recomputes the binding.
-   Only then does it call Stripe. A tampered or re-signed receipt is blocked before Stripe (`runs/gate_test.txt`).
-5. **Retry safety.** A retried refund reuses `idempotency_key = agentmint-<binding>`.
+   Only then does it hand the refund to mint.run. A tampered or re-signed receipt is blocked before
+   anything reaches Stripe (`runs/gate_test.txt`).
+5. **mint.run executes it once.** `refund()` proposes a Stripe `refund.create` to a local mint.run server
+   (`supportTicketId = agentmint:<receipt id>:<binding>`, part of the intent hash) and executes it. Mint allows one
+   execution winner, records the attempt before calling Stripe, and uses `mint:<action id>:refund.create:v1` as the
+   Stripe idempotency key. Each binding maps to one Mint action (`runs/mint_actions.json`), so a retry re-executes
+   or reconciles the same action instead of proposing a new one.
 
-## At-most-once comes from Stripe, not AgentMint
+## Who guarantees what
 
-The at-most-once guarantee comes from **Stripe idempotency keyed on the binding**, not from
-Mint's execution boundary. AgentMint decides *whether* `refund()` may call Stripe (a valid, signed, allowed
-authorization). It does not track receipt use: the same authorization can be presented again, and Stripe's idempotency
-key is what stops a second refund. Single-use receipts (`JtiStore`), expiry and timestamping are not wired in.
-If a decorated function raises, no receipt is written, so `refund()` returns Stripe errors instead of raising.
+- **AgentMint (Python):** whether the refund may happen at all. It checks that the authorization is signed,
+  allowed and bound to the exact Parallel evidence. It does not track receipt use.
+- **mint.run (Rust):** that it happens at most once. Mint picks one execution winner, keeps a durable attempt,
+  sets the provider idempotency key and reconciles unknown outcomes. It also signs a receipt for the result.
+- **Stripe:** the money, plus a human approval step on this restricted key.
+
+**Human approval at Stripe.** This `rk_test_` key makes Stripe hold refunds for approval with a 403 `approval_required`.
+mint.run (`src/packs/stripe.rs`) now treats that as **Unknown**, not Failed, because Stripe runs the refund if a human
+approves it. After approval, `reconcile` finds the refund by its `metadata.mint_action_id` and the action becomes
+**Succeeded** with a signed receipt (`runs/mint_refund_after_approval.log`, `mint_receipts/`).
+
+If a decorated function raises, no AgentMint receipt is written, so `refund()` returns errors instead of raising.
 
 ## How to run
 
 ```bash
+./setup_local.sh                         # venv, deps, builds mint.run (needs Rust), asks for keys
+./mint_up.sh                             # local mint.run server (provider=stripe, test mode)
 python3 -m pip install --break-system-packages parallel-web stripe \
   "git+https://github.com/aerf-spec/agentmint-python"   # PyPI agentmint 0.1.0 lacks @notarise and the CLI
 agentmint init -y .                      # keystore + ./receipts sink, timestamper = none
@@ -59,6 +73,8 @@ Press Enter to move to each beat. Say-this-now notes for each beat are in `LOOM_
 
 - `demo.py`: the demo. AgentMint-only lines are tagged `# [agentmint]`. The gate in `refund()` adds about 10 more.
 - `loom_demo.sh`, `LOOM_SCRIPT.md`: Loom walkthrough and talk track.
+- `mint_up.sh`: starts and stops the local mint.run server (`.mint/` holds its key and DB, gitignored).
+- `mint_receipts/`: mint.run's signed refund receipts, plus its public key (`keys.json`).
 - `retry_refund.py`: verifies an authorization receipt, then retries its refund twice.
 - `verify_chain_ordered.py`: works around `agentmint chain verify` sorting receipts by filename.
 - `bench_overhead.py`: overhead benchmark.

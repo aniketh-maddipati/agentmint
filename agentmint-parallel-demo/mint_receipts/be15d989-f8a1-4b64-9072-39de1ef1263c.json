@@ -1,0 +1,33 @@
+{
+  "format_version": "mint-signed-v1",
+  "kid": "mint-demo-1",
+  "payload": {
+    "format_version": "mint-receipt-v1",
+    "action_id": "be15d989-f8a1-4b64-9072-39de1ef1263c",
+    "tenant_id": "acme",
+    "actor": {
+      "subject": "user_123",
+      "agent_id": "support-agent-7",
+      "delegated_by": null,
+      "issuer": "https://identity.example.com"
+    },
+    "intent_hash": "sha256:50e1ff5d1c3c4faa9af313504bd9d0651fe13c14e01e7dbe504fa5b70ff40b32",
+    "policy": {
+      "effect": "automatic",
+      "policy_version": "stripe-refund-thresholds-v1",
+      "reason": "refund <= 5000 cents automatic"
+    },
+    "approval": null,
+    "attempt_id": "87033c3b-ce45-42a2-a58e-651205b2ed01",
+    "provider": "stripe",
+    "operation": "refund.create",
+    "provider_idempotency_key": "mint:be15d989-f8a1-4b64-9072-39de1ef1263c:refund.create:v1",
+    "provider_resource_id": "re_3USP5yRilGVAxTyU16grdQ2H",
+    "status": "Succeeded",
+    "started_at": "2026-10-19T22:31:55.751131950Z",
+    "completed_at": "2026-10-19T22:46:00.276272307Z",
+    "reconciliation_required": true,
+    "kid": "mint-demo-1"
+  },
+  "signature": "1dBoUHuSr8dQixf0QebE0kiSpUJ6ZbMZURwOe3_SUmUYu2rjWCzd6G79s4lkwlIWI-T2kkHlOwoKOZrnpwohAg"
+}
