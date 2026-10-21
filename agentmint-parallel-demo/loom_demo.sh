@@ -43,14 +43,12 @@ endbeat() { if [ "${SILENT:-0}" = 1 ] && [ -n "$CAP" ]; then
             CAP=""; pause; }
 
 # 1 ─ title
-beat 1 "Evidence-gated side effects: Parallel → policy → AgentMint → mint.run → Stripe"
+beat 1 "Evidence-gated refunds"
 cat <<EOF
-  1. Research   Parallel Task API (base), JSON output schema, per-field basis: citations + confidence
-  2. Decide     pure policy over FieldBasis: disruption ∧ confidence∈{medium,high} ∧ ≥2 hostnames
-  3. Authorize  AgentMint receipt: Ed25519, hash-chained, binding = H(pi | amount | H(run_id, content, basis))
-  4. Gate       refund(receipt_path): pinned-key verify, allowed, recompute binding, else no call
-  5. Execute    mint.run: intent hash (RFC 8785) includes the AgentMint receipt; one winner; reconcile
-  6. Provider   Stripe test mode, \$12.99 partial refund on a \$100 PaymentIntent
+  Parallel    finds and cites the evidence
+  Policy      decides in plain code
+  AgentMint   signs it and gates the refund
+  mint.run    runs the Stripe refund once
 
   ${D}mode: $([ "$LIVE" = 1 ] && echo "live Parallel Task runs (used ${USED}/10 so far)" || echo "replaying signed Parallel results")${N}
 EOF
