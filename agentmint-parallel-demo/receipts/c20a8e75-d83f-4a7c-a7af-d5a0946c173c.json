@@ -1,0 +1,50 @@
+{
+  "id": "c20a8e75-d83f-4a7c-a7af-d5a0946c173c",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "refund",
+  "action": "stripe:partial_refund",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "e26ceb342aefe12715dfbd7ed71ac75e7487ff411d5a95f80655cfbba2395f65f08815d69ce556607213a573fb1204103f673759c52ffc6e8f56488ad3d1fb28",
+  "evidence": {
+    "args": [
+      "receipts/020ab7c8-bbc1-4063-83e5-ceb207f9b8e0.json"
+    ],
+    "kwargs": {},
+    "result": {
+      "executed": false,
+      "reason": "refused by policy",
+      "why": {
+        "disruption": true,
+        "confidence": "medium",
+        "independent_sources": [
+          "logisticsmgmt.com"
+        ],
+        "summary": "Yes\u2014FedEx reported a national service disruption affecting its Memphis hub, and shipments due Monday, January 26, could be delayed."
+      },
+      "authorization_receipt": "020ab7c8-bbc1-4063-83e5-ceb207f9b8e0"
+    }
+  },
+  "observed_at": "2026-10-21T19:33:31.390567+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "8ea1a18b-9407-4b67-82d9-2f5e444d4653",
+  "session_trajectory": [
+    {
+      "action": "stripe:partial_refund",
+      "agent": "refund",
+      "in_policy": true,
+      "observed_at": "2026-10-21T19:33:31.390567+00:00"
+    }
+  ],
+  "previous_receipt_hash": "b9670cfb479796de13abf082dcf6a9ebf14f8ca730d9b9765c41fdb96c7a587f",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "a06d9c10838be0cb2d53aee61c489fd44d4f8196e233e44fc8823b9fd9361672c3d27ca8f6c1e0b69393762bc2c67c9964723361a2a558aa1e1adb234d89fe02"
+}

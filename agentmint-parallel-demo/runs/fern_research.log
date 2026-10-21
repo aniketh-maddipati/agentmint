@@ -1,0 +1,27 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+TASK RUNS USED: 6/10
+parallel task trun_0525cf6e1b84453eadc3f87d9fe78dd7 started (processor=base)
+  parallel     7s | exec_status Starting research
+  parallel     7s | tool_call   Listing tools for MCP server every.
+  parallel     7s | search      Objective: Find reliable documentation of a FedEx delivery service disruption affecting Memphis, Tennessee on 
+  parallel     7s | search      Query: FedEx service disruption Memphis January 26 2026 deliveries
+  parallel     7s | search      Query: FedEx service alerts Memphis Jan 26 2026 weather
+  parallel     7s | 43 sources considered, 0 read
+  parallel    11s | search      Objective: Identify the dates and affected locations for the FedEx winter weather disruption reported around J
+  parallel    11s | search      Query: FedEx national service disruption January 26 2026 Memphis winter storm
+  parallel    11s | search      Query: FedEx Memphis hub delays January 27 2026 winter storm
+  parallel    11s | extract     Extract: https://www.uml.edu/myuml/submissions/2026/2026-01-28-09-57-29-fedex-service-alerts-national-serv.asp
+  parallel    17s | read uml.edu
+  parallel    17s | 91 sources considered, 1 read
+  parallel    35s | run completed
+latency 35.4 run trun_0525cf6e1b84453eadc3f87d9fe78dd7
+POLICY FAIL {
+ "disruption": true,
+ "confidence": "medium",
+ "independent_sources": [
+  "logisticsmgmt.com"
+ ],
+ "summary": "Yes\u2014FedEx reported a national service disruption affecting its Memphis hub, and shipments due Monday, January 26, could be delayed."
+}
+ - logisticsmgmt.com | Carriers issue winter weather service alerts  - Logistics Management | Our top priorities are the safety and well-being of our team members, as well as providing our customers with the highest level of service possible. A
+receipt c22f5192-1eab-4507-b45b-df419c08e646

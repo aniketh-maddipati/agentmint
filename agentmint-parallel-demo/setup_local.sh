@@ -7,11 +7,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [ ! -x .venv/bin/python ]; then
+if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c "import anthropic, mcp" 2>/dev/null; then
   echo "Creating .venv and installing dependencies…"
-  python3 -m venv .venv
+  [ -x .venv/bin/python ] || python3 -m venv .venv
   .venv/bin/python -m pip install --quiet --upgrade pip
-  .venv/bin/python -m pip install --quiet parallel-web stripe "git+https://github.com/aerf-spec/agentmint-python"
+  .venv/bin/python -m pip install --quiet parallel-web stripe anthropic mcp "git+https://github.com/aerf-spec/agentmint-python"
 fi
 
 command -v cargo >/dev/null || { echo "Rust is required for mint.run. Install it from https://rustup.rs, then re-run."; exit 1; }
@@ -23,6 +23,10 @@ if [ ! -f .env ]; then
   case "$SK" in rk_test_*|sk_test_*) ;; *) echo "Stripe key must be a test-mode key (rk_test_ or sk_test_)."; exit 1;; esac
   ( umask 077; printf 'PARALLEL_API_KEY=%s\nSTRIPE_KEY=%s\n' "$PK" "$SK" > .env )
   echo "Saved keys to .env (gitignored)."
+fi
+if ! grep -q '^ANTHROPIC_API_KEY=' .env && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  read -rsp "ANTHROPIC_API_KEY (for the Claude agent): " AK; echo
+  ( umask 077; printf 'ANTHROPIC_API_KEY=%s\n' "$AK" >> .env ); echo "Added ANTHROPIC_API_KEY to .env."
 fi
 
 if [ ! -f .agentmint/keys/signing_key.bin ]; then

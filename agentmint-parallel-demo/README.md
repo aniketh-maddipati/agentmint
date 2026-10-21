@@ -26,6 +26,19 @@ inside Mint's intent hash. Mint signs its own receipt for the refund.
    Stripe idempotency key. Each binding maps to one Mint action (`runs/mint_actions.json`), so a retry re-executes
    or reconciles the same action instead of proposing a new one.
 
+## The agent
+
+`agent.py` is a minimal Claude support agent (`claude-opus-5-5`, low effort, manual tool loop). It reads one customer
+message and talks to `refund_desk_mcp.py`, a stdio MCP server with two tools:
+
+- `check_delivery_disruption(order_id)`: the order's carrier, city and date go to a Parallel Task (base, JSON schema).
+  It returns the verdict, confidence and cited sites, and signs an AgentMint research receipt.
+- `refund_shipping(order_id)`: policy, then a signed AgentMint authorization, then the gate, then mint.run, then Stripe.
+  The amount ($12.99) is fixed in code.
+
+The model only supplies an order ID, so it can't change what gets researched or how much is refunded.
+It needs `ANTHROPIC_API_KEY` in `.env`.
+
 ## Who guarantees what
 
 - **AgentMint (Python):** whether the refund may happen at all. It checks that the authorization is signed,
@@ -72,7 +85,8 @@ Press Enter to move to each beat. Say-this-now notes for each beat are in `LOOM_
 ## Files
 
 - `demo.py`: the demo. AgentMint-only lines are tagged `# [agentmint]`. The gate in `refund()` adds about 10 more.
-- `loom_demo.sh`, `LOOM_SCRIPT.md`: Loom walkthrough and talk track.
+- `agent.py`, `refund_desk_mcp.py`: the Claude agent and its MCP server.
+- `loom_demo.sh`, `LOOM_SCRIPT.md`: Loom walkthrough (one scenario, 5 beats) and talk track.
 - `mint_up.sh`: starts and stops the local mint.run server (`.mint/` holds its key and DB, gitignored).
 - `mint_receipts/`: mint.run's signed refund receipts, plus its public key (`keys.json`).
 - `retry_refund.py`: verifies an authorization receipt, then retries its refund twice.

@@ -1,0 +1,94 @@
+{
+  "id": "a5889e6d-8a08-423b-ae45-9424a89f8ba3",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "authorize",
+  "action": "authorize:refund_shipping",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "c611a3e712d8aca6768e3a07d88d8782efae9e043cef617eb21074403cc5d156beadca9decc248b8f80c141910800cd76444250325c64e6e0cd8e627381e4013",
+  "evidence": {
+    "args": [
+      "pi_3UT5E2RilGVAxTyU0ISJuFjn",
+      1299,
+      {
+        "run_id": "trun_0525cf6e1b84453eadc3f87d9fe78dd7",
+        "query": "Was there a FedEx delivery disruption in Memphis, Tennessee on or around 2026-01-26?",
+        "content": {
+          "disruption": true,
+          "summary": "Yes\u2014FedEx reported a national service disruption affecting its Memphis hub, and shipments due Monday, January 26, could be delayed."
+        },
+        "basis": [
+          {
+            "field": "disruption",
+            "reasoning": "The report quotes FedEx saying contingency plans were active at its Memphis hub and that a national service disruption could delay shipments committed for Monday, January 26.",
+            "citations": [
+              {
+                "url": "https://www.logisticsmgmt.com/article/carriers_issue_winter_weather_service_alerts",
+                "excerpts": [
+                  "Our top priorities are the safety and well-being of our team members, as well as providing our customers with the highest level of service possible. A National Service Disruption has been issued, and shipments with a delivery commitment of Monday, January 26 may be delayed, with potential delays continuing throughout the week."
+                ],
+                "title": "Carriers issue winter weather service alerts  - Logistics Management"
+              }
+            ],
+            "confidence": "medium"
+          },
+          {
+            "field": "summary",
+            "reasoning": "The cited passage identifies the Memphis hub as affected and states that shipments with a January 26 delivery commitment may be delayed.",
+            "citations": [
+              {
+                "url": "https://www.logisticsmgmt.com/article/carriers_issue_winter_weather_service_alerts",
+                "excerpts": [
+                  "Our top priorities are the safety and well-being of our team members, as well as providing our customers with the highest level of service possible. A National Service Disruption has been issued, and shipments with a delivery commitment of Monday, January 26 may be delayed, with potential delays continuing throughout the week."
+                ],
+                "title": "Carriers issue winter weather service alerts  - Logistics Management"
+              }
+            ],
+            "confidence": "medium"
+          }
+        ],
+        "latency_s": 35.4,
+        "sha256": "767362df3af8ea663990c835ad62ed4a8bebfd3202e964f77cf7c837242e6422",
+        "replayed_from_receipt": "c22f5192-1eab-4507-b45b-df419c08e646"
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "allowed": false,
+      "binding": "f3c2d15b6cd20ec688ffc42e9704681b3cc934bae9dc1381b09efcb24b23eed6",
+      "pi": "pi_3UT5E2RilGVAxTyU0ISJuFjn",
+      "amount": 1299,
+      "evidence_sha256": "767362df3af8ea663990c835ad62ed4a8bebfd3202e964f77cf7c837242e6422",
+      "why": {
+        "disruption": true,
+        "confidence": "medium",
+        "independent_sources": [
+          "logisticsmgmt.com"
+        ],
+        "summary": "Yes\u2014FedEx reported a national service disruption affecting its Memphis hub, and shipments due Monday, January 26, could be delayed."
+      }
+    }
+  },
+  "observed_at": "2026-10-21T19:31:03.328131+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "67dab66d-3073-482a-88f9-1e90fa71c7f4",
+  "session_trajectory": [
+    {
+      "action": "authorize:refund_shipping",
+      "agent": "authorize",
+      "in_policy": true,
+      "observed_at": "2026-10-21T19:31:03.328131+00:00"
+    }
+  ],
+  "previous_receipt_hash": "b8f9db85278fb8eb8e4746da43814efc254ff9cb39c343f733d44b82a695b5ff",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "c17fc742d8163357df3e711f2dd4b8147a48e85912986cb0710ac8b061c072699eee46a7af2f2e81d74dbf4e41a728ac57a235e4351c85dbaf114d45c852970a"
+}

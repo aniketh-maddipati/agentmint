@@ -1,0 +1,82 @@
+{
+  "id": "10c49b5d-031e-48ce-9466-fc13ae1b28de",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "research",
+  "action": "research:carrier_disruption",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "a08e9e717c33b6d336db1550516577cbfaff8e9c7172fa3dad420b1622101f89fda5ed6dc37570514501862eb7f62ff02e55239a4429f539191696e27a33c4b6",
+  "evidence": {
+    "args": [
+      {
+        "carrier": "FedEx",
+        "region": "Memphis, Tennessee",
+        "date": "2026-01-26"
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "run_id": "trun_0525cf6e1b84453eadc3f87d9fe78dd7",
+      "query": "Was there a FedEx delivery disruption in Memphis, Tennessee on or around 2026-01-26?",
+      "content": {
+        "disruption": true,
+        "summary": "Yes\u2014FedEx reported a national service disruption affecting its Memphis hub, and shipments due Monday, January 26, could be delayed."
+      },
+      "basis": [
+        {
+          "field": "disruption",
+          "reasoning": "The report quotes FedEx saying contingency plans were active at its Memphis hub and that a national service disruption could delay shipments committed for Monday, January 26.",
+          "citations": [
+            {
+              "url": "https://www.logisticsmgmt.com/article/carriers_issue_winter_weather_service_alerts",
+              "excerpts": [
+                "Our top priorities are the safety and well-being of our team members, as well as providing our customers with the highest level of service possible. A National Service Disruption has been issued, and shipments with a delivery commitment of Monday, January 26 may be delayed, with potential delays continuing throughout the week."
+              ],
+              "title": "Carriers issue winter weather service alerts  - Logistics Management"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "summary",
+          "reasoning": "The cited passage identifies the Memphis hub as affected and states that shipments with a January 26 delivery commitment may be delayed.",
+          "citations": [
+            {
+              "url": "https://www.logisticsmgmt.com/article/carriers_issue_winter_weather_service_alerts",
+              "excerpts": [
+                "Our top priorities are the safety and well-being of our team members, as well as providing our customers with the highest level of service possible. A National Service Disruption has been issued, and shipments with a delivery commitment of Monday, January 26 may be delayed, with potential delays continuing throughout the week."
+              ],
+              "title": "Carriers issue winter weather service alerts  - Logistics Management"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "latency_s": 35.4,
+      "sha256": "767362df3af8ea663990c835ad62ed4a8bebfd3202e964f77cf7c837242e6422",
+      "replayed_from_receipt": "c22f5192-1eab-4507-b45b-df419c08e646"
+    }
+  },
+  "observed_at": "2026-10-21T19:31:03.217368+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "b01a385f-4342-4d59-9d5d-f8fa4a6ec318",
+  "session_trajectory": [
+    {
+      "action": "research:carrier_disruption",
+      "agent": "research",
+      "in_policy": true,
+      "observed_at": "2026-10-21T19:31:03.217368+00:00"
+    }
+  ],
+  "previous_receipt_hash": "892f04d7ffd6aadaa6c6f606073c3c83ada8a917cc17ea2dc8b2d5a41592db7f",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "c60ab5ea6dd773284a77dda226f17afddcf762e5444fab7dcab469ae40ada4f43b751b50a953b3462cefa9eb120b8deb429bfd75a5fa4206480f90cc83e6190c"
+}
