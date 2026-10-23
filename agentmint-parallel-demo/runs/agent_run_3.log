@@ -1,0 +1,9 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+customer: Hi, my order #1042 was supposed to arrive in Memphis on Monday, January 26th, and it showed up days late because of the snowstorm. Can I get the $12.99 shipping back?
+agent → tool: check_delivery_disruption({"order_id": "1042"})
+REPLAY: Parallel result trun_0525cf6e1b84453e890048c588200236 from signed receipt 7648ac96 (no new Task run)
+tool → agent: Parallel run trun_0525cf6e1b84453e890048c588200236: disruption=true confidence=medium sites=dailymemphian.com, supplychaindive.com
+agent → tool: refund_shipping({"order_id": "1042"})
+tool → agent: AUTHORIZED $12.99 → mint.run: Unknown, Stripe is holding it (human approval required). Mint action e763f0ad will reconcile
+RECEIPTS: _ e824e776-f2aa-4f6c-8fff-74c13295c11b
+agent: (stand-in reply)
