@@ -109,7 +109,9 @@ def replay_research(claim):
 def research(claim):
     if os.environ.get("DEMO_REPLAY") == "1":
         return replay_research(claim)
-    q = f"Was there a {claim['carrier']} delivery disruption in {claim['region']} on or around {claim['date']}?"
+    # Asks for corroboration explicitly; the policy (2+ distinct sites) is unchanged.
+    q = (f"Was there a {claim['carrier']} delivery disruption in {claim['region']} on or around {claim['date']}? "
+         "Cite independent sources (different publishers) that document it.")
     take_task_budget()
     t0 = time.time()
     run = client.task_run.create(input=q, task_spec={"output_schema": SCHEMA}, processor="base", enable_events=True)

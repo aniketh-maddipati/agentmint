@@ -33,6 +33,15 @@ After human approval in Stripe, the retry reconciled the same action, found `re_
 `metadata.mint_action_id`, and moved **Unknown → Succeeded**. A second retry returned the stored result without calling Stripe.
 Refunds on the payment: **1 ($12.99)**. `mint verify` on the receipt: valid. One changed character in a copy: `invalid signature`.
 
+**Agent scenario: Winter Storm Fern** (FedEx, Memphis TN, 2026-01-26), run through the refund-desk MCP tool.
+
+| Parallel run | Question | disruption | confidence | cited sites | Policy |
+|---|---|---|---|---|---|
+| `trun_…d9fe78dd7` | "Was there a … disruption …?" | true | medium | logisticsmgmt.com | REFUSED (1 site) |
+| `trun_…c588200236` | same, plus "Cite independent sources (different publishers) that document it." | true | medium | dailymemphian.com, supplychaindive.com | **AUTHORIZED** |
+
+The policy was not changed. Only the question asks for corroboration. That's one run each, so it's a single data point, not a measured effect.
+
 ## Verification
 
 | Check | Result |

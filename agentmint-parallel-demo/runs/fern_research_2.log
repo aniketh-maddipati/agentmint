@@ -1,0 +1,32 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+TASK RUNS USED: 7/10
+parallel task trun_0525cf6e1b84453e890048c588200236 started (processor=base)
+  parallel     7s | exec_status Starting research
+  parallel     7s | tool_call   Listing tools for MCP server every.
+  parallel     7s | 0 sources considered, 0 read
+  parallel    13s | search      Objective: Find reliable reports of FedEx delivery service disruption affecting Memphis, Tennessee around Janu
+  parallel    13s | search      Query: FedEx delivery delays Memphis January 26 2026
+  parallel    13s | search      Query: Memphis Tennessee FedEx service disruption January 2026 winter storm
+  parallel    17s | 63 sources considered, 0 read
+  parallel    23s | extract     Extract: https://www.tennessean.com/story/news/local/2026/01/26/mail-delays-in-tennessee-today/88363224007
+  parallel    23s | extract     Extract: https://dailymemphian.com/article/59334/memphis-airport-fedex-report-delays-service
+  parallel    23s | extract     Extract: https://www.supplychaindive.com/news/fedex-ups-postal-delays-winter-storm-fern/810486
+  parallel    27s | read supplychaindive.com
+  parallel    27s | read dailymemphian.com
+  parallel    27s | 63 sources considered, 2 read
+  parallel    37s | read tennessean.com
+  parallel    37s | 85 sources considered, 3 read
+  parallel    61s | run completed
+latency 61.2 run trun_0525cf6e1b84453e890048c588200236
+POLICY PASS {
+ "disruption": true,
+ "confidence": "medium",
+ "independent_sources": [
+  "dailymemphian.com",
+  "supplychaindive.com"
+ ],
+ "summary": "Yes\u2014on January 26, FedEx reported a national service disruption affecting its Memphis hub, with Monday-committed shipments potentially delayed, as reported by the Daily Memphian and Supply Chain Dive."
+}
+ - dailymemphian.com | Memphis airport, FedEx report delays, service interruptions - Memphis 
+ - supplychaindive.com | Winter Storm Fern disrupts FedEx, UPS and Postal Service deliveries | 
+receipt 7648ac96-09bf-4678-aa32-333a61d81cd9
