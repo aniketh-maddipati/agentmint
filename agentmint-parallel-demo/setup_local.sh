@@ -7,11 +7,20 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c "import anthropic, mcp" 2>/dev/null; then
-  echo "Creating .venv and installing dependencies…"
-  [ -x .venv/bin/python ] || python3 -m venv .venv
+# The agent needs anthropic>=2 and mcp>=2, which need Python 3.10+ (macOS's default python3 is often 3.9).
+PY=""
+for p in python3.13 python3.12 python3.11 python3.10 python3; do
+  if command -v "$p" >/dev/null && "$p" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then PY="$p"; break; fi
+done
+[ -n "$PY" ] || { echo "Python 3.10+ is required. On macOS: brew install python@3.12  (then re-run)"; exit 1; }
+if [ -x .venv/bin/python ] && ! .venv/bin/python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "Existing .venv uses Python < 3.10; recreating it with $PY."; rm -rf .venv
+fi
+if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c "import anthropic, mcp; from mcp import Client; from mcp.server.mcpserver import MCPServer" 2>/dev/null; then
+  echo "Creating .venv ($($PY --version)) and installing dependencies…"
+  [ -x .venv/bin/python ] || "$PY" -m venv .venv
   .venv/bin/python -m pip install --quiet --upgrade pip
-  .venv/bin/python -m pip install --quiet parallel-web stripe anthropic mcp "git+https://github.com/aerf-spec/agentmint-python"
+  .venv/bin/python -m pip install --quiet parallel-web stripe "anthropic>=2" "mcp>=2" "git+https://github.com/aerf-spec/agentmint-python"
 fi
 
 command -v cargo >/dev/null || { echo "Rust is required for mint.run. Install it from https://rustup.rs, then re-run."; exit 1; }

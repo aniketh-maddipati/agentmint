@@ -48,10 +48,14 @@ async def main(message):
         messages = [{"role": "user", "content": message}]
         show("customer:", message)
         for _ in range(6):  # small cap: this task needs 2 tool calls
-            resp = await claude.beta.messages.create(
-                model=MODEL, max_tokens=4000, system=SYSTEM, tools=tools, messages=messages,
-                output_config={"effort": "low"},
-                betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+            args = dict(model=MODEL, max_tokens=4000, system=SYSTEM, tools=tools, messages=messages,
+                        output_config={"effort": "low"})
+            try:
+                resp = await claude.beta.messages.create(**args, betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+            except anthropic.BadRequestError as e:
+                if "fallback" not in str(e).lower():
+                    raise
+                resp = await claude.beta.messages.create(**args)  # account without the fallback beta
             if resp.stop_reason == "refusal":
                 show("agent:", "(request declined by the model)"); return
             messages.append({"role": "assistant", "content": resp.content})
@@ -73,4 +77,11 @@ async def main(message):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else CUSTOMER))
+    try:
+        asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else CUSTOMER))
+    except anthropic.AuthenticationError:
+        sys.exit("AGENT FAILED: ANTHROPIC_API_KEY was rejected. Check the key in .env.")
+    except anthropic.APIStatusError as e:
+        sys.exit(f"AGENT FAILED: Claude API returned {e.status_code}: {e.message}")
+    except anthropic.APIConnectionError:
+        sys.exit("AGENT FAILED: could not reach the Claude API (network).")

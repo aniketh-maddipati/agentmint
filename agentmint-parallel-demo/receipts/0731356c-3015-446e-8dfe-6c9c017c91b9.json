@@ -1,0 +1,96 @@
+{
+  "id": "0731356c-3015-446e-8dfe-6c9c017c91b9",
+  "type": "notarised_evidence",
+  "plan_id": "7c4324af-5bf1-4c73-8897-ec2a81125df5",
+  "agent": "research",
+  "action": "research:carrier_disruption",
+  "in_policy": true,
+  "policy_reason": "matched scope *",
+  "evidence_hash_sha512": "3d507d6b09a5e48bd4424809f120fb09000cc0ae166fef2d4c813629a11c0ad4403ba63231de3cc7e305554907ae1614e029c5f46f93a05f81074dab4d2b810d",
+  "evidence": {
+    "args": [
+      {
+        "carrier": "FedEx",
+        "region": "Memphis, Tennessee",
+        "date": "2026-01-26"
+      }
+    ],
+    "kwargs": {},
+    "result": {
+      "run_id": "trun_0525cf6e1b84453e890048c588200236",
+      "query": "Was there a FedEx delivery disruption in Memphis, Tennessee on or around 2026-01-26? Cite independent sources (different publishers) that document it.",
+      "content": {
+        "disruption": true,
+        "summary": "Yes\u2014on January 26, FedEx reported a national service disruption affecting its Memphis hub, with Monday-committed shipments potentially delayed, as reported by the Daily Memphian and Supply Chain Dive."
+      },
+      "basis": [
+        {
+          "field": "disruption",
+          "reasoning": "The Daily Memphian report is dated January 26, 2026, and says FedEx issued a national disruption impacting its Memphis hub. Supply Chain Dive independently reports that Monday-committed shipments could be delayed and that Memphis was among the affected hubs. Together, these document a delivery disruption in the region on the specified date.",
+          "citations": [
+            {
+              "url": "https://dailymemphian.com/article/59334/memphis-airport-fedex-report-delays-service",
+              "excerpts": [
+                "By [Steve Bohnel](https://dailymemphian.com/authors/1035) , Daily Memphian Updated: January 26, 2026 3:22 PM CT | Published: January 26, 2026 1:04 PM CT <strong>Deicing trucks surround a FedEx plane parked at the Memphis International Airport on Nov. 29, 2022.</strong> (Patrick Lantrip/The Daily Memphian file) **Deicing trucks surround a FedEx plane parked at the Memphis International Airport on Nov. 29, 2022.** (Patrick Lantrip/The Daily Memphian file) FedEx officials said they issued a national service disruption, impacting operations at the Memphis and Indianapolis hubs."
+              ],
+              "title": "Memphis airport, FedEx report delays, service interruptions - Memphis Local, Sports, Business & Food News | Daily Memphian"
+            },
+            {
+              "url": "https://www.supplychaindive.com/news/fedex-ups-postal-delays-winter-storm-fern/810486",
+              "excerpts": [
+                "FedEx [issued a national service disruption](https://www.fedex.com/en-us/service-alerts.html) on Monday, with the carrier warning that shipments with a Monday delivery commitment may be delayed. Although FedEx deployed contingency plans to limit impacts at key hubs in Memphis, Tennessee, and Indianapolis, delays could continue throughout the week, per the service alert."
+              ],
+              "title": "Winter Storm Fern disrupts FedEx, UPS and Postal Service deliveries | Supply Chain Dive"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "summary",
+          "reasoning": "The Daily Memphian and Supply Chain Dive report the January 26 FedEx disruption, the Memphis hub impact, and potential delays to shipments. They are separate publishers, supporting the summary with independent reporting.",
+          "citations": [
+            {
+              "url": "https://dailymemphian.com/article/59334/memphis-airport-fedex-report-delays-service",
+              "excerpts": [
+                "By [Steve Bohnel](https://dailymemphian.com/authors/1035) , Daily Memphian Updated: January 26, 2026 3:22 PM CT | Published: January 26, 2026 1:04 PM CT <strong>Deicing trucks surround a FedEx plane parked at the Memphis International Airport on Nov. 29, 2022.</strong> (Patrick Lantrip/The Daily Memphian file) **Deicing trucks surround a FedEx plane parked at the Memphis International Airport on Nov. 29, 2022.** (Patrick Lantrip/The Daily Memphian file) FedEx officials said they issued a national service disruption, impacting operations at the Memphis and Indianapolis hubs."
+              ],
+              "title": "Memphis airport, FedEx report delays, service interruptions - Memphis Local, Sports, Business & Food News | Daily Memphian"
+            },
+            {
+              "url": "https://www.supplychaindive.com/news/fedex-ups-postal-delays-winter-storm-fern/810486",
+              "excerpts": [
+                "FedEx [issued a national service disruption](https://www.fedex.com/en-us/service-alerts.html) on Monday, with the carrier warning that shipments with a Monday delivery commitment may be delayed. Although FedEx deployed contingency plans to limit impacts at key hubs in Memphis, Tennessee, and Indianapolis, delays could continue throughout the week, per the service alert."
+              ],
+              "title": "Winter Storm Fern disrupts FedEx, UPS and Postal Service deliveries | Supply Chain Dive"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "latency_s": 61.2,
+      "sha256": "cf6ef8a20556defe7902e03aad23e9cd46c4661ff5a1fb88e8425f49805022d3",
+      "replayed_from_receipt": "7648ac96-09bf-4678-aa32-333a61d81cd9"
+    }
+  },
+  "observed_at": "2026-10-23T20:12:21.745869+00:00",
+  "aiuc_controls": [
+    "E015",
+    "D003",
+    "B001"
+  ],
+  "key_id": "a94c88d5c4ba7371",
+  "agent_key_id": "",
+  "policy_hash": "662d5a2c9b2152eca8b42e1d80d9517f6361143c6f4fee7e04f8fff9e4bd8e33",
+  "session_id": "05017217-1d6d-4ada-80d9-27a6a9f5ba8f",
+  "session_trajectory": [
+    {
+      "action": "research:carrier_disruption",
+      "agent": "research",
+      "in_policy": true,
+      "observed_at": "2026-10-23T20:12:21.745869+00:00"
+    }
+  ],
+  "previous_receipt_hash": "5b34a18d6bb19f505d4acc4b768045bc4e67e5780030ae9fc13eed9f10e6c6f8",
+  "plan_signature": "565498583b650cfc0648a0fd43fca65fea26cfa1cb301b0d96ea9a371b604689558912342f0ac186f75ca158993eacccc90454a2f72e10947b63273ab4546900",
+  "signature": "2c1b1ec17fd6b1bf4b51b2b26284faf8aa9c8f5ffb8cab0b8c442c7c7a3fe2d1902a89eaa31d539b44aba7ae6fe864e5fb67919bef395b7f8e6a2dfd5f2d340d"
+}

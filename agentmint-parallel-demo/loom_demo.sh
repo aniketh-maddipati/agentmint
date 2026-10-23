@@ -61,6 +61,10 @@ beat 2 "Order #1042: late because of the snowstorm"
 run "python3 agent.py"
 LOG=$(mktemp); python3 agent.py 2>&1 | tee "$LOG" | stream
 AUTH=$(awk '/^RECEIPTS:/{print $3}' "$LOG" | tail -1)
+if [ -z "$AUTH" ]; then
+  echo; echo "  ${R}${B}The agent run did not finish, so there is nothing to show in beats 3-5.${N}"
+  echo "  ${D}See the error above. Full log: $LOG${N}"; exit 1
+fi
 if grep -q "AUTHORIZED" "$LOG"; then
   cap "Parallel found it, policy passed, mint.run sent it. Stripe holds it for a human: Unknown."
 else
