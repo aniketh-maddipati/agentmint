@@ -1,0 +1,5 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+attempt 1: mint.run: Unknown, Stripe is holding it (human approval required). Mint action a38d3c9c will reconcile
+attempt 2 (retry): mint.run: Unknown, Stripe is holding it (human approval required). Mint action a38d3c9c will reconcile
+refunds on pi_3UTop6RilGVAxTyU1tFb3avc: 0 ($0.00)
+RECEIPTS: 2abba5a5-fca4-418d-bc2e-6fd91b449daf a802b388-c5f5-4737-91ee-ec004bf5e653
